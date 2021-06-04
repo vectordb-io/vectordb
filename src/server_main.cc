@@ -9,6 +9,7 @@
 #include <glog/logging.h>
 #include "status.h"
 #include "config.h"
+#include "server.h"
 
 std::string exe_name;
 
@@ -38,15 +39,22 @@ int main(int argc, char** argv) {
 
     s = vectordb::Config::GetInstance().Load(argc, argv);
     if (s.ok()) {
-        LOG(INFO) << "read config:" << vectordb::Config::GetInstance().DebugString();
+        LOG(INFO) << "read config: \n" << vectordb::Config::GetInstance().ToString();
     } else {
         PrintHelp();
         exit(-1);
     }
 
+    s = vectordb::Server::GetInstance().Init();
+    assert(s.ok());
+
+    s = vectordb::Server::GetInstance().Start();
+    assert(s.ok());
+
     while (true) {
         std::this_thread::sleep_for(std::chrono::seconds(3));
     }
 
+    google::ShutdownGoogleLogging();
     return 0;
 }

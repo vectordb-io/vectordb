@@ -1,3 +1,6 @@
+#include <cstdio>
+#include <string>
+#include "version.h"
 #include "config.h"
 
 namespace vectordb {
@@ -9,10 +12,15 @@ Config::~Config() {
 }
 
 std::string
-Config::DebugString() {
+Config::ToString() const {
     std::string s;
-    s.append("\n[\n");
-    s.append("address: \n");
+    s.append("[\n");
+    s.append("address:");
+    s.append(address_.ToString());
+    s.append("\n");
+    s.append("data_path:");
+    s.append(data_path_);
+    s.append("\n");
     s.append("]\n");
     return s;
 }
@@ -23,25 +31,31 @@ Config::Load(int argc, char **argv) {
     option_index = 0;
     static struct option long_options[] = {
         {"help", no_argument, nullptr, 'h'},
-        {"ping", no_argument, nullptr, 't'},  // t means test
-        {"peers", required_argument, nullptr, 'p'},
-        {"path", required_argument, nullptr, 's'},  // s means storage path
-        {"me", required_argument, nullptr, 'm'},
+        {"version", no_argument, nullptr, 'v'},
+        {"addr", required_argument, nullptr, 'a'},
+        {"data_path", required_argument, nullptr, 'd'},
         {nullptr, 0, nullptr, 0}
     };
 
-    vectordb::HostAndPort me;
-    std::vector<vectordb::HostAndPort> peers;
-    while ((option_value = getopt_long(argc, argv, "hp:m:", long_options, &option_index)) != -1) {
+    while ((option_value = getopt_long(argc, argv, "hva:d:", long_options, &option_index)) != -1) {
         switch (option_value) {
-        case 'm':
+        case 'a': {
+            std::string host;
+            int port;
+            ParseHostPort(std::string(optarg), host, port);
+            address_.set_host(host);
+            address_.set_port(port);
+            break;
+        }
+
+        case 'd':
+            data_path_ = std::string(optarg);
             break;
 
-        case 't':
-            break;
-
-        case 's':
-            storage_path_ = std::string(optarg);
+        case 'v':
+            printf("%s\n", __VECTORDB__VERSION__);
+            fflush(nullptr);
+            exit(0);
             break;
 
         case 'h':
@@ -53,13 +67,11 @@ Config::Load(int argc, char **argv) {
             exit(0);
         }
     }
-
-
     return Status::OK();
 }
 
 void
-Config::ParseHostPort(std::string &hp, std::string &host, int &port) {
+Config::ParseHostPort(const std::string &hp, std::string &host, int &port) {
     char* psave = nullptr;
     const char *d = ":";
     char *p;

@@ -27,6 +27,14 @@ class HostAndPort {
         return std::string(buf);
     }
 
+    void set_host(const std::string &host) {
+        host_ = host;
+    }
+
+    void set_port(int port) {
+        port_ = port;
+    }
+
     std::string host() const {
         return host_;
     }
@@ -51,24 +59,25 @@ class Config {
     Config(const Config&) = delete;
     Config& operator=(const Config&) = delete;
 
-    std::string DebugString();
+    std::string ToString() const;
     Status Load(int argc, char **argv);
 
     const HostAndPort& address() const {
         return address_;
     }
 
-    const std::string& storage_path() const {
-        return storage_path_;
+    const std::string& data_path() const {
+        return data_path_;
     }
 
   private:
     Config();
     ~Config();
-    void ParseHostPort(std::string &hp, std::string &host, int &port);
+
+    void ParseHostPort(const std::string &hp, std::string &host, int &port);
 
     HostAndPort address_;
-    std::string storage_path_;
+    std::string data_path_;
 };
 
 } // namespace vectordb

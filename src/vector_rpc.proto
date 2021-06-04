@@ -2,24 +2,8 @@ syntax = "proto3";
 
 package vector_rpc;
 
-// The VectorDB service definition.
 service VectorDB {
-
-  // Ping
   rpc Ping (PingRequest) returns (PingReply) {}
-
-  // Add vector
-  rpc PutVector (PutVectorRequest) returns (PutVectorReply) {}
-
-  // Get vector
-  rpc GetVector (GetVectorRequest) returns (GetVectorReply) {}
-
-  // Delete vector
-  rpc DeleteVector (DeleteVectorRequest) returns (DeleteVectorReply) {}
-
-  // Get similar vectors
-  rpc GetKNN (GetKNNRequest) returns (GetKNNReply) {}
-
 }
 
 message PingRequest {
@@ -29,55 +13,4 @@ message PingRequest {
 message PingReply {
   string msg = 1;
 }
-
-message GetKNNRequest {
-  string key = 1;
-  repeated double vector = 2;
-  int32 count = 3;
-}
-
-message GetKNNReply {
-  Reply r = 1;
-  repeated Vector vectors = 2;
-}
-
-message DeleteVectorRequest {
-  string key = 1;
-}
-
-message DeleteVectorReply {
-  Reply r = 1;
-}
-
-message GetVectorRequest {
-  string key = 1;
-}
-
-message GetVectorReply {
-  Reply r = 1;
-  Vector v = 2; 
-}
-
-message PutVectorRequest {
-  Vector v = 1;
-}
-
-message PutVectorReply {
-  Reply r = 1;
-}
-
-message Reply {
-  int32 retno = 1;
-  string msg = 2;
-}
-
-message Vector {
-  string key = 1;
-  repeated double vector = 2;
-  repeated string attached_values = 3;
-}
-
-
-
-
 
