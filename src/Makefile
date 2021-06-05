@@ -42,6 +42,7 @@ clean:
 cleanall: clean
 	rm -f vectordb_rpc.pb.*
 	rm -f vectordb_rpc.grpc.pb.*
+	rm -f vectordb_meta.pb.*
 
 
 
