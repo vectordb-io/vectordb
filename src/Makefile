@@ -1,12 +1,12 @@
 CC:=g++
 CFLAGS+=-c -Wall -g -std=c++17
 
-OBJS_SERVER=server_main.o config.o status.o vector_rpc.pb.o vector_rpc.grpc.pb.o server.o util.o grpc_server.o
+OBJS_SERVER=server_main.o config.o status.o vectordb_rpc.pb.o vectordb_rpc.grpc.pb.o node.o util.o grpc_server.o meta.o vengine_annoy.cc coding.o vectordb_meta.pb.o
 INCLUDES_SERVER=-I./
 LIBS_SERVER=-lglog -lprotobuf -lgrpc++ -lgrpc -lpthread -lleveldb
 LFLAGS_SERVER=-L/usr/local/lib
 
-OBJS_CLIENT=client_main.o vector_rpc.pb.o vector_rpc.grpc.pb.o
+OBJS_CLIENT=client_main.o vectordb_rpc.pb.o vectordb_rpc.grpc.pb.o
 INCLUDES_CLIENT=-I./
 LIBS_CLIENT=-lglog -lprotobuf -lgrpc++ -lgrpc -lpthread -lleveldb
 LFLAGS_CLIENT=-L/usr/local/lib
@@ -27,8 +27,9 @@ vectordb_client: $(OBJS_CLIENT)
 
 .PHONY:
 proto:
-	protoc -I. --cpp_out=. vector_rpc.proto
-	protoc -I. --grpc_out=. --plugin=protoc-gen-grpc=`which grpc_cpp_plugin` vector_rpc.proto
+	protoc -I. --cpp_out=. vectordb_rpc.proto
+	protoc -I. --grpc_out=. --plugin=protoc-gen-grpc=`which grpc_cpp_plugin` vectordb_rpc.proto
+	protoc -I. --cpp_out=. vectordb_meta.proto
 
 all:
 	make proto && make cs 
@@ -39,8 +40,8 @@ clean:
 	rm -rf vectordb_client
 
 cleanall: clean
-	rm -f vector_rpc.pb.*
-	rm -f vector_rpc.grpc.pb.*
+	rm -f vectordb_rpc.pb.*
+	rm -f vectordb_rpc.grpc.pb.*
 
 
 

@@ -1,17 +1,17 @@
 #ifndef __VECTORDB_GRPC_SERVER_H__
 #define __VECTORDB_GRPC_SERVER_H__
 
-#include "vector_rpc.grpc.pb.h"
+#include "vectordb_rpc.grpc.pb.h"
 #include <grpcpp/grpcpp.h>
 #include "status.h"
 
 namespace vectordb {
 
-class VectorDBServiceImpl final : public vector_rpc::VectorDB::Service {
+class VectorDBServiceImpl final : public vectordb_rpc::VectorDB::Service {
   public:
     grpc::Status Ping(grpc::ServerContext* context,
-                      const vector_rpc::PingRequest* request,
-                      vector_rpc::PingReply* reply) override;
+                      const vectordb_rpc::PingRequest* request,
+                      vectordb_rpc::PingReply* reply) override;
   private:
 };
 

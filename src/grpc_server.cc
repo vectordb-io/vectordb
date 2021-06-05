@@ -1,15 +1,15 @@
 #include <glog/logging.h>
 #include "config.h"
-#include "server.h"
+#include "node.h"
 #include "grpc_server.h"
 
 namespace vectordb {
 
 grpc::Status
 VectorDBServiceImpl::Ping(grpc::ServerContext* context,
-                          const vector_rpc::PingRequest* request,
-                          vector_rpc::PingReply* reply) {
-    auto s = Server::GetInstance().OnPing(request, reply);
+                          const vectordb_rpc::PingRequest* request,
+                          vectordb_rpc::PingReply* reply) {
+    auto s = Node::GetInstance().OnPing(request, reply);
     assert(s.ok());
 
     return grpc::Status::OK;

@@ -9,7 +9,7 @@
 #include <glog/logging.h>
 #include "status.h"
 #include "config.h"
-#include "server.h"
+#include "node.h"
 
 std::string exe_name;
 
@@ -45,10 +45,10 @@ int main(int argc, char** argv) {
         exit(-1);
     }
 
-    s = vectordb::Server::GetInstance().Init();
+    s = vectordb::Node::GetInstance().Init();
     assert(s.ok());
 
-    s = vectordb::Server::GetInstance().Start();
+    s = vectordb::Node::GetInstance().Start();
     assert(s.ok());
 
     while (true) {

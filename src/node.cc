@@ -1,15 +1,17 @@
-#include "server.h"
+#include "config.h"
+#include "node.h"
 
 namespace vectordb {
 
-Server::Server() {
+Node::Node()
+    :meta_(Config::GetInstance().data_path()+std::string("/meta")) {
 }
 
-Server::~Server() {
+Node::~Node() {
 }
 
 Status
-Server::Init() {
+Node::Init() {
     Status s;
     s = grpc_server_.Init();
     assert(s.ok());
@@ -17,7 +19,7 @@ Server::Init() {
 }
 
 Status
-Server::Start() {
+Node::Start() {
     Status s;
     s = grpc_server_.Start();
     assert(s.ok());
@@ -25,7 +27,7 @@ Server::Start() {
 }
 
 Status
-Server::Stop() {
+Node::Stop() {
     Status s;
     s = grpc_server_.Stop();
     assert(s.ok());
@@ -33,7 +35,7 @@ Server::Stop() {
 }
 
 Status
-Server::OnPing(const vector_rpc::PingRequest* request, vector_rpc::PingReply* reply) {
+Node::OnPing(const vectordb_rpc::PingRequest* request, vectordb_rpc::PingReply* reply) {
     if (request->msg() == "ping") {
         reply->set_msg("pang");
     } else {

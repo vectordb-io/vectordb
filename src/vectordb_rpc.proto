@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package vector_rpc;
+package vectordb_rpc;
 
 service VectorDB {
   rpc Ping (PingRequest) returns (PingReply) {}
