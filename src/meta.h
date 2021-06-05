@@ -11,6 +11,8 @@
 
 namespace vectordb {
 
+#define META_PERSIST_KEY_TABLES "META_PERSIST_KEY_TABLES"
+
 enum EngineType {
     kVEngineAnnoy = 0,
     kVEngineFaiss = 1,
@@ -195,6 +197,9 @@ class Partition {
 
 class Table {
   public:
+    Table() {
+    }
+
     Table(const std::string& name,
           int partition_num,
           int replica_num,
@@ -207,6 +212,8 @@ class Table {
          path_(path) {
         AddPartitions();
     }
+
+    Table(const Table&) = default;
 
     void Init(const std::string& name,
               int partition_num,

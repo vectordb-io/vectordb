@@ -31,3 +31,6 @@ message Table {
   repeated Partition partitions = 6;
 }
 
+message TableNames {
+  repeated string table_names = 1;
+}

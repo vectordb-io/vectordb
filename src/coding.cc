@@ -138,5 +138,28 @@ Str2Table(const std::string &s, Table &table) {
     return ret;
 }
 
+bool
+Str2TableNames(const std::string &s, std::vector<std::string> &table_names) {
+    vectordb_meta::TableNames pb;
+    bool ret = pb.ParseFromString(s);
+    if (ret) {
+        for (int i = 0; i < pb.table_names_size(); i++) {
+            const std::string &table_name = pb.table_names(i);
+            table_names.push_back(table_name);
+        }
+    }
+    return ret;
+}
+
+void
+TableNames2Str(const std::vector<std::string> &table_names, std::string &s) {
+    vectordb_meta::TableNames pb;
+    for (auto &name : table_names) {
+        std::string *s = pb.add_table_names();
+        *s = name;
+    }
+    bool ret = pb.SerializeToString(&s);
+    assert(ret);
+}
 
 }  // namespace vectordb

@@ -70,6 +70,14 @@ class Config {
         return data_path_;
     }
 
+    const std::string meta_path() const {
+        return data_path_ + "/meta";
+    }
+
+    const std::string engine_path() const {
+        return data_path_ + "/data";
+    }
+
   private:
     Config();
     ~Config();

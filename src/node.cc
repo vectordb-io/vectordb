@@ -1,10 +1,11 @@
+#include "util.h"
 #include "config.h"
 #include "node.h"
 
 namespace vectordb {
 
 Node::Node()
-    :meta_(Config::GetInstance().data_path()+std::string("/meta")) {
+    :meta_(Config::GetInstance().meta_path()) {
 }
 
 Node::~Node() {
@@ -13,6 +14,12 @@ Node::~Node() {
 Status
 Node::Init() {
     Status s;
+    if (!DirOK(Config::GetInstance().data_path())) {
+        Mkdir(Config::GetInstance().data_path());
+    }
+
+    s = meta_.Init();
+    assert(s.ok());
     s = grpc_server_.Init();
     assert(s.ok());
     return Status::OK();

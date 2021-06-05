@@ -1,3 +1,6 @@
+#include <glog/logging.h>
+#include "util.h"
+#include "coding.h"
 #include "meta.h"
 
 namespace vectordb {
@@ -8,16 +11,70 @@ Meta::Meta(const std::string &path)
 
 Status
 Meta::Load() {
+    bool b;
+    leveldb::Status s;
+    std::string value;
+    std::vector<std::string> table_names;
+
+    s = db_->Get(leveldb::ReadOptions(), META_PERSIST_KEY_TABLES, &value);
+    if (s.IsNotFound()) {
+        return Status::OK();
+    }
+    assert(s.ok());
+
+    b = Str2TableNames(value, table_names);
+    assert(b);
+
+    for (auto &table_name : table_names) {
+        s = db_->Get(leveldb::ReadOptions(), table_name, &value);
+        assert(s.ok());
+
+        Table table;
+        b = Str2Table(value, table);
+        assert(b);
+
+        tables_.insert(std::pair<std::string, std::shared_ptr<Table>>
+                       (table_name, std::make_shared<Table>(table)));
+    }
     return Status::OK();
 }
 
 Status
 Meta::Persist() {
+    std::vector<std::string> table_names;
+    for (auto &t : tables_) {
+        table_names.push_back(t.first);
+    }
+
+    leveldb::Status s;
+    leveldb::WriteOptions write_options;
+    write_options.sync = true;
+    std::string v;
+
+    TableNames2Str(table_names, v);
+    s = db_->Put(write_options, META_PERSIST_KEY_TABLES, v);
+    assert(s.ok());
+
+    for (auto &t : tables_) {
+        std::string key = t.first;
+        std::string value;
+        Table &table = *(t.second);
+        Table2Str(table, value);
+        s = db_->Put(write_options, META_PERSIST_KEY_TABLES, v);
+        assert(s.ok());
+    }
+
     return Status::OK();
 }
 
 Status
 Meta::Init() {
+    leveldb::Options options;
+    options.create_if_missing = true;
+    leveldb::Status status = leveldb::DB::Open(options, path_, &db_);
+    assert(status.ok());
+    auto s = Load();
+    assert(s.ok());
     return Status::OK();
 }
 
