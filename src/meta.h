@@ -8,6 +8,7 @@
 #include <leveldb/db.h>
 #include "status.h"
 #include "config.h"
+#include "util.h"
 
 namespace vectordb {
 
@@ -18,6 +19,8 @@ enum EngineType {
     kVEngineFaiss = 1,
     kGEngineEasyGraph = 10,
 };
+
+std::string EngineTypeToString(EngineType e);
 
 class Replica {
   public:
@@ -87,6 +90,41 @@ class Replica {
     const std::string&
     path() const {
         return path_;
+    }
+
+    const std::string
+    ToStringShort() const {
+        char buf[256];
+        std::string s;
+        s.append("replica:{");
+        snprintf(buf, sizeof(buf), "name:%s", name_.c_str());
+        s.append(buf);
+        s.append("}");
+        return s;
+    }
+
+    const std::string
+    ToString() const {
+        char buf[256];
+        std::string s;
+
+        s.append("replica:{");
+        snprintf(buf, sizeof(buf), "id:%d, ", id_);
+        s.append(buf);
+        snprintf(buf, sizeof(buf), "name:%s, ", name_.c_str());
+        s.append(buf);
+        snprintf(buf, sizeof(buf), "table_name:%s, ", table_name_.c_str());
+        s.append(buf);
+        snprintf(buf, sizeof(buf), "partition_name:%s, ", partition_name_.c_str());
+        s.append(buf);
+        snprintf(buf, sizeof(buf), "engine_type:%s, ", EngineTypeToString(engine_type_).c_str());
+        s.append(buf);
+        snprintf(buf, sizeof(buf), "address:%s, ", address_.c_str());
+        s.append(buf);
+        snprintf(buf, sizeof(buf), "path:%s", path_.c_str());
+        s.append(buf);
+        s.append("}");
+        return s;
     }
 
   private:
@@ -170,6 +208,55 @@ class Partition {
         assert(it == replicas_.end());
         auto replica_sp = std::make_shared<Replica>(r);
         replicas_.insert(std::pair<std::string, std::shared_ptr<Replica>>(replica_sp->name(), replica_sp));
+    }
+
+    const std::string
+    ToStringShort() const {
+        char buf[256];
+        std::string s;
+        s.append("partition:{");
+        snprintf(buf, sizeof(buf), "name:%s, ", name_.c_str());
+        s.append(buf);
+        s.append("replicas:{");
+        for (auto &r : replicas_) {
+            s.append((r.second)->ToStringShort());
+            s.append(", ");
+        }
+        s.pop_back();
+        s.pop_back();
+        s.append("}");
+        s.append("}");
+        return s;
+    }
+
+    const std::string
+    ToString() const {
+        char buf[256];
+        std::string s;
+
+        s.append("partition:{");
+        snprintf(buf, sizeof(buf), "id:%d, ", id_);
+        s.append(buf);
+        snprintf(buf, sizeof(buf), "name:%s, ", name_.c_str());
+        s.append(buf);
+        snprintf(buf, sizeof(buf), "table_name:%s, ", table_name_.c_str());
+        s.append(buf);
+        snprintf(buf, sizeof(buf), "replica_num:%d, ", replica_num_);
+        s.append(buf);
+        snprintf(buf, sizeof(buf), "engine_type:%s, ", EngineTypeToString(engine_type_).c_str());
+        s.append(buf);
+        snprintf(buf, sizeof(buf), "path:%s, ", path_.c_str());
+        s.append(buf);
+        s.append("replicas:{");
+        for (auto &r : replicas_) {
+            s.append((r.second)->ToString());
+            s.append(", ");
+        }
+        s.pop_back();
+        s.pop_back();
+        s.append("}");
+        s.append("}");
+        return s;
     }
 
   private:
@@ -261,6 +348,53 @@ class Table {
         partitions_.insert(std::pair<std::string, std::shared_ptr<Partition>>(partition_sp->name(), partition_sp));
     }
 
+    const std::string
+    ToStringShort() const {
+        char buf[256];
+        std::string s;
+        s.append("table:{");
+        snprintf(buf, sizeof(buf), "name:%s, ", name_.c_str());
+        s.append(buf);
+        s.append("partitions:{");
+        for (auto &p : partitions_) {
+            s.append((p.second)->ToStringShort());
+            s.append(", ");
+        }
+        s.pop_back();
+        s.pop_back();
+        s.append("}");
+        s.append("}");
+        return s;
+    }
+
+    const std::string
+    ToString() const {
+        char buf[256];
+        std::string s;
+
+        s.append("table:{");
+        snprintf(buf, sizeof(buf), "name:%s, ", name_.c_str());
+        s.append(buf);
+        snprintf(buf, sizeof(buf), "partition_num:%d, ", partition_num_);
+        s.append(buf);
+        snprintf(buf, sizeof(buf), "replica_num:%d, ", replica_num_);
+        s.append(buf);
+        snprintf(buf, sizeof(buf), "engine_type:%s, ", EngineTypeToString(engine_type_).c_str());
+        s.append(buf);
+        snprintf(buf, sizeof(buf), "path:%s, ", path_.c_str());
+        s.append(buf);
+        s.append("partitions:{");
+        for (auto &p : partitions_) {
+            s.append((p.second)->ToString());
+            s.append(", ");
+        }
+        s.pop_back();
+        s.pop_back();
+        s.append("}");
+        s.append("}");
+        return s;
+    }
+
   private:
     void AddPartitions() {
         assert(partition_num_ > 0);
@@ -306,6 +440,36 @@ class Meta {
     Status ReplicaName(const std::string &table_name,
                        const std::string &key,
                        std::string &replica_name) const;
+
+    const std::string
+    ToString() const {
+        std::string s;
+        s.append("meta:{\n");
+        for (auto &t : tables_) {
+            s.append((t.second)->ToString());
+            s.append("\n");
+        }
+        s.append("}\n");
+        return s;
+    }
+
+    const std::string
+    ToStringShort() const {
+        std::string s;
+        s.append("meta:{\n");
+        for (auto &t : tables_) {
+            s.append(t.first);
+            s.append(":\n");
+            for (auto &p : (t.second)->partitions()) {
+                for (auto &r : (p.second)->replicas()) {
+                    s.append((r.second)->ToStringShort());
+                    s.append("\n");
+                }
+            }
+        }
+        s.append("}\n");
+        return s;
+    }
 
   private:
     std::map<std::string, std::shared_ptr<Table>> tables_;

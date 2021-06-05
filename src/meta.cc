@@ -5,6 +5,21 @@
 
 namespace vectordb {
 
+std::string
+EngineTypeToString(EngineType e) {
+    if (e == kVEngineAnnoy) {
+        return "kVEngineAnnoy";
+
+    } else if (e == kVEngineFaiss) {
+        return "kVEngineFaiss";
+
+    } else if (e == kGEngineEasyGraph) {
+        return "kGEngineEasyGraph";
+
+    }
+    return "unknown engine";
+}
+
 Meta::Meta(const std::string &path)
     :path_(path) {
 }
@@ -26,6 +41,7 @@ Meta::Load() {
     assert(b);
 
     for (auto &table_name : table_names) {
+        LOG(INFO) << "loading meta... table:" << table_name;
         s = db_->Get(leveldb::ReadOptions(), table_name, &value);
         assert(s.ok());
 
@@ -36,6 +52,9 @@ Meta::Load() {
         tables_.insert(std::pair<std::string, std::shared_ptr<Table>>
                        (table_name, std::make_shared<Table>(table)));
     }
+
+    LOG(INFO) << "meta load: " << ToStringShort();
+
     return Status::OK();
 }
 
@@ -60,7 +79,7 @@ Meta::Persist() {
         std::string value;
         Table &table = *(t.second);
         Table2Str(table, value);
-        s = db_->Put(write_options, META_PERSIST_KEY_TABLES, v);
+        s = db_->Put(write_options, key, value);
         assert(s.ok());
     }
 
