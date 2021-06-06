@@ -4,6 +4,7 @@
 #include "meta.h"
 #include "status.h"
 #include "vengine.h"
+#include "engine_manager.h"
 #include "grpc_server.h"
 
 namespace vectordb {
@@ -25,8 +26,12 @@ class Node {
 
     Status OnPing(const vectordb_rpc::PingRequest* request, vectordb_rpc::PingReply* reply);
 
-    const GrpcServer* grpc_server() const {
-        return &grpc_server_;
+    GrpcServer& grpc_server() {
+        return grpc_server_;
+    }
+
+    EngineManager& engine_manager() {
+        return engine_manager_;
     }
 
   private:
@@ -34,7 +39,7 @@ class Node {
     ~Node();
 
     Meta meta_;
-    VEngine *vengine_;
+    EngineManager engine_manager_;
     GrpcServer grpc_server_;
 };
 
