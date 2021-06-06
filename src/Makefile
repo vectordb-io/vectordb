@@ -6,12 +6,12 @@ INCLUDES_SERVER=-I./
 LIBS_SERVER=-lglog -lprotobuf -lgrpc++ -lgrpc -lpthread -lleveldb
 LFLAGS_SERVER=-L/usr/local/lib
 
-OBJS_CLIENT=client_main.o vectordb_rpc.pb.o vectordb_rpc.grpc.pb.o
+OBJS_CLIENT=client_main.o vectordb_rpc.pb.o vectordb_rpc.grpc.pb.o vclient.o cli_config.o status.o util.o
 INCLUDES_CLIENT=-I./
 LIBS_CLIENT=-lglog -lprotobuf -lgrpc++ -lgrpc -lpthread -lleveldb
 LFLAGS_CLIENT=-L/usr/local/lib
 
-cs: vectordb_server vectordb_client
+cs: vectordb_server vectordb_cli
 	@echo ""
 	@echo "success, go go go!"
 	@echo ""
@@ -19,7 +19,7 @@ cs: vectordb_server vectordb_client
 vectordb_server: $(OBJS_SERVER)
 	$(CC) $^ -o $@ $(LIBS_SERVER) $(LFLAGS_SERVER)
 
-vectordb_client: $(OBJS_CLIENT)
+vectordb_cli: $(OBJS_CLIENT)
 	$(CC) $^ -o $@ $(LIBS_CLIENT) $(LFLAGS_CLIENT)
 
 %.o: %.cc %.h
@@ -37,7 +37,7 @@ all:
 clean:
 	rm -rf *.o 
 	rm -rf vectordb_server
-	rm -rf vectordb_client
+	rm -rf vectordb_cli
 
 cleanall: clean
 	rm -f vectordb_rpc.pb.*
