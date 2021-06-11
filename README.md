@@ -6,6 +6,9 @@
 ## What is VectorDB?
 
 Vectordb is an open-source distributed database used in AI service. It supports the operations on KV, vector and graph, which can help the developers to build their AI service easily and quickly.
+<br>
+<br>
+More details at [vectordb.io](http://vectordb.io)
 
 ## Quick start
 
