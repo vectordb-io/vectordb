@@ -35,6 +35,10 @@ class Node {
         return engine_manager_;
     }
 
+    Meta& meta() {
+        return meta_;
+    }
+
   private:
     Node();
     ~Node();

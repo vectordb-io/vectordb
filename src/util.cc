@@ -10,6 +10,8 @@
 
 namespace vectordb {
 
+namespace util {
+
 bool
 DirOK(const std::string &path) {
     DIR* dir = opendir(path.c_str());
@@ -26,5 +28,13 @@ Mkdir(const std::string &path) {
     int ret = mkdir(path.c_str(), 0775);
     assert(ret == 0);
 }
+
+void
+ToLower(std::string &str) {
+    for (size_t i = 0; i < str.size(); i++)
+        str[i] = tolower(str[i]);
+}
+
+} // namespace util
 
 }  // namespace vectordb

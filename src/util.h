@@ -6,10 +6,13 @@
 
 namespace vectordb {
 
+namespace util {
+
+void ToLower(std::string &str);
 bool DirOK(const std::string &path);
 void Mkdir(const std::string &path);
 
-
+} // namespace util
 
 }  // namespace vectordb
 

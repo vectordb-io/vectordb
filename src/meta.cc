@@ -7,17 +7,34 @@ namespace vectordb {
 
 std::string
 EngineTypeToString(EngineType e) {
-    if (e == kVEngineAnnoy) {
-        return "kVEngineAnnoy";
+    if (e == kKVEngine) {
+        return "kKVEngine";
 
-    } else if (e == kVEngineFaiss) {
-        return "kVEngineFaiss";
+    } else if (e == kVectorEngine) {
+        return "kVectorEngine";
 
-    } else if (e == kGEngineEasyGraph) {
-        return "kGEngineEasyGraph";
+    } else if (e == kGraphEngine) {
+        return "kGraphEngine";
 
     }
-    return "unknown engine";
+    return "error engine";
+}
+
+EngineType StringToEngineType(const std::string &s) {
+    std::string engine_type = s;
+    util::ToLower(engine_type);
+    if (s == "kv") {
+        return kKVEngine;
+
+    } else if (s == "vector") {
+        return kVectorEngine;
+
+    } else if (s == "graph") {
+        return kGraphEngine;
+
+    } else {
+        return kErrorEngine;
+    }
 }
 
 Meta::Meta(const std::string &path)

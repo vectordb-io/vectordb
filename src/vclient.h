@@ -32,7 +32,10 @@ class VClient {
     void ShowReply(const std::string &s) const;
     void Do(const std::vector<std::string> &cmd_sv, const std::string &params_json);
 
-    void Ping(std::string &reply_msg);
+    void Ping(const vectordb_rpc::PingRequest &request, std::string &reply_msg);
+    void CreateTable(const vectordb_rpc::CreateTableRequest &request, std::string &reply_msg);
+    void ShowTables(const vectordb_rpc::ShowTablesRequest &request, std::string &reply_msg);
+
     void Info(std::string &reply_msg);
 
     std::shared_ptr<grpc::Channel> channel_;

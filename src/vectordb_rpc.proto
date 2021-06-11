@@ -5,6 +5,8 @@ package vectordb_rpc;
 service VectorDB {
   rpc Ping (PingRequest) returns (PingReply) {}
   rpc Info (InfoRequest) returns (InfoReply) {}
+  rpc CreateTable (CreateTableRequest) returns (CreateTableReply) {}
+  rpc ShowTables (ShowTablesRequest) returns (ShowTablesReply) {}
 }
 
 message PingRequest {
@@ -13,6 +15,26 @@ message PingRequest {
 
 message PingReply {
   string msg = 1;
+}
+
+message CreateTableRequest {
+  string table_name = 1;
+  int32 partition_num = 2;
+  int32 replica_num = 3;
+  string engine_type = 4;
+  int32 dim = 5;
+}
+
+message CreateTableReply {
+  int32 code = 1;
+  string msg = 2;
+}
+
+message ShowTablesRequest {
+}
+
+message ShowTablesReply {
+  repeated string tables = 1;
 }
 
 message InfoRequest {

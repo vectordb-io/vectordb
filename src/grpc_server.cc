@@ -23,6 +23,52 @@ VectorDBServiceImpl::Info(grpc::ServerContext* context,
     return grpc::Status::OK;
 }
 
+grpc::Status
+VectorDBServiceImpl::CreateTable(grpc::ServerContext* context,
+                                 const vectordb_rpc::CreateTableRequest* request,
+                                 vectordb_rpc::CreateTableReply* reply) {
+
+    std::string table_path = Config::GetInstance().engine_path();
+    table_path.append("/").append(request->table_name());
+    EngineType et = StringToEngineType(request->engine_type());
+
+    reply->set_code(1);
+    reply->set_msg("create table error");
+
+    auto s = Node::GetInstance().meta().AddTable(
+                 request->table_name(),
+                 request->partition_num(),
+                 request->replica_num(),
+                 et,
+                 table_path);
+    if (s.ok()) {
+        Node::GetInstance().meta().Persist();
+        reply->set_code(0);
+        reply->set_msg("create table ok");
+    }
+
+    if (et == kVectorEngine) {
+        // creaete vector db
+    }
+
+    return grpc::Status::OK;
+}
+
+
+grpc::Status
+VectorDBServiceImpl::ShowTables(grpc::ServerContext* context,
+                                const vectordb_rpc::ShowTablesRequest* request,
+                                vectordb_rpc::ShowTablesReply* reply) {
+
+    std::vector<std::string> tables;
+    Node::GetInstance().meta().table_names(tables);
+    for (auto &t : tables) {
+        std::string *s = reply->add_tables();
+        *s = t;
+    }
+    return grpc::Status::OK;
+}
+
 GrpcServer::GrpcServer() {
 }
 

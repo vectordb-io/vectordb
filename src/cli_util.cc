@@ -5,6 +5,7 @@
 #include <string>
 #include <sstream>
 #include <iostream>
+#include "jsonxx/json.hpp"
 #include "cli_util.h"
 
 namespace vectordb {
@@ -31,7 +32,7 @@ HelpStr() {
     s.append("create table {\"table_name\":\"vector_table\", \"engine_type\":\"vector\", \"dim\":100, \"partition_num\":1, \"replica_num\":1}").append("\n");
     s.append("put {\"table_name\":\"vector_table\", \"key\":\"kkk\", \"vector\":[1.13, 2.25, 3.73, 4.99], \"attach_value1\":\"attach_value1\", \"attach_value2\":\"attach_value2\", \"attach_value3\":\"attach_value3\"}").append("\n");
     s.append("build index {\"table_name\":\"vector_table\", \"index_type\":\"annoy\"}").append("\n");
-    s.append("build index {\"table_name\":\"vector_table\", \"index_type\":\"complete_graph\"}").append("\n");
+    s.append("build index {\"table_name\":\"vector_table\", \"index_type\":\"knn_graph\", \"k\":0}").append("\n");
     s.append("get {\"table_name\":\"vector_table\", \"key\":\"kkk\"}").append("\n");
     s.append("getknn {\"table_name\":\"vector_table\", \"key\":\"kkk\", \"limit\":20}").append("\n");
     s.append("distance key {\"table_name\":\"vector_table\", \"key1\":\"xxx\", \"key2\":\"ooo\"}").append("\n");
@@ -47,14 +48,32 @@ HelpStr() {
     return s;
 }
 
-void ToLower(std::string &str) {
+void
+ToLower(std::string &str) {
     for (size_t i = 0; i < str.size(); i++)
         str[i] = tolower(str[i]);
 }
 
 std::string
-ToString(const vectordb_rpc::PingReply &msg) {
-    return msg.msg();
+ToString(const vectordb_rpc::PingReply &reply) {
+    return reply.msg();
+}
+
+std::string
+ToString(const vectordb_rpc::CreateTableReply &reply) {
+    jsonxx::json j;
+    j["code"] = reply.code();
+    j["msg"] = reply.msg();
+    return j.dump(4, ' ');
+}
+
+std::string
+ToString(const vectordb_rpc::ShowTablesReply &reply) {
+    std::string s;
+    for (int i = 0; i < reply.tables_size(); ++i) {
+        s.append(reply.tables(i)).append("\n");
+    }
+    return s;
 }
 
 void

@@ -15,8 +15,8 @@ Node::~Node() {
 Status
 Node::Init() {
     Status s;
-    if (!DirOK(Config::GetInstance().data_path())) {
-        Mkdir(Config::GetInstance().data_path());
+    if (!util::DirOK(Config::GetInstance().data_path())) {
+        util::Mkdir(Config::GetInstance().data_path());
     }
 
     s = meta_.Init();

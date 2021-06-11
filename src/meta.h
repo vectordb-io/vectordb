@@ -15,12 +15,15 @@ namespace vectordb {
 #define META_PERSIST_KEY_TABLES "META_PERSIST_KEY_TABLES"
 
 enum EngineType {
-    kVEngineAnnoy = 0,
-    kVEngineFaiss = 1,
-    kGEngineEasyGraph = 10,
+    kKVEngine = 0,
+    kVectorEngine = 10,
+    kGraphEngine = 20,
+    kErrorEngine = 100,
 };
 
 std::string EngineTypeToString(EngineType e);
+EngineType StringToEngineType(const std::string &s);
+
 
 class Replica {
   public:
@@ -565,6 +568,13 @@ class Meta {
         s.pop_back();
         s.append("}\n");
         return s;
+    }
+
+    void
+    table_names(std::vector<std::string> &sv) const {
+        for (auto &t : tables_) {
+            sv.push_back(t.second->name());
+        }
     }
 
   private:

@@ -44,27 +44,40 @@ VClient::Do(const std::vector<std::string> &cmd_sv, const std::string &params_js
         return;
 
     } else if (cmd_sv.size() == 2 && cmd_sv[0] == "create" && cmd_sv[1] == "table") {
-        std::cout << "cmd: create table" << std::endl;
         try {
             auto j = jsonxx::json::parse(params_json);
             std::string table_name = j["table_name"].as_string();
+            int partition_num = j["partition_num"].as_integer();
+            int replica_num = j["replica_num"].as_integer();
             std::string engine_type = j["engine_type"].as_string();
-            int dim = j["dim"].as_integer();
-
-            std::cout << "table_name:" << table_name << std::endl;
-            std::cout << "engine_type:" << engine_type << std::endl;
-            std::cout << "dim:" << dim << std::endl;
+            if (engine_type == "vector") {
+                int dim = j["dim"].as_integer();
+                vectordb_rpc::CreateTableRequest request;
+                request.set_table_name(table_name);
+                request.set_partition_num(partition_num);
+                request.set_replica_num(replica_num);
+                request.set_engine_type(engine_type);
+                request.set_dim(dim);
+                CreateTable(request, reply);
+            }
+            //std::cout << "table_name:" << table_name << std::endl;
+            //std::cout << "engine_type:" << engine_type << std::endl;
+            //std::cout << "dim:" << dim << std::endl;
 
         } catch (std::exception &e) {
             std::cout << e.what() << std::endl;
         }
 
     } else if (cmd_sv.size() == 2 && cmd_sv[0] == "show" && cmd_sv[1] == "tables") {
+        vectordb_rpc::ShowTablesRequest request;
+        ShowTables(request, reply);
 
     } else if (cmd_sv.size() == 2 && cmd_sv[0] == "describe") {
 
     } else if (cmd_sv.size() == 1 && cmd_sv[0] == "ping") {
-        Ping(reply);
+        vectordb_rpc::PingRequest request;
+        request.set_msg("ping");
+        Ping(request, reply);
 
     } else if (cmd_sv.size() == 1 && cmd_sv[0] == "exit") {
         exit(0);
@@ -128,45 +141,6 @@ VClient::Do(const std::vector<std::string> &cmd_sv, const std::string &params_js
 
 }
 
-/*
-void
-VClient::Do(std::vector<std::string> &argv) {
-    if (argv.size() == 0) {
-        return;
-    }
-
-    Status s;
-    std::string reply;
-    std::string command = argv[0];
-    cli_util::ToLower(command);
-
-    if ("exit" == command || "quit" == command) {
-        exit(0);
-    }
-
-    if ("ping" == command) {
-        s = Ping(reply);
-        assert(s.ok());
-
-    } else if("help" == command) {
-        reply = cli_util::HelpStr();
-
-    } else if("info" == command) {
-        s = Info(reply);
-        assert(s.ok());
-
-    } else if("version" == command) {
-        reply = __VECTORDB__VERSION__;
-
-    } else {
-        reply = "unknown command: ";
-        reply.append(command);
-    }
-
-    ShowReply(reply);
-}
-*/
-
 Status
 VClient::Stop() {
     return Status::OK();
@@ -185,9 +159,31 @@ VClient::Prompt() const {
 }
 
 void
-VClient::Ping(std::string &reply_msg) {
-    vectordb_rpc::PingRequest request;
-    request.set_msg("ping");
+VClient::ShowTables(const vectordb_rpc::ShowTablesRequest &request, std::string &reply_msg) {
+    vectordb_rpc::ShowTablesReply reply;
+    grpc::ClientContext context;
+    grpc::Status status = stub_->ShowTables(&context, request, &reply);
+    if (status.ok()) {
+        reply_msg = cli_util::ToString(reply);
+    } else {
+        reply_msg = status.error_message();
+    }
+}
+
+void
+VClient::CreateTable(const vectordb_rpc::CreateTableRequest &request, std::string &reply_msg) {
+    vectordb_rpc::CreateTableReply reply;
+    grpc::ClientContext context;
+    grpc::Status status = stub_->CreateTable(&context, request, &reply);
+    if (status.ok()) {
+        reply_msg = cli_util::ToString(reply);
+    } else {
+        reply_msg = status.error_message();
+    }
+}
+
+void
+VClient::Ping(const vectordb_rpc::PingRequest &request, std::string &reply_msg) {
     vectordb_rpc::PingReply reply;
     grpc::ClientContext context;
     grpc::Status status = stub_->Ping(&context, request, &reply);
