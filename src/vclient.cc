@@ -1,6 +1,7 @@
-#include "util.h"
+#include "cli_util.h"
 #include "cli_config.h"
 #include "vclient.h"
+#include "version.h"
 
 namespace vectordb {
 
@@ -45,6 +46,8 @@ VClient::Do(std::vector<std::string> &argv) {
         return;
     }
 
+    Status s;
+    std::string reply;
     std::string command = argv[0];
     ToLower(command);
 
@@ -53,12 +56,25 @@ VClient::Do(std::vector<std::string> &argv) {
     }
 
     if ("ping" == command) {
-        std::string reply = Ping();
-        ShowReply(reply);
+        s = Ping(reply);
+        assert(s.ok());
+
+    } else if("help" == command) {
+        reply = HelpStr();
+
+    } else if("info" == command) {
+        s = Info(reply);
+        assert(s.ok());
+
+    } else if("version" == command) {
+        reply = __VECTORDB__VERSION__;
+
     } else {
-        printf("unknown command [%s] \n", command.c_str());
+        reply = "unknown command: ";
+        reply.append(command);
     }
 
+    ShowReply(reply);
 }
 
 Status
@@ -78,19 +94,33 @@ VClient::Prompt() const {
     fflush(nullptr);
 }
 
-std::string
-VClient::Ping() {
+Status
+VClient::Ping(std::string &reply_msg) {
     vectordb_rpc::PingRequest request;
     request.set_msg("ping");
     vectordb_rpc::PingReply reply;
     grpc::ClientContext context;
     grpc::Status status = stub_->Ping(&context, request, &reply);
     if (status.ok()) {
-        return reply.msg();
+        reply_msg = ToString(reply);
     } else {
-        LOG(ERROR) << status.error_code() << ": " << status.error_message();
-        return "RPC failed";
+        reply_msg = status.error_message();
     }
+    return Status::OK();
+}
+
+Status
+VClient::Info(std::string &reply_msg) {
+    vectordb_rpc::InfoRequest request;
+    vectordb_rpc::InfoReply reply;
+    grpc::ClientContext context;
+    grpc::Status status = stub_->Info(&context, request, &reply);
+    if (status.ok()) {
+        reply_msg = reply.msg();
+    } else {
+        reply_msg = status.error_message();
+    }
+    return Status::OK();
 }
 
 }  // namespace vectordb

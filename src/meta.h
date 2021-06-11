@@ -127,6 +127,30 @@ class Replica {
         return s;
     }
 
+    const std::string
+    ToStringInfo() const {
+        char buf[256];
+        std::string s;
+
+        s.append("replica:{\n");
+        snprintf(buf, sizeof(buf), "id:%d \n", id_);
+        s.append(buf);
+        snprintf(buf, sizeof(buf), "name:%s \n", name_.c_str());
+        s.append(buf);
+        snprintf(buf, sizeof(buf), "table_name:%s \n", table_name_.c_str());
+        s.append(buf);
+        snprintf(buf, sizeof(buf), "partition_name:%s \n", partition_name_.c_str());
+        s.append(buf);
+        snprintf(buf, sizeof(buf), "engine_type:%s \n", EngineTypeToString(engine_type_).c_str());
+        s.append(buf);
+        snprintf(buf, sizeof(buf), "address:%s \n", address_.c_str());
+        s.append(buf);
+        snprintf(buf, sizeof(buf), "path:%s \n", path_.c_str());
+        s.append(buf);
+        s.append("}\n");
+        return s;
+    }
+
   private:
     int id_;
     std::string name_;
@@ -256,6 +280,36 @@ class Partition {
         s.pop_back();
         s.append("}");
         s.append("}");
+        return s;
+    }
+
+    const std::string
+    ToStringInfo() const {
+        char buf[256];
+        std::string s;
+
+        s.append("partition:{\n");
+        snprintf(buf, sizeof(buf), "id:%d \n", id_);
+        s.append(buf);
+        snprintf(buf, sizeof(buf), "name:%s \n", name_.c_str());
+        s.append(buf);
+        snprintf(buf, sizeof(buf), "table_name:%s \n", table_name_.c_str());
+        s.append(buf);
+        snprintf(buf, sizeof(buf), "replica_num:%d \n", replica_num_);
+        s.append(buf);
+        snprintf(buf, sizeof(buf), "engine_type:%s \n", EngineTypeToString(engine_type_).c_str());
+        s.append(buf);
+        snprintf(buf, sizeof(buf), "path:%s \n", path_.c_str());
+        s.append(buf);
+        s.append("replicas:{");
+        for (auto &r : replicas_) {
+            s.append((r.second)->name());
+            s.append(", ");
+        }
+        s.pop_back();
+        s.pop_back();
+        s.append("}\n");
+        s.append("}\n");
         return s;
     }
 
@@ -395,6 +449,34 @@ class Table {
         return s;
     }
 
+    const std::string
+    ToStringInfo() const {
+        char buf[256];
+        std::string s;
+
+        s.append("table:{\n");
+        snprintf(buf, sizeof(buf), "name:%s \n", name_.c_str());
+        s.append(buf);
+        snprintf(buf, sizeof(buf), "partition_num:%d \n", partition_num_);
+        s.append(buf);
+        snprintf(buf, sizeof(buf), "replica_num:%d \n", replica_num_);
+        s.append(buf);
+        snprintf(buf, sizeof(buf), "engine_type:%s \n", EngineTypeToString(engine_type_).c_str());
+        s.append(buf);
+        snprintf(buf, sizeof(buf), "path:%s \n", path_.c_str());
+        s.append(buf);
+        s.append("partitions:{\n");
+        for (auto &p : partitions_) {
+            s.append((p.second)->ToStringInfo());
+            s.append("\n");
+        }
+        s.pop_back();
+        s.pop_back();
+        s.append("}\n");
+        s.append("}\n");
+        return s;
+    }
+
   private:
     void AddPartitions() {
         assert(partition_num_ > 0);
@@ -454,6 +536,18 @@ class Meta {
     }
 
     const std::string
+    ToStringInfo() const {
+        std::string s;
+        s.append("meta:{\n");
+        for (auto &t : tables_) {
+            s.append((t.second)->ToStringInfo());
+            s.append("\n");
+        }
+        s.append("}\n");
+        return s;
+    }
+
+    const std::string
     ToStringShort() const {
         std::string s;
         s.append("meta:{\n");
@@ -466,7 +560,9 @@ class Meta {
                     s.append("\n");
                 }
             }
+            s.append("\n");
         }
+        s.pop_back();
         s.append("}\n");
         return s;
     }

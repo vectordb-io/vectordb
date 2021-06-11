@@ -25,6 +25,7 @@ class Node {
     Status Stop();
 
     Status OnPing(const vectordb_rpc::PingRequest* request, vectordb_rpc::PingReply* reply);
+    Status OnInfo(const vectordb_rpc::InfoRequest* request, vectordb_rpc::InfoReply* reply);
 
     GrpcServer& grpc_server() {
         return grpc_server_;

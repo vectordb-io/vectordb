@@ -83,4 +83,10 @@ Node::OnPing(const vectordb_rpc::PingRequest* request, vectordb_rpc::PingReply* 
     return Status::OK();
 }
 
+Status
+Node::OnInfo(const vectordb_rpc::InfoRequest* request, vectordb_rpc::InfoReply* reply) {
+    reply->set_msg(meta_.ToStringInfo());
+    return Status::OK();
+}
+
 }  // namespace vectordb

@@ -25,6 +25,7 @@ bool Str2Table(const std::string &s, Table &table);
 bool Str2TableNames(const std::string &s, std::vector<std::string> &table_names);
 void TableNames2Str(const std::vector<std::string> &table_names, std::string &s);
 
+
 }  // namespace vectordb
 
 #endif

@@ -4,6 +4,7 @@ package vectordb_rpc;
 
 service VectorDB {
   rpc Ping (PingRequest) returns (PingReply) {}
+  rpc Info (InfoRequest) returns (InfoReply) {}
 }
 
 message PingRequest {
@@ -14,3 +15,9 @@ message PingReply {
   string msg = 1;
 }
 
+message InfoRequest {
+}
+
+message InfoReply {
+  string msg = 1;
+}

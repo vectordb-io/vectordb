@@ -1,6 +1,5 @@
 # vectordb
 
-
 <img src="images/vectordb.jpeg" width="40%">
 
 ## What is VectorDB?

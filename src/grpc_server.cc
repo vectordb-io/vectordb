@@ -11,7 +11,15 @@ VectorDBServiceImpl::Ping(grpc::ServerContext* context,
                           vectordb_rpc::PingReply* reply) {
     auto s = Node::GetInstance().OnPing(request, reply);
     assert(s.ok());
+    return grpc::Status::OK;
+}
 
+grpc::Status
+VectorDBServiceImpl::Info(grpc::ServerContext* context,
+                          const vectordb_rpc::InfoRequest* request,
+                          vectordb_rpc::InfoReply* reply) {
+    auto s = Node::GetInstance().OnInfo(request, reply);
+    assert(s.ok());
     return grpc::Status::OK;
 }
 

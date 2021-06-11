@@ -6,7 +6,7 @@ INCLUDES_SERVER=-I./
 LIBS_SERVER=-lglog -lprotobuf -lgrpc++ -lgrpc -lpthread -lleveldb
 LFLAGS_SERVER=-L/usr/local/lib
 
-OBJS_CLIENT=client_main.o vectordb_rpc.pb.o vectordb_rpc.grpc.pb.o vclient.o cli_config.o status.o util.o
+OBJS_CLIENT=client_main.o vectordb_rpc.pb.o vectordb_rpc.grpc.pb.o vclient.o cli_config.o status.o cli_util.o 
 INCLUDES_CLIENT=-I./
 LIBS_CLIENT=-lglog -lprotobuf -lgrpc++ -lgrpc -lpthread -lleveldb
 LFLAGS_CLIENT=-L/usr/local/lib

@@ -9,8 +9,7 @@ namespace vectordb {
 bool DirOK(const std::string &path);
 void Mkdir(const std::string &path);
 
-void ToLower(std::string &str);
-void Parse(std::string &line, std::vector<std::string> &argv);
+
 
 }  // namespace vectordb
 

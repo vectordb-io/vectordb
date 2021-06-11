@@ -12,6 +12,11 @@ class VectorDBServiceImpl final : public vectordb_rpc::VectorDB::Service {
     grpc::Status Ping(grpc::ServerContext* context,
                       const vectordb_rpc::PingRequest* request,
                       vectordb_rpc::PingReply* reply) override;
+
+    grpc::Status Info(grpc::ServerContext* context,
+                      const vectordb_rpc::InfoRequest* request,
+                      vectordb_rpc::InfoReply* reply) override;
+
   private:
 };
 
