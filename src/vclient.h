@@ -30,10 +30,10 @@ class VClient {
 
     void Prompt() const;
     void ShowReply(const std::string &s) const;
-    void Do(std::vector<std::string> &argv);
+    void Do(const std::vector<std::string> &cmd_sv, const std::string &params_json);
 
-    Status Ping(std::string &reply_msg);
-    Status Info(std::string &reply_msg);
+    void Ping(std::string &reply_msg);
+    void Info(std::string &reply_msg);
 
     std::shared_ptr<grpc::Channel> channel_;
     std::unique_ptr<vectordb_rpc::VectorDB::Stub> stub_;
