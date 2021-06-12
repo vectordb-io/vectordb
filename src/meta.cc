@@ -198,23 +198,11 @@ Meta::GetReplica(const std::string &name) const {
     int replica_id;
 
     bool b = util::ParseReplicaName(name, table_name, partition_id, replica_id);
-
-    LOG(INFO) << "debug b: " << b;
-
     if (b) {
         std::string partition_name = util::PartitionName(table_name, partition_id);
         pp = GetPartition(partition_name);
-
-        LOG(INFO) << "debug partition_name: " << partition_name;
-
         if (pp) {
             pr = pp->GetReplica(name);
-
-            LOG(INFO) << "debug GetReplica : " << name;
-
-            if (pr) {
-                LOG(INFO) << "debug get replcia: " << pr->ToStringPretty();
-            }
         }
     }
     return pr;

@@ -93,7 +93,8 @@ VClient::Do(const std::vector<std::string> &cmd_sv, const std::string &params_js
         reply = cli_util::HelpStr();
 
     } else if (cmd_sv.size() == 1 && cmd_sv[0] == "info") {
-
+        vectordb_rpc::InfoRequest request;
+        Info(request, reply);
 
     } else if (cmd_sv.size() == 1 && cmd_sv[0] == "version") {
         reply = __VECTORDB__VERSION__;
@@ -211,13 +212,12 @@ VClient::Describe(const vectordb_rpc::DescribeRequest &request, std::string &rep
 }
 
 void
-VClient::Info(std::string &reply_msg) {
-    vectordb_rpc::InfoRequest request;
+VClient::Info(const vectordb_rpc::InfoRequest &request, std::string &reply_msg) {
     vectordb_rpc::InfoReply reply;
     grpc::ClientContext context;
     grpc::Status status = stub_->Info(&context, request, &reply);
     if (status.ok()) {
-        reply_msg = reply.msg();
+        reply_msg = cli_util::ToString(reply);
     } else {
         reply_msg = status.error_message();
     }

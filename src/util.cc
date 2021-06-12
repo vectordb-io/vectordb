@@ -120,9 +120,6 @@ ParseReplicaName(const std::string &replica_name, std::string &table_name, int &
         return false;
     }
     sscanf(sv_id[1].c_str(), "%d", &replica_id);
-
-    LOG(INFO) << "debug: " << sv[1].c_str() << " " << sv[2].c_str() << " " << partition_id << " " << replica_id;
-
     return true;
 }
 

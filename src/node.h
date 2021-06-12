@@ -26,6 +26,9 @@ class Node {
 
     Status OnPing(const vectordb_rpc::PingRequest* request, vectordb_rpc::PingReply* reply);
     Status OnInfo(const vectordb_rpc::InfoRequest* request, vectordb_rpc::InfoReply* reply);
+    Status OnCreateTable(const vectordb_rpc::CreateTableRequest* request, vectordb_rpc::CreateTableReply* reply);
+    Status OnShowTables(const vectordb_rpc::ShowTablesRequest* request, vectordb_rpc::ShowTablesReply* reply);
+    Status OnDescribe(const vectordb_rpc::DescribeRequest* request, vectordb_rpc::DescribeReply* reply);
 
     GrpcServer& grpc_server() {
         return grpc_server_;

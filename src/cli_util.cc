@@ -82,6 +82,11 @@ ToString(const vectordb_rpc::CreateTableReply &reply) {
 }
 
 std::string
+ToString(const vectordb_rpc::InfoReply &reply) {
+    return reply.msg();
+}
+
+std::string
 ToString(const vectordb_rpc::ShowTablesReply &reply) {
     jsonxx::json j, jt;
     int k = 0;
