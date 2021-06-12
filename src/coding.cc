@@ -4,45 +4,54 @@ namespace vectordb {
 
 void
 Pb2Replica(const vectordb_rpc::Replica &pb, Replica &replica) {
-    replica.Init(
-        pb.id(),
-        pb.name(),
-        pb.table_name(),
-        pb.partition_name(),
-        static_cast<EngineType>(pb.engine_type()),
-        pb.path());
+    replica.set_id(pb.id());
+    replica.set_name(pb.name());
+    replica.set_table_name(pb.table_name());
+    replica.set_partition_name(pb.partition_name());
+    replica.set_path(pb.path());
 }
 
 void
 Pb2Partition(const vectordb_rpc::Partition &pb, Partition &partition) {
-    partition.Init(
-        pb.id(),
-        pb.name(),
-        pb.table_name(),
-        pb.replica_num(),
-        static_cast<EngineType>(pb.engine_type()),
-        pb.path());
+    partition.set_id(pb.id());
+    partition.set_name(pb.name());
+    partition.set_table_name(pb.table_name());
+    partition.set_replica_num(pb.replica_num());
+    partition.set_path(pb.path());
     for (int i = 0; i < pb.replicas_size(); i++) {
         const vectordb_rpc::Replica &replica_pb = pb.replicas(i);
         Replica replica;
         Pb2Replica(replica_pb, replica);
-        partition.AddReplica(replica);
+
+        auto it = partition.replicas().find(replica.name());
+        assert(it == partition.replicas().end());
+        auto sp = std::make_shared<Replica>(replica);
+        partition.mutable_replicas().insert(std::pair<std::string, std::shared_ptr<Replica>>(sp->name(), sp));
     }
 }
 
 void
 Pb2Table(const vectordb_rpc::Table &pb, Table &table) {
-    table.Init(
-        pb.name(),
-        pb.partition_num(),
-        pb.replica_num(),
-        static_cast<EngineType>(pb.engine_type()),
-        pb.path());
+    TableParam param;
+    param.name = pb.name();
+    param.partition_num = pb.partition_num();
+    param.replica_num = pb.replica_num();
+    param.engine_type = pb.engine_type();
+    param.path = pb.path();
     for (int i = 0; i < pb.partitions_size(); i++) {
         const vectordb_rpc::Partition &partition_pb = pb.partitions(i);
         Partition partition;
         Pb2Partition(partition_pb, partition);
-        table.AddPartition(partition);
+
+        auto it = table.partitions().find(partition.name());
+        assert(it == table.partitions().end());
+        auto sp = std::make_shared<Partition>(partition);
+        table.mutable_partitions().insert(std::pair<std::string, std::shared_ptr<Partition>>(sp->name(), sp));
+    }
+
+    for (int i = 0; i < pb.indices_size(); i++) {
+        const vectordb_rpc::Index &index = pb.indices(i);
+        table.mutable_indices().insert(std::pair<std::string, std::string>(index.index_name(), index.index_type()));
     }
 }
 
@@ -52,7 +61,6 @@ Replica2Pb(const Replica &replica, vectordb_rpc::Replica &pb) {
     pb.set_name(replica.name());
     pb.set_table_name(replica.table_name());
     pb.set_partition_name(replica.partition_name());
-    pb.set_engine_type(replica.engine_type());
     pb.set_address(replica.address());
     pb.set_path(replica.path());
 }
@@ -63,7 +71,6 @@ Partition2Pb(const Partition &partition, vectordb_rpc::Partition &pb) {
     pb.set_name(partition.name());
     pb.set_table_name(partition.table_name());
     pb.set_replica_num(partition.replica_num());
-    pb.set_engine_type(partition.engine_type());
     pb.set_path(partition.path());
     for (auto &r : partition.replicas()) {
         vectordb_rpc::Replica* replica = pb.add_replicas();
@@ -81,6 +88,12 @@ Table2Pb(const Table &table, vectordb_rpc::Table &pb) {
     for (auto &p : table.partitions()) {
         vectordb_rpc::Partition* partition = pb.add_partitions();
         Partition2Pb(*(p.second), *partition);
+    }
+
+    for (auto &indices_ : table.indices()) {
+        vectordb_rpc::Index* index = pb.add_indices();
+        index->set_index_name(indices_.first);
+        index->set_index_type(indices_.second);
     }
 }
 

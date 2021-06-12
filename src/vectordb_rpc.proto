@@ -15,9 +15,8 @@ message Replica {
   string name = 2;
   string table_name = 3;
   string partition_name = 4;
-  int32 engine_type = 5;
-  string address = 6;
-  string path = 7;
+  string address = 5;
+  string path = 6;
 }
 
 message Partition {
@@ -25,18 +24,23 @@ message Partition {
   string name = 2;
   string table_name = 3;
   int32 replica_num = 4;
-  int32 engine_type = 5;
-  string path = 6;
-  repeated Replica replicas = 7;
+  string path = 5;
+  repeated Replica replicas = 6;
 }
+
+message Index {
+  string index_name = 1;
+  string index_type = 2;
+};
 
 message Table {
   string name = 1;
   int32 partition_num = 2;
   int32 replica_num = 3;
-  int32 engine_type = 4;
+  string engine_type = 4;
   string path = 5;
   repeated Partition partitions = 6;
+  repeated Index indices = 7;
 }
 
 message TableNames {

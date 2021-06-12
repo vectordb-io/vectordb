@@ -1,9 +1,50 @@
+#include <glog/logging.h>
+#include "util.h"
 #include "vengine.h"
 
 namespace vectordb {
 
+VEngine::VEngine(std::string path)
+    :path_(path) {
+    data_path_ = path_ + "/data";
+    index_path_ = path_ + "/index";
+}
+
+VEngine::~VEngine() {
+    delete data_;
+}
+
 Status
-VEngine::Open(const Options &options, const std::string &name, VEngine** vengine) {
+VEngine::Init() {
+    if (!util::DirOK(path_)) {
+        LOG(INFO) << "mkdir " << path_;
+        util::Mkdir(path_);
+    }
+    if (!util::DirOK(index_path_)) {
+        LOG(INFO) << "mkdir " << index_path_;
+        util::Mkdir(index_path_);
+    }
+
+    Status s;
+    s = InitData();
+    assert(s.ok());
+    s = InitIndices();
+    assert(s.ok());
+    return Status::OK();
+}
+
+Status
+VEngine::InitData() {
+    leveldb::Options options;
+    options.create_if_missing = true;
+    leveldb::Status status = leveldb::DB::Open(options, data_path_, &data_);
+    assert(status.ok());
+    return Status::OK();
+}
+
+Status
+VEngine::InitIndices() {
+    return Status::OK();
 }
 
 Status

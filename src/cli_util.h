@@ -26,6 +26,8 @@ std::string ToString(const vectordb_rpc::CreateTableReply &reply);
 std::string ToString(const vectordb_rpc::ShowTablesReply &reply);
 std::string ToString(const vectordb_rpc::DescribeReply &reply);
 
+
+
 } // namespace cli_util
 
 } // namespace vectordb

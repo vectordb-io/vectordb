@@ -127,6 +127,14 @@ ToJson(const vectordb_rpc::Table &table) {
     for (int i = 0; i < table.partitions_size(); ++i) {
         j["partitions"][k++] = table.partitions(i).name();
     }
+
+    k = 0;
+    for (int i = 0; i < table.indices_size(); ++i) {
+        jsonxx::json ji;
+        ji["index_name"] = table.indices(i).index_name();
+        ji["index_type"] = table.indices(i).index_type();
+        j["indices"][k++] = ji;
+    }
     return j;
 }
 
@@ -137,7 +145,6 @@ ToJson(const vectordb_rpc::Partition &partition) {
     j["name"] = partition.name();
     j["table_name"] = partition.table_name();
     j["replica_num"] = partition.replica_num();
-    j["engine_type"] = partition.engine_type();
     j["path"] = partition.path();
     int k = 0;
     for (int i = 0; i < partition.replicas_size(); ++i) {
@@ -153,7 +160,6 @@ ToJson(const vectordb_rpc::Replica &replica) {
     j["name"] = replica.name();
     j["table_name"] = replica.table_name();
     j["partition_name"] = replica.partition_name();
-    j["engine_type"] = replica.engine_type();
     j["address"] = replica.address();
     j["path"] = replica.path();
     return j;

@@ -7,17 +7,18 @@ EngineManager::Init() {
     return Status::OK();
 }
 
-VEngine*
+std::shared_ptr<VEngine>
 EngineManager::GetVEngine(const std::string &replica_name) const {
+    std::shared_ptr<VEngine> ve;
     auto it = vengines_.find(replica_name);
     if (it != vengines_.end()) {
-        return it->second;
+        ve = it->second;
     }
-    return nullptr;
+    return ve;
 }
 
 void
-EngineManager::AddVEngine(const std::string &replica_name, VEngine*) {
+EngineManager::AddVEngine(const std::string &replica_name, std::shared_ptr<VEngine> ve) {
 
 }
 

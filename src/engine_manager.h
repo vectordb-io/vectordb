@@ -3,6 +3,7 @@
 
 #include <map>
 #include <vector>
+#include <memory>
 #include <string>
 #include "status.h"
 #include "vengine.h"
@@ -17,11 +18,13 @@ class EngineManager {
     ~EngineManager() = default;
 
     Status Init();
-    VEngine* GetVEngine(const std::string &replica_name) const;
-    void AddVEngine(const std::string &replica_name, VEngine*);
+    void AddVEngine(const std::string &replica_name, std::shared_ptr<VEngine> ve);
+
+    std::shared_ptr<VEngine>
+    GetVEngine(const std::string &replica_name) const;
 
   private:
-    std::map<std::string, VEngine*> vengines_;
+    std::map<std::string, std::shared_ptr<VEngine>> vengines_;
 };
 
 } // namespace vectordb

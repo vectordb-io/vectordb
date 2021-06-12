@@ -15,12 +15,12 @@ namespace vectordb {
 
 class VEngine {
   public:
-    VEngine() = default;
+    VEngine(std::string path);
     VEngine(const VEngine&) = delete;
     VEngine& operator=(const VEngine&) = delete;
-    virtual ~VEngine() {};
+    ~VEngine();
 
-    Status Open(const Options &options, const std::string &name, VEngine** vengine);
+    Status Init();
     Status Put(const WriteOptions &options, const std::string &key, const Vec &result);
     Status Get(const ReadOptions &options, const std::string &key, Vec &result);
     Status Delete(const WriteOptions &options, const std::string &key);
@@ -30,9 +30,14 @@ class VEngine {
     bool HasIndex();
 
   private:
-    std::string path_;
-    leveldb::DB* data_;
+    Status InitData();
+    Status InitIndices();
 
+    std::string path_;
+    std::string data_path_;
+    std::string index_path_;
+
+    leveldb::DB* data_;
     std::map<std::string, VIndex*> indices_;
 };
 

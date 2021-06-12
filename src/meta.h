@@ -15,86 +15,111 @@ namespace vectordb {
 
 #define META_PERSIST_KEY_TABLES "META_PERSIST_KEY_TABLES"
 
-enum EngineType {
-    kKVEngine = 0,
-    kVectorEngine = 10,
-    kGraphEngine = 20,
-    kErrorEngine = 100,
+#define KV_ENGINE "kv"
+#define VECTOR_ENGINE "vector"
+#define GRAPH_ENGINE "graph"
+
+#define VECTOR_INDEX_ANNOY "annoy"
+#define VECTOR_INDEX_KNNGRAPH "knn_graph"
+
+struct IndexParam {
+    std::string table_name;
+    std::string index_name;
+    std::string index_type;
 };
 
-std::string EngineTypeToString(EngineType e);
-EngineType StringToEngineType(const std::string &s);
+struct ReplicaParam {
+    int id;
+    std::string name;
+    std::string table_name;
+    std::string partition_name;
+    std::string path;
+};
 
+struct PartitionParam {
+    int id;
+    std::string name;
+    std::string table_name;
+    int replica_num;
+    std::string path;
+};
+
+struct TableParam {
+    std::string name;
+    int partition_num;
+    int replica_num;
+    std::string engine_type;
+    std::string path;
+};
 
 class Replica {
   public:
-    Replica() {
-    }
-
-    Replica(const Replica&) = default;
-
-    Replica(int id,
-            const std::string &name,
-            const std::string &table_name,
-            const std::string &partition_name,
-            EngineType engine_type,
-            const std::string &path)
-        :id_(id),
-         name_(name),
-         table_name_(table_name),
-         partition_name_(partition_name),
-         engine_type_(engine_type),
-         path_(path) {
+    Replica() = default;
+    Replica(const ReplicaParam &param)
+        :id_(param.id),
+         name_(param.name),
+         table_name_(param.table_name),
+         partition_name_(param.partition_name),
+         path_(param.path) {
         address_ = Config::GetInstance().address().ToString();
     }
-
-    void Init(int id,
-              const std::string &name,
-              const std::string &table_name,
-              const std::string &partition_name,
-              EngineType engine_type,
-              const std::string &path);
+    Replica(const Replica&) = default;
+    Replica& operator=(const Replica&) = default;
+    ~Replica() = default;
 
     int id() const {
         return id_;
     }
 
-    const std::string&
-    name() const {
+    void set_id(int id) {
+        id_ = id;
+    }
+
+    std::string name() const {
         return name_;
     }
 
-    const std::string&
-    table_name() const {
+    void set_name(const std::string& name) {
+        name_ = name;
+    }
+
+    std::string table_name() const {
         return table_name_;
     }
 
-    const std::string&
-    partition_name() const {
+    void set_table_name(const std::string& table_name) {
+        table_name_ = table_name;
+    }
+
+    std::string partition_name() const {
         return partition_name_;
     }
 
-    EngineType engine_type() const {
-        return engine_type_;
+    void set_partition_name(const std::string& partition_name) {
+        partition_name_ = partition_name;
     }
 
-    const std::string&
-    address() const {
+    std::string address() const {
         return address_;
     }
 
-    const std::string&
-    path() const {
+    void set_address(const std::string& address) {
+        address_ = address;
+    }
+
+    std::string path() const {
         return path_;
     }
 
-    const std::string
-    ToString() const {
+    void set_path(const std::string& path) {
+        path_ = path;
+    }
+
+    std::string ToString() const {
         return ToJson().dump();
     }
 
-    const std::string
-    ToStringPretty() const {
+    std::string ToStringPretty() const {
         return ToJson().dump(4, ' ');
     }
 
@@ -105,39 +130,24 @@ class Replica {
     std::string name_;
     std::string table_name_;
     std::string partition_name_;
-    EngineType engine_type_;
     std::string address_;
     std::string path_;
 };
 
 class Partition {
   public:
-    Partition() {
+    Partition() = default;
+    Partition(const PartitionParam& param)
+        :id_(param.id),
+         name_(param.name),
+         table_name_(param.table_name),
+         replica_num_(param.replica_num),
+         path_(param.path) {
+        AddAllReplicas();
     }
-
-    Partition(int id,
-              const std::string &name,
-              const std::string &table_name,
-              int replica_num,
-              EngineType engine_type,
-              const std::string &path)
-        :id_(id),
-         name_(name),
-         table_name_(table_name),
-         replica_num_(replica_num),
-         engine_type_(engine_type),
-         path_(path) {
-        AddReplicas();
-    }
-
-    void Init(int id,
-              const std::string &name,
-              const std::string &table_name,
-              int replica_num,
-              EngineType engine_type,
-              const std::string &path);
-    void AddReplica(const Replica &r);
-    void AddReplicas();
+    Partition(const Partition&) = default;
+    Partition& operator=(const Partition&) = default;
+    ~Partition() = default;
 
     std::shared_ptr<Replica>
     GetReplica(std::string name) const;
@@ -146,27 +156,45 @@ class Partition {
         return id_;
     }
 
-    const std::string&
-    name() const {
+    void set_id(int id) {
+        id_ = id;
+    }
+
+    std::string name() const {
         return name_;
     }
 
-    const std::string&
-    table_name() const {
+    void set_name(const std::string& name) {
+        name_ = name;
+    }
+
+    std::string table_name() const {
         return table_name_;
+    }
+
+    void set_table_name(const std::string& table_name) {
+        table_name_ = table_name;
     }
 
     int replica_num() const {
         return replica_num_;
     }
 
-    EngineType engine_type() const {
-        return engine_type_;
+    void set_replica_num(int replica_num) {
+        replica_num_ = replica_num;
     }
 
-    const std::string&
-    path() const {
+    std::string path() const {
         return path_;
+    }
+
+    void set_path(const std::string& path) {
+        path_ = path;
+    }
+
+    std::map<std::string, std::shared_ptr<Replica>>&
+    mutable_replicas() {
+        return replicas_;
     }
 
     const std::map<std::string, std::shared_ptr<Replica>>&
@@ -174,80 +202,87 @@ class Partition {
         return replicas_;
     }
 
-    const std::string
-    ToString() const {
+    std::string ToString() const {
         return ToJson().dump();
     }
 
-    const std::string
-    ToStringPretty() const {
+    std::string ToStringPretty() const {
         return ToJson().dump(4, ' ');
     }
 
-
   private:
+    void AddAllReplicas();
     jsonxx::json ToJson() const;
 
     int id_;
     std::string name_;
     std::string table_name_;
     int replica_num_;
-    EngineType engine_type_;
     std::string path_;
     std::map<std::string, std::shared_ptr<Replica>> replicas_;
 };
 
 class Table {
   public:
-    Table() {
+    Table() = default;
+    Table(const TableParam &param)
+        :name_(param.name),
+         partition_num_(param.partition_num),
+         replica_num_(param.replica_num),
+         engine_type_(param.engine_type),
+         path_(param.path) {
+        AddAllPartitions();
     }
-
-    Table(const std::string& name,
-          int partition_num,
-          int replica_num,
-          EngineType engine_type,
-          const std::string& path)
-        :name_(name),
-         partition_num_(partition_num),
-         replica_num_(replica_num),
-         engine_type_(engine_type),
-         path_(path) {
-        AddPartitions();
-    }
-
     Table(const Table&) = default;
-
-    void Init(const std::string& name,
-              int partition_num,
-              int replica_num,
-              EngineType engine_type,
-              const std::string& path);
-    void AddPartition(const Partition &p);
-    void AddPartitions();
+    Table& operator=(const Table&) = default;
+    ~Table() = default;
 
     std::shared_ptr<Partition>
     GetPartition(std::string name) const;
 
-    const std::string&
-    name() const {
+    std::string name() const {
         return name_;
+    }
+
+    void set_name(const std::string& name) {
+        name_ = name;
     }
 
     int partition_num() const {
         return partition_num_;
     }
 
+    void set_partition_num(int partition_num) {
+        partition_num_ = partition_num;
+    }
+
     int replica_num() const {
         return replica_num_;
     }
 
-    EngineType engine_type() const {
+    void set_replica_num(int replica_num) {
+        replica_num_ = replica_num;
+    }
+
+    std::string engine_type() const {
         return engine_type_;
     }
 
-    const std::string&
-    path() const {
+    void set_engine_type(const std::string& engine_type) {
+        engine_type_ = engine_type;
+    }
+
+    std::string path() const {
         return path_;
+    }
+
+    void set_path(const std::string& path) {
+        path_ = path;
+    }
+
+    std::map<std::string, std::shared_ptr<Partition>>&
+    mutable_partitions() {
+        return partitions_;
     }
 
     const std::map<std::string, std::shared_ptr<Partition>>&
@@ -255,27 +290,36 @@ class Table {
         return partitions_;
     }
 
-    const std::string
-    ToString() const {
+    std::map<std::string, std::string>&
+    mutable_indices() {
+        return indices_;
+    }
+
+    const std::map<std::string, std::string>&
+    indices() const {
+        return indices_;
+    }
+
+    std::string ToString() const {
         return ToJson().dump();
     }
 
-    const std::string
-    ToStringPretty() const {
+    std::string ToStringPretty() const {
         return ToJson().dump(4, ' ');
     }
 
   private:
+    void AddAllPartitions();
     jsonxx::json ToJson() const;
 
     std::string name_;
     int partition_num_;
     int replica_num_;
-    EngineType engine_type_;
+    std::string engine_type_;
     std::string path_;
     std::map<std::string, std::shared_ptr<Partition>> partitions_;
+    std::map<std::string, std::string> indices_;
 };
-
 
 class Meta {
   public:
@@ -287,26 +331,14 @@ class Meta {
     Status Init();
     Status Load();
     Status Persist();
-
-    Status AddTable(const std::string &name,
-                    int partition_num,
-                    int replica_num,
-                    EngineType engine_type,
-                    const std::string &path);
-
+    Status AddTable(const TableParam &param);
+    Status AddIndex(const IndexParam &param);
     Status DropTable(const std::string &name);
-
     Status ReplicaName(const std::string &table_name,
                        const std::string &key,
                        std::string &replica_name) const;
-
-    const std::string ToString() const;
-    const std::string ToStringPretty() const;
-
-    std::map<std::string, std::shared_ptr<Table>>&
-    tables() {
-        return tables_;
-    }
+    std::string ToString() const;
+    std::string ToStringPretty() const;
 
     std::shared_ptr<Table>
     GetTable(const std::string &name) const;
@@ -316,6 +348,16 @@ class Meta {
 
     std::shared_ptr<Replica>
     GetReplica(const std::string &name) const;
+
+    std::map<std::string, std::shared_ptr<Table>>&
+    mutable_tables() {
+        return tables_;
+    }
+
+    const std::map<std::string, std::shared_ptr<Table>>&
+    tables() const {
+        return tables_;
+    }
 
   private:
     std::map<std::string, std::shared_ptr<Table>> tables_;

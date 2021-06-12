@@ -5,38 +5,6 @@
 
 namespace vectordb {
 
-std::string
-EngineTypeToString(EngineType e) {
-    if (e == kKVEngine) {
-        return "kKVEngine";
-
-    } else if (e == kVectorEngine) {
-        return "kVectorEngine";
-
-    } else if (e == kGraphEngine) {
-        return "kGraphEngine";
-
-    }
-    return "error engine";
-}
-
-EngineType StringToEngineType(const std::string &s) {
-    std::string engine_type = s;
-    util::ToLower(engine_type);
-    if (s == "kv") {
-        return kKVEngine;
-
-    } else if (s == "vector") {
-        return kVectorEngine;
-
-    } else if (s == "graph") {
-        return kGraphEngine;
-
-    } else {
-        return kErrorEngine;
-    }
-}
-
 Meta::Meta(const std::string &path)
     :path_(path) {
 }
@@ -71,7 +39,6 @@ Meta::Load() {
     }
 
     LOG(INFO) << "meta load: \n" << ToStringPretty();
-
     return Status::OK();
 }
 
@@ -115,20 +82,15 @@ Meta::Init() {
 }
 
 Status
-Meta::AddTable(const std::string &name,
-               int partition_num,
-               int replica_num,
-               EngineType engine_type,
-               const std::string &path) {
-    auto it = tables_.find(name);
+Meta::AddTable(const TableParam &param) {
+    auto it = tables_.find(param.name);
     if (it != tables_.end()) {
-        std::string msg = name;
+        std::string msg = param.name;
         msg.append(" already exist");
         return Status::Corruption(msg);
     }
-
-    auto table = std::make_shared<Table>(name, partition_num, replica_num, engine_type, path);
-    tables_.insert(std::pair<std::string, std::shared_ptr<Table>>(name, table));
+    auto table = std::make_shared<Table>(param);
+    tables_.insert(std::pair<std::string, std::shared_ptr<Table>>(param.name, table));
     return Status::OK();
 }
 
@@ -215,7 +177,6 @@ Replica::ToJson() const {
     j["name"] = name_;
     j["table_name"] = table_name_;
     j["partition_name"] = partition_name_;
-    j["engine_type"] = engine_type_;
     j["address"] = address_;
     j["path"] = path_;
     return j;
@@ -228,7 +189,6 @@ Partition::ToJson() const {
     j["name"] = name_;
     j["table_name"] = table_name_;
     j["replica_num"] = replica_num_;
-    j["engine_type"] = engine_type_;
     j["path"] = path_;
     int k = 0;
     for (auto &r : replicas_) {
@@ -249,10 +209,18 @@ Table::ToJson() const {
     for (auto &p : partitions_) {
         j["partitions"][k++] = p.second->name();
     }
+
+    k = 0;
+    for (auto &kv : indices_) {
+        jsonxx::json ji;
+        ji["index_name"] = kv.first;
+        ji["index_type"] = kv.second;
+        j[k++] = ji;
+    }
     return j;
 }
 
-const std::string
+std::string
 Meta::ToString() const {
     std::string s;
     s.append("meta:\n");
@@ -263,7 +231,7 @@ Meta::ToString() const {
     return s;
 }
 
-const std::string
+std::string
 Meta::ToStringPretty() const {
     std::string s;
     s.append("meta:\n");
@@ -275,87 +243,41 @@ Meta::ToStringPretty() const {
 }
 
 void
-Partition::AddReplica(const Replica &r) {
-    auto it = replicas_.find(r.name());
-    assert(it == replicas_.end());
-    auto replica_sp = std::make_shared<Replica>(r);
-    replicas_.insert(std::pair<std::string, std::shared_ptr<Replica>>(replica_sp->name(), replica_sp));
-}
-
-void
-Partition::AddReplicas() {
+Partition::AddAllReplicas() {
     assert(replica_num_ > 0);
     for (int replica_id = 0; replica_id < replica_num_; ++replica_id) {
         std::string replica_name = util::ReplicaName(table_name_, id_, replica_id);
         char buf[256];
         snprintf(buf, sizeof(buf), "%s/%d", path_.c_str(), replica_id);
         std::string replica_path = std::string(buf);
-        auto replica = std::make_shared<Replica>(replica_id, replica_name, table_name_, name_, engine_type_, replica_path);
+
+        ReplicaParam param;
+        param.id = replica_id;
+        param.name = replica_name;
+        param.table_name = table_name_;
+        param.partition_name = name_;
+        param.path = replica_path;
+        auto replica = std::make_shared<Replica>(param);
         replicas_.insert(std::pair<std::string, std::shared_ptr<Replica>>(replica_name, replica));
     }
 }
 
 void
-Replica::Init(int id,
-              const std::string &name,
-              const std::string &table_name,
-              const std::string &partition_name,
-              EngineType engine_type,
-              const std::string &path) {
-    id_ = id;
-    name_ = name;
-    table_name_ = table_name;
-    partition_name_ = partition_name;
-    engine_type_ = engine_type;
-    path_ = path;
-    address_ = Config::GetInstance().address().ToString();
-}
-
-void
-Partition::Init(int id,
-                const std::string &name,
-                const std::string &table_name,
-                int replica_num,
-                EngineType engine_type,
-                const std::string &path) {
-    id_ = id;
-    name_ = name;
-    table_name_ = table_name;
-    replica_num_ = replica_num;
-    engine_type_ = engine_type;
-    path_ = path;
-}
-
-void
-Table::Init(const std::string& name,
-            int partition_num,
-            int replica_num,
-            EngineType engine_type,
-            const std::string& path) {
-    name_ = name;
-    partition_num_ = partition_num;
-    replica_num_ = replica_num;
-    engine_type_ = engine_type;
-    path_ = path;
-}
-
-void
-Table::AddPartition(const Partition &p) {
-    auto it = partitions_.find(p.name());
-    assert(it == partitions_.end());
-    auto partition_sp = std::make_shared<Partition>(p);
-    partitions_.insert(std::pair<std::string, std::shared_ptr<Partition>>(partition_sp->name(), partition_sp));
-}
-
-void
-Table::AddPartitions() {
+Table::AddAllPartitions() {
     assert(partition_num_ > 0);
     for (int partition_id = 0; partition_id < partition_num_; ++partition_id) {
         std::string partition_name = util::PartitionName(name_, partition_id);
         char buf[256];
         snprintf(buf, sizeof(buf), "%s/%d", path_.c_str(), partition_id);
         std::string partition_path = std::string(buf);
-        auto partition = std::make_shared<Partition>(partition_id, partition_name, name_, replica_num_, engine_type_, partition_path);
+
+        PartitionParam param;
+        param.id = partition_id;
+        param.name = partition_name;
+        param.table_name = name_;
+        param.replica_num = replica_num_;
+        param.path = partition_path;
+        auto partition = std::make_shared<Partition>(param);
         partitions_.insert(std::pair<std::string, std::shared_ptr<Partition>>(partition_name, partition));
     }
 }
@@ -380,5 +302,26 @@ Table::GetPartition(std::string name) const {
     return pp;
 }
 
+Status
+Meta::AddIndex(const IndexParam &param) {
+    auto it_table = tables_.find(param.table_name);
+    if (it_table == tables_.end()) {
+        std::string msg = param.table_name;
+        msg.append(" not exist");
+        return Status::Corruption(msg);
+    }
+    assert(param.index_type == VECTOR_INDEX_ANNOY || param.index_type == VECTOR_INDEX_KNNGRAPH);
+    assert(it_table->second->engine_type() == VECTOR_ENGINE);
+
+    auto it_index = it_table->second->indices().find(param.index_name);
+    if (it_index != it_table->second->indices().end()) {
+        std::string msg = param.index_name;
+        msg.append(" already exist");
+        return Status::Corruption(msg);
+    }
+
+    it_table->second->mutable_indices().insert(std::pair<std::string, std::string>(param.index_name, param.index_type));
+    return Status::OK();
+}
 
 } // namespace vectordb
