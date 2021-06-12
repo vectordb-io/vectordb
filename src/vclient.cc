@@ -29,6 +29,7 @@ VClient::Start() {
         std::getline(std::cin, cmd_line);
         //LOG(INFO) << "[" << line << "]";
         cli_util::ToLower(cmd_line);
+        cli_util::DelTail(cmd_line, ';');
 
         cli_util::Split2(cmd_line, '{', cmd_line1, cmd_line2);
         std::vector<std::string> cmd_sv;
@@ -73,6 +74,9 @@ VClient::Do(const std::vector<std::string> &cmd_sv, const std::string &params_js
         ShowTables(request, reply);
 
     } else if (cmd_sv.size() == 2 && cmd_sv[0] == "describe") {
+        vectordb_rpc::DescribeRequest request;
+        request.set_name(cmd_sv[1]);
+        Describe(request, reply);
 
     } else if (cmd_sv.size() == 1 && cmd_sv[0] == "ping") {
         vectordb_rpc::PingRequest request;
@@ -187,6 +191,18 @@ VClient::Ping(const vectordb_rpc::PingRequest &request, std::string &reply_msg) 
     vectordb_rpc::PingReply reply;
     grpc::ClientContext context;
     grpc::Status status = stub_->Ping(&context, request, &reply);
+    if (status.ok()) {
+        reply_msg = cli_util::ToString(reply);
+    } else {
+        reply_msg = status.error_message();
+    }
+}
+
+void
+VClient::Describe(const vectordb_rpc::DescribeRequest &request, std::string &reply_msg) {
+    vectordb_rpc::DescribeReply reply;
+    grpc::ClientContext context;
+    grpc::Status status = stub_->Describe(&context, request, &reply);
     if (status.ok()) {
         reply_msg = cli_util::ToString(reply);
     } else {

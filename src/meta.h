@@ -320,9 +320,8 @@ class Partition {
     void AddReplicas() {
         assert(replica_num_ > 0);
         for (int replica_id = 0; replica_id < replica_num_; ++replica_id) {
+            std::string replica_name = util::ReplicaName(table_name_, id_, replica_id);
             char buf[256];
-            snprintf(buf, sizeof(buf), "%s#partition%d#replica%d", table_name_.c_str(), id_, replica_id);
-            std::string replica_name = std::string(buf);
             snprintf(buf, sizeof(buf), "%s/%d", path_.c_str(), replica_id);
             std::string replica_path = std::string(buf);
             auto replica = std::make_shared<Replica>(replica_id, replica_name, table_name_, name_, engine_type_, replica_path);
@@ -484,9 +483,8 @@ class Table {
     void AddPartitions() {
         assert(partition_num_ > 0);
         for (int partition_id = 0; partition_id < partition_num_; ++partition_id) {
+            std::string partition_name = util::PartitionName(name_, partition_id);
             char buf[256];
-            snprintf(buf, sizeof(buf), "%s#partition%d", name_.c_str(), partition_id);
-            std::string partition_name = std::string(buf);
             snprintf(buf, sizeof(buf), "%s/%d", path_.c_str(), partition_id);
             std::string partition_path = std::string(buf);
             auto partition = std::make_shared<Partition>(partition_id, partition_name, name_, replica_num_, engine_type_, partition_path);
@@ -576,6 +574,15 @@ class Meta {
             sv.push_back(t.second->name());
         }
     }
+
+    std::shared_ptr<Table>
+    GetTable(const std::string &name) const;
+
+    std::shared_ptr<Partition>
+    GetPartition(const std::string &name) const;
+
+    std::shared_ptr<Replica>
+    GetReplica(const std::string &name) const;
 
   private:
     std::map<std::string, std::shared_ptr<Table>> tables_;

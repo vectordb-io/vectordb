@@ -162,4 +162,56 @@ Meta::ReplicaName(const std::string &table_name,
     return Status::OK();
 }
 
+std::shared_ptr<Table>
+Meta::GetTable(const std::string &name) const {
+    std::shared_ptr<Table> p;
+    auto it = tables_.find(name);
+    if (it != tables_.end()) {
+        p = it->second;
+    }
+    return p;
+}
+
+std::shared_ptr<Partition>
+Meta::GetPartition(const std::string &name) const {
+    std::shared_ptr<Table> pt;
+    std::shared_ptr<Partition> pp;
+    std::string table_name;
+    int partition_id;
+
+    bool b = util::ParsePartitionName(name, table_name, partition_id);
+    if (b) {
+        pt = GetTable(table_name);
+        if (pt) {
+            auto it = pt->partitions().find(name);
+            if (it != pt->partitions().end()) {
+                pp = it->second;
+            }
+        }
+    }
+    return pp;
+}
+
+std::shared_ptr<Replica>
+Meta::GetReplica(const std::string &name) const {
+    std::shared_ptr<Partition> pp;
+    std::shared_ptr<Replica> pr;
+    std::string table_name;
+    int partition_id;
+    int replica_id;
+
+    bool b = util::ParseReplicaName(name, table_name, partition_id, replica_id);
+    if (b) {
+        std::string partition_name = util::PartitionName(table_name, partition_id);
+        pp = GetPartition(partition_name);
+        if (pp) {
+            auto it = pp->replicas().find(name);
+            if (it != pp->replicas().end()) {
+                pr = it->second;
+            }
+        }
+    }
+    return pr;
+}
+
 }  // namespace vectordb

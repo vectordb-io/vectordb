@@ -1,7 +1,7 @@
 CC:=g++
 CFLAGS+=-c -Wall -g -std=c++17
 
-OBJS_SERVER=server_main.o config.o status.o vectordb_rpc.pb.o vectordb_rpc.grpc.pb.o node.o util.o grpc_server.o meta.o coding.o vectordb_meta.pb.o vengine_annoy.o vec.o engine_manager.o
+OBJS_SERVER=server_main.o config.o status.o vectordb_rpc.pb.o vectordb_rpc.grpc.pb.o node.o util.o grpc_server.o meta.o coding.o vengine_annoy.o vec.o engine_manager.o
 INCLUDES_SERVER=-I./
 LIBS_SERVER=-lglog -lprotobuf -lgrpc++ -lgrpc -lpthread -lleveldb
 LFLAGS_SERVER=-L/usr/local/lib
@@ -29,7 +29,6 @@ vectordb-cli: $(OBJS_CLIENT)
 proto:
 	protoc -I. --cpp_out=. vectordb_rpc.proto
 	protoc -I. --grpc_out=. --plugin=protoc-gen-grpc=`which grpc_cpp_plugin` vectordb_rpc.proto
-	protoc -I. --cpp_out=. vectordb_meta.proto
 
 all:
 	make proto && make cs 
@@ -42,7 +41,6 @@ clean:
 cleanall: clean
 	rm -f vectordb_rpc.pb.*
 	rm -f vectordb_rpc.grpc.pb.*
-	rm -f vectordb_meta.pb.*
 
 
 

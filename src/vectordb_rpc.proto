@@ -7,6 +7,40 @@ service VectorDB {
   rpc Info (InfoRequest) returns (InfoReply) {}
   rpc CreateTable (CreateTableRequest) returns (CreateTableReply) {}
   rpc ShowTables (ShowTablesRequest) returns (ShowTablesReply) {}
+  rpc Describe (DescribeRequest) returns (DescribeReply) {}
+}
+
+message Replica {
+  int32 id = 1;
+  string name = 2;
+  string table_name = 3;
+  string partition_name = 4;
+  int32 engine_type = 5;
+  string address = 6;
+  string path = 7;
+}
+
+message Partition {
+  int32 id = 1;
+  string name = 2;
+  string table_name = 3;
+  int32 replica_num = 4;
+  int32 engine_type = 5;
+  string path = 6;
+  repeated Replica replicas = 7;
+}
+
+message Table {
+  string name = 1;
+  int32 partition_num = 2;
+  int32 replica_num = 3;
+  int32 engine_type = 4;
+  string path = 5;
+  repeated Partition partitions = 6;
+}
+
+message TableNames {
+  repeated string table_names = 1;
 }
 
 message PingRequest {
@@ -35,6 +69,24 @@ message ShowTablesRequest {
 
 message ShowTablesReply {
   repeated string tables = 1;
+}
+
+message DescribeRequest {
+  string name = 1;
+}
+
+message DescribeReply {
+  int32 code = 1;
+  string msg = 2;
+
+  bool describe_table = 3;
+  Table table = 4;
+
+  bool describe_partition = 5;
+  Partition partition = 6;
+
+  bool describe_replica = 7;
+  Replica replica = 8;
 }
 
 message InfoRequest {

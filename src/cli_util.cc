@@ -12,6 +12,20 @@ namespace vectordb {
 
 namespace cli_util {
 
+void DelTail(std::string &s, char c) {
+    while (true) {
+        if (s.empty()) {
+            return;
+        }
+        auto it = s.rbegin();
+        if (*it == c) {
+            s.pop_back();
+        } else {
+            break;
+        }
+    }
+}
+
 std::string
 HelpStr() {
     std::string s;
@@ -69,11 +83,75 @@ ToString(const vectordb_rpc::CreateTableReply &reply) {
 
 std::string
 ToString(const vectordb_rpc::ShowTablesReply &reply) {
-    std::string s;
+    jsonxx::json j, jt;
+    int k = 0;
     for (int i = 0; i < reply.tables_size(); ++i) {
-        s.append(reply.tables(i)).append("\n");
+        j[k++] = reply.tables(i);
     }
-    return s;
+    jt["tables"] = j;
+    return jt.dump(4, ' ');
+}
+
+std::string
+ToString(const vectordb_rpc::DescribeReply &reply) {
+    jsonxx::json j;
+    j["code"] = reply.code();
+    j["msg"] = reply.msg();
+
+    if (reply.describe_table()) {
+        j["table"] = ToJson(reply.table());
+    }
+    if (reply.describe_partition()) {
+        j["partition"] = ToJson(reply.partition());
+    }
+    if (reply.describe_replica()) {
+        j["replica"] = ToJson(reply.replica());
+    }
+    return j.dump(4, ' ');
+}
+
+jsonxx::json
+ToJson(const vectordb_rpc::Table &table) {
+    jsonxx::json j;
+    j["name"] = table.name();
+    j["partition_num"] = table.partition_num();
+    j["replica_num"] = table.replica_num();
+    j["engine_type"] = table.engine_type();
+    j["path"] = table.path();
+    int k = 0;
+    for (int i = 0; i < table.partitions_size(); ++i) {
+        j["partitions"][k++] = table.partitions(i).name();
+    }
+    return j;
+}
+
+jsonxx::json
+ToJson(const vectordb_rpc::Partition &partition) {
+    jsonxx::json j;
+    j["id"] = partition.id();
+    j["name"] = partition.name();
+    j["table_name"] = partition.table_name();
+    j["replica_num"] = partition.replica_num();
+    j["engine_type"] = partition.engine_type();
+    j["path"] = partition.path();
+    int k = 0;
+    for (int i = 0; i < partition.replicas_size(); ++i) {
+        j["replicas"][k++] = partition.replicas(i).name();
+    }
+    return j;
+}
+
+jsonxx::json
+ToJson(const vectordb_rpc::Replica &replica) {
+    jsonxx::json j;
+    j["id"] = replica.id();
+    j["name"] = replica.name();
+    j["table_name"] = replica.table_name();
+    j["partition_name"] = replica.partition_name();
+    j["engine_type"] = replica.engine_type();
+    j["address"] = replica.address();
+    j["path"] = replica.path();
+    return j;
 }
 
 void

@@ -35,6 +35,7 @@ class VClient {
     void Ping(const vectordb_rpc::PingRequest &request, std::string &reply_msg);
     void CreateTable(const vectordb_rpc::CreateTableRequest &request, std::string &reply_msg);
     void ShowTables(const vectordb_rpc::ShowTablesRequest &request, std::string &reply_msg);
+    void Describe(const vectordb_rpc::DescribeRequest &request, std::string &reply_msg);
 
     void Info(std::string &reply_msg);
 
