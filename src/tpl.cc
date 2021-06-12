@@ -4,4 +4,4 @@ namespace vectordb {
 
 
 
-}  // namespace vectordb
+} // namespace vectordb

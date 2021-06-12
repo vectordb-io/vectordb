@@ -39,9 +39,9 @@ HelpStr() {
     s.append("quit").append("\n");
     s.append("version").append("\n");
     s.append("show tables").append("\n");
-    s.append("describe table_name").append("\n");
-    s.append("describe partition_name").append("\n");
-    s.append("describe replica_name").append("\n").append("\n");
+    s.append("desc table_name").append("\n");
+    s.append("desc partition_name").append("\n");
+    s.append("desc replica_name").append("\n").append("\n");
 
     s.append("create table {\"table_name\":\"vector_table\", \"engine_type\":\"vector\", \"dim\":100, \"partition_num\":1, \"replica_num\":1}").append("\n");
     s.append("put {\"table_name\":\"vector_table\", \"key\":\"kkk\", \"vector\":[1.13, 2.25, 3.73, 4.99], \"attach_value1\":\"attach_value1\", \"attach_value2\":\"attach_value2\", \"attach_value3\":\"attach_value3\"}").append("\n");
@@ -156,6 +156,8 @@ ToJson(const vectordb_rpc::Replica &replica) {
 
 void
 Split(const std::string &s, char separator, std::vector<std::string> &sv, const std::string ignore) {
+    sv.clear();
+
     std::set<char> ignore_chars;
     for (auto c : ignore) {
         ignore_chars.insert(c);

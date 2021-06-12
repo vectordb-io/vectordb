@@ -28,32 +28,6 @@ Node::Init() {
     s = grpc_server_.Init();
     assert(s.ok());
 
-#if 0
-    {
-        std::string table_name;
-        std::string str;
-        table_name = "my_table1";
-        str = Config::GetInstance().engine_path();
-        str.append("/");
-        str.append(table_name);
-        s = meta_.AddTable(table_name, 1, 1, kVEngineAnnoy, str);
-    }
-    {
-        std::string table_name;
-        std::string str;
-        table_name = "my_table2";
-        str = Config::GetInstance().engine_path();
-        str.append("/");
-        str.append(table_name);
-        s = meta_.AddTable(table_name, 5, 3, kVEngineAnnoy, str);
-    }
-
-    meta_.Persist();
-
-    LOG(INFO) << "add table: " << meta_.ToStringShort();
-    assert(s.ok());
-#endif
-
     return Status::OK();
 }
 
@@ -85,8 +59,8 @@ Node::OnPing(const vectordb_rpc::PingRequest* request, vectordb_rpc::PingReply* 
 
 Status
 Node::OnInfo(const vectordb_rpc::InfoRequest* request, vectordb_rpc::InfoReply* reply) {
-    reply->set_msg(meta_.ToStringInfo());
+    reply->set_msg(meta_.ToStringPretty());
     return Status::OK();
 }
 
-}  // namespace vectordb
+} // namespace vectordb

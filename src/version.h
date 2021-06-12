@@ -7,6 +7,6 @@ namespace vectordb {
 #define __VECTORDB__VERSION__ "v0.1"
 #endif
 
-}  // namespace vectordb
+} // namespace vectordb
 
 #endif

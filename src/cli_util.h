@@ -27,6 +27,6 @@ std::string ToString(const vectordb_rpc::DescribeReply &reply);
 
 } // namespace cli_util
 
-}  // namespace vectordb
+} // namespace vectordb
 
 #endif

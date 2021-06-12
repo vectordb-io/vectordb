@@ -31,6 +31,6 @@ class Vec {
     int dim_;
 };
 
-}  // namespace vectordb
+} // namespace vectordb
 
 #endif

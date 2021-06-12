@@ -73,7 +73,7 @@ VClient::Do(const std::vector<std::string> &cmd_sv, const std::string &params_js
         vectordb_rpc::ShowTablesRequest request;
         ShowTables(request, reply);
 
-    } else if (cmd_sv.size() == 2 && cmd_sv[0] == "describe") {
+    } else if (cmd_sv.size() == 2 && cmd_sv[0] == "desc") {
         vectordb_rpc::DescribeRequest request;
         request.set_name(cmd_sv[1]);
         Describe(request, reply);
@@ -223,4 +223,4 @@ VClient::Info(std::string &reply_msg) {
     }
 }
 
-}  // namespace vectordb
+} // namespace vectordb

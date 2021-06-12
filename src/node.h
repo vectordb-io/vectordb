@@ -48,6 +48,6 @@ class Node {
     GrpcServer grpc_server_;
 };
 
-}  // namespace vectordb
+} // namespace vectordb
 
 #endif

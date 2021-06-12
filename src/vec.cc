@@ -11,4 +11,4 @@ Vec::Vec(const std::vector<float> &data, int dim)
 }
 
 
-}  // namespace vectordb
+} // namespace vectordb

@@ -16,4 +16,9 @@ EngineManager::GetVEngine(const std::string &replica_name) const {
     return nullptr;
 }
 
-}  // namespace vectordb
+void
+EngineManager::AddVEngine(const std::string &replica_name, VEngine*) {
+
+}
+
+} // namespace vectordb

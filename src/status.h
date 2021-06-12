@@ -121,6 +121,6 @@ inline Status& Status::operator=(Status&& rhs) noexcept {
     return *this;
 }
 
-}  // namespace vectordb
+} // namespace vectordb
 
 #endif

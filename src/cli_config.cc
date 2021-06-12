@@ -61,4 +61,4 @@ CliConfig::ParseHostPort(const std::string &hp, std::string &host, int &port) {
     sscanf(p, "%d", &port);
 }
 
-}  // namespace vectordb
+} // namespace vectordb

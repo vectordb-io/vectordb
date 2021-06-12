@@ -15,6 +15,6 @@ struct WriteOptions {
     WriteOptions() = default;
 };
 
-}  // namespace vectordb
+} // namespace vectordb
 
 #endif

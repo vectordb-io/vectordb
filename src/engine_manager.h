@@ -18,11 +18,12 @@ class EngineManager {
 
     Status Init();
     VEngine* GetVEngine(const std::string &replica_name) const;
+    void AddVEngine(const std::string &replica_name, VEngine*);
 
   private:
     std::map<std::string, VEngine*> vengines_;
 };
 
-}  // namespace vectordb
+} // namespace vectordb
 
 #endif

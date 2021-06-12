@@ -7,6 +7,7 @@
 #include <string>
 #include <sstream>
 #include <iostream>
+#include <glog/logging.h>
 #include "meta.h"
 #include "util.h"
 
@@ -16,6 +17,8 @@ namespace util {
 
 void
 Split(const std::string &s, char separator, std::vector<std::string> &sv, const std::string ignore) {
+    sv.clear();
+
     std::set<char> ignore_chars;
     for (auto c : ignore) {
         ignore_chars.insert(c);
@@ -69,42 +72,60 @@ ToLower(std::string &str) {
 std::string
 PartitionName(const std::string &table_name, int partition_id) {
     char buf[256];
-    snprintf(buf, sizeof(buf), "%s#partition%d", table_name.c_str(), partition_id);
+    snprintf(buf, sizeof(buf), "%s#partition_%d", table_name.c_str(), partition_id);
     return std::string(buf);
 }
 
 std::string
 ReplicaName(const std::string &table_name, int partition_id, int replica_id) {
     char buf[256];
-    snprintf(buf, sizeof(buf), "%s#partition%d#replica%d", table_name.c_str(), partition_id, replica_id);
+    snprintf(buf, sizeof(buf), "%s#partition_%d#replica_%d", table_name.c_str(), partition_id, replica_id);
     return std::string(buf);
 }
 
 bool
 ParsePartitionName(const std::string &partition_name, std::string &table_name, int &partition_id) {
-    std::vector<std::string> sv;
+    std::vector<std::string> sv, sv_id;
     Split(partition_name, '#', sv);
     if (sv.size() != 2) {
         return false;
     }
     table_name = sv[0];
-    sscanf(sv[1].c_str(), "%d", &partition_id);
+
+    Split(sv[1], '_', sv_id);
+    if (sv_id.size() != 2) {
+        return false;
+    }
+    sscanf(sv_id[1].c_str(), "%d", &partition_id);
     return true;
 }
 
 bool
 ParseReplicaName(const std::string &replica_name, std::string &table_name, int &partition_id, int &replica_id) {
-    std::vector<std::string> sv;
+    std::vector<std::string> sv, sv_id;
     Split(replica_name, '#', sv);
     if (sv.size() != 3) {
         return false;
     }
     table_name = sv[0];
-    sscanf(sv[1].c_str(), "%d", &partition_id);
-    sscanf(sv[2].c_str(), "%d", &replica_id);
+
+    Split(sv[1], '_', sv_id);
+    if (sv_id.size() != 2) {
+        return false;
+    }
+    sscanf(sv_id[1].c_str(), "%d", &partition_id);
+
+    Split(sv[2], '_', sv_id);
+    if (sv_id.size() != 2) {
+        return false;
+    }
+    sscanf(sv_id[1].c_str(), "%d", &replica_id);
+
+    LOG(INFO) << "debug: " << sv[1].c_str() << " " << sv[2].c_str() << " " << partition_id << " " << replica_id;
+
     return true;
 }
 
 } // namespace util
 
-}  // namespace vectordb
+} // namespace vectordb

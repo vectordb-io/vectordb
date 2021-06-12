@@ -162,4 +162,4 @@ TableNames2Str(const std::vector<std::string> &table_names, std::string &s) {
     assert(ret);
 }
 
-}  // namespace vectordb
+} // namespace vectordb

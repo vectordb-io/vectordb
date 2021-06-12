@@ -4,6 +4,6 @@
 namespace vectordb {
 
 
-}  // namespace vectordb
+} // namespace vectordb
 
 #endif

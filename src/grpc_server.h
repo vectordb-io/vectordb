@@ -50,6 +50,6 @@ class GrpcServer {
     std::unique_ptr<grpc::Server> server_;
 };
 
-}  // namespace vectordb
+} // namespace vectordb
 
 #endif

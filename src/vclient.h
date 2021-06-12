@@ -43,6 +43,6 @@ class VClient {
     std::unique_ptr<vectordb_rpc::VectorDB::Stub> stub_;
 };
 
-}  // namespace vectordb
+} // namespace vectordb
 
 #endif

@@ -48,7 +48,8 @@ VectorDBServiceImpl::CreateTable(grpc::ServerContext* context,
     }
 
     if (et == kVectorEngine) {
-        // creaete vector db
+        VEngine* vengine;
+//       auto s = VEngine::Open(Options(), const std::string &name, VEngine** vengine);
     }
 
     return grpc::Status::OK;
@@ -60,7 +61,10 @@ VectorDBServiceImpl::ShowTables(grpc::ServerContext* context,
                                 const vectordb_rpc::ShowTablesRequest* request,
                                 vectordb_rpc::ShowTablesReply* reply) {
     std::vector<std::string> tables;
-    Node::GetInstance().meta().table_names(tables);
+    for (auto &t : Node::GetInstance().meta().tables()) {
+        tables.push_back(t.first);
+    }
+
     for (auto &t : tables) {
         std::string *s = reply->add_tables();
         *s = t;
@@ -73,7 +77,7 @@ VectorDBServiceImpl::Describe(grpc::ServerContext* context,
                               const vectordb_rpc::DescribeRequest* request,
                               vectordb_rpc::DescribeReply* reply) {
     reply->set_code(0);
-    std::string msg = "describe ";
+    std::string msg = "desc ";
     msg.append(request->name()).append(" ok");
     reply->set_msg(msg);
 
@@ -93,6 +97,8 @@ VectorDBServiceImpl::Describe(grpc::ServerContext* context,
         reply->set_describe_partition(false);
     }
 
+
+    LOG(INFO) << "debug begin GetReplica: " << request->name();
     std::shared_ptr<Replica> pr = Node::GetInstance().meta().GetReplica(request->name());
     if (pr) {
         reply->set_describe_replica(true);
@@ -147,4 +153,4 @@ Status GrpcServer::StopService() {
     return Status::OK();
 }
 
-}  // namespace vectordb
+} // namespace vectordb

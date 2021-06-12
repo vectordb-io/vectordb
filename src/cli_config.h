@@ -29,6 +29,6 @@ class CliConfig {
     int port_;
 };
 
-}  // namespace vectordb
+} // namespace vectordb
 
 #endif

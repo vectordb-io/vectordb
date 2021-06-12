@@ -103,6 +103,6 @@ inline int Slice::compare(const Slice& b) const {
     return r;
 }
 
-}  // namespace vectordb
+} // namespace vectordb
 
 #endif
