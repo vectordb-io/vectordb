@@ -86,7 +86,19 @@ VClient::Do(const std::vector<std::string> &cmd_sv, const std::string &params_js
     } else if (cmd_sv.size() == 1 && cmd_sv[0] == "exit") {
         exit(0);
 
+    } else if (cmd_sv.size() == 1 && cmd_sv[0] == "exit()") {
+        exit(0);
+
+    } else if (cmd_sv.size() == 1 && cmd_sv[0] == "exit;") {
+        exit(0);
+
     } else if (cmd_sv.size() == 1 && cmd_sv[0] == "quit") {
+        exit(0);
+
+    } else if (cmd_sv.size() == 1 && cmd_sv[0] == "quit()") {
+        exit(0);
+
+    } else if (cmd_sv.size() == 1 && cmd_sv[0] == "quit;") {
         exit(0);
 
     } else if (cmd_sv.size() == 1 && cmd_sv[0] == "help") {
@@ -101,37 +113,58 @@ VClient::Do(const std::vector<std::string> &cmd_sv, const std::string &params_js
 
     } else if (cmd_sv.size() == 2 && cmd_sv[0] == "build" && cmd_sv[1] == "index") {
 
-    } else if (cmd_sv.size() == 2 && cmd_sv[0] == "put" && cmd_sv[1] == "vector") {
-        std::cout << "cmd: put vector" << std::endl;
+    } else if (cmd_sv.size() == 1 && cmd_sv[0] == "put") {
         try {
             auto j = jsonxx::json::parse(params_json);
             std::string table_name = j["table_name"].as_string();
             std::string key = j["key"].as_string();
+            const auto& vector_arr = j["vector"].as_array();
+
+            vectordb_rpc::PutVecRequest request;
+            request.set_table(table_name);
+            request.set_key(key);
+            for (auto &jobj : vector_arr) {
+                double dd = jobj.as_float();
+                request.mutable_vec()->add_data(dd);
+            }
+            PutVec(request, reply);
+
+
+            /*
             std::string attach_value1 = j["attach_value1"].as_string();
             std::string attach_value2 = j["attach_value2"].as_string();
             std::string attach_value3 = j["attach_value3"].as_string();
             const auto& vector_arr = j["vector"].as_array();
-
-            std::cout << "table_name:" << table_name << std::endl;
-            std::cout << "key:" << key << std::endl;
-            std::cout << "vector: {" << std::endl;
+            std::cout << "attach_value1:" << attach_value1 << std::endl;
+            std::cout << "attach_value2:" << attach_value2 << std::endl;
+            std::cout << "attach_value3:" << attach_value3 << std::endl;
             for (auto &jobj : vector_arr) {
                 double dd;
                 dd = jobj.as_float();
                 std::cout << "jobj.is_float(): " << jobj.is_float() << " data:" << dd << std::endl;
             }
-            std::cout << "}" << std::endl;
-            std::cout << "attach_value1:" << attach_value1 << std::endl;
-            std::cout << "attach_value2:" << attach_value2 << std::endl;
-            std::cout << "attach_value3:" << attach_value3 << std::endl;
+
+            */
 
 
         } catch (std::exception &e) {
             std::cout << e.what() << std::endl;
         }
 
+    } else if (cmd_sv.size() == 1 && cmd_sv[0] == "get") {
+        try {
+            auto j = jsonxx::json::parse(params_json);
+            std::string table_name = j["table_name"].as_string();
+            std::string key = j["key"].as_string();
 
-    } else if (cmd_sv.size() == 2 && cmd_sv[0] == "get" && cmd_sv[1] == "vector") {
+            vectordb_rpc::GetVecRequest request;
+            request.set_table(table_name);
+            request.set_key(key);
+            GetVec(request, reply);
+
+        } catch (std::exception &e) {
+            std::cout << e.what() << std::endl;
+        }
 
     } else if (cmd_sv.size() == 1 && cmd_sv[0] == "getknn") {
 
@@ -222,5 +255,30 @@ VClient::Info(const vectordb_rpc::InfoRequest &request, std::string &reply_msg) 
         reply_msg = status.error_message();
     }
 }
+
+void
+VClient::PutVec(const vectordb_rpc::PutVecRequest &request, std::string &reply_msg) {
+    vectordb_rpc::PutVecReply reply;
+    grpc::ClientContext context;
+    grpc::Status status = stub_->PutVec(&context, request, &reply);
+    if (status.ok()) {
+        reply_msg = cli_util::ToString(reply);
+    } else {
+        reply_msg = status.error_message();
+    }
+}
+
+void
+VClient::GetVec(const vectordb_rpc::GetVecRequest &request, std::string &reply_msg) {
+    vectordb_rpc::GetVecReply reply;
+    grpc::ClientContext context;
+    grpc::Status status = stub_->GetVec(&context, request, &reply);
+    if (status.ok()) {
+        reply_msg = cli_util::ToString(reply);
+    } else {
+        reply_msg = status.error_message();
+    }
+}
+
 
 } // namespace vectordb

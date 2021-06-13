@@ -8,6 +8,34 @@ service VectorDB {
   rpc CreateTable (CreateTableRequest) returns (CreateTableReply) {}
   rpc ShowTables (ShowTablesRequest) returns (ShowTablesReply) {}
   rpc Describe (DescribeRequest) returns (DescribeReply) {}
+  rpc PutVec (PutVecRequest) returns (PutVecReply) {}
+  rpc GetVec (GetVecRequest) returns (GetVecReply) {}
+}
+
+message Vec {
+  repeated double data = 1;
+}
+
+message PutVecRequest {
+  string table = 1;
+  string key = 2;
+  Vec vec = 3;
+}
+
+message PutVecReply {
+  int32 code = 1;
+  string msg = 2;
+}
+
+message GetVecRequest {
+  string table = 1;
+  string key = 2;
+}
+
+message GetVecReply {
+  int32 code = 1;
+  string msg = 2;
+  Vec vec = 3;
 }
 
 message Replica {
@@ -41,6 +69,7 @@ message Table {
   string path = 5;
   repeated Partition partitions = 6;
   repeated Index indices = 7;
+  int32 dim = 8;
 }
 
 message TableNames {

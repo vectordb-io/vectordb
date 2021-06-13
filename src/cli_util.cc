@@ -119,6 +119,7 @@ jsonxx::json
 ToJson(const vectordb_rpc::Table &table) {
     jsonxx::json j;
     j["name"] = table.name();
+    j["dim"] = table.dim();
     j["partition_num"] = table.partition_num();
     j["replica_num"] = table.replica_num();
     j["engine_type"] = table.engine_type();
@@ -164,6 +165,26 @@ ToJson(const vectordb_rpc::Replica &replica) {
     j["path"] = replica.path();
     return j;
 }
+
+std::string
+ToString(const vectordb_rpc::PutVecReply &reply) {
+    jsonxx::json j;
+    j["code"] = reply.code();
+    j["msg"] = reply.msg();
+    return j.dump(4, ' ');
+}
+
+std::string
+ToString(const vectordb_rpc::GetVecReply &reply) {
+    jsonxx::json j;
+    j["code"] = reply.code();
+    j["msg"] = reply.msg();
+    for (int i = 0; i < reply.vec().data_size(); ++i) {
+        j["vec"][i] = reply.vec().data(i);
+    }
+    return j.dump(4, ' ');
+}
+
 
 void
 Split(const std::string &s, char separator, std::vector<std::string> &sv, const std::string ignore) {

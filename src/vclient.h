@@ -37,6 +37,8 @@ class VClient {
     void CreateTable(const vectordb_rpc::CreateTableRequest &request, std::string &reply_msg);
     void ShowTables(const vectordb_rpc::ShowTablesRequest &request, std::string &reply_msg);
     void Describe(const vectordb_rpc::DescribeRequest &request, std::string &reply_msg);
+    void PutVec(const vectordb_rpc::PutVecRequest &request, std::string &reply_msg);
+    void GetVec(const vectordb_rpc::GetVecRequest &request, std::string &reply_msg);
 
     std::shared_ptr<grpc::Channel> channel_;
     std::unique_ptr<vectordb_rpc::VectorDB::Stub> stub_;

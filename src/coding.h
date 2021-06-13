@@ -1,6 +1,7 @@
 #ifndef __VECTORDB_CODING_H__
 #define __VECTORDB_CODING_H__
 
+#include "vec.h"
 #include "meta.h"
 #include "vectordb_rpc.pb.h"
 
@@ -25,6 +26,10 @@ bool Str2Table(const std::string &s, Table &table);
 bool Str2TableNames(const std::string &s, std::vector<std::string> &table_names);
 void TableNames2Str(const std::vector<std::string> &table_names, std::string &s);
 
+void Vec2Pb(const Vec &v, vectordb_rpc::Vec &pb);
+void Pb2Vec(const vectordb_rpc::Vec &pb, Vec &v);
+void Vec2Str(const Vec &v, std::string &s);
+bool Str2Vec(const std::string &s, Vec &v);
 
 } // namespace vectordb
 

@@ -38,6 +38,7 @@ Pb2Table(const vectordb_rpc::Table &pb, Table &table) {
     param.replica_num = pb.replica_num();
     param.engine_type = pb.engine_type();
     param.path = pb.path();
+    param.dim = pb.dim();
     for (int i = 0; i < pb.partitions_size(); i++) {
         const vectordb_rpc::Partition &partition_pb = pb.partitions(i);
         Partition partition;
@@ -85,6 +86,7 @@ Table2Pb(const Table &table, vectordb_rpc::Table &pb) {
     pb.set_replica_num(table.replica_num());
     pb.set_engine_type(table.engine_type());
     pb.set_path(table.path());
+    pb.set_dim(table.dim());
     for (auto &p : table.partitions()) {
         vectordb_rpc::Partition* partition = pb.add_partitions();
         Partition2Pb(*(p.second), *partition);
@@ -173,6 +175,39 @@ TableNames2Str(const std::vector<std::string> &table_names, std::string &s) {
     }
     bool ret = pb.SerializeToString(&s);
     assert(ret);
+}
+
+void
+Vec2Pb(const Vec &v, vectordb_rpc::Vec &pb) {
+    for (auto &d : v.data()) {
+        pb.add_data(d);
+    }
+}
+
+void
+Pb2Vec(const vectordb_rpc::Vec &pb, Vec &v) {
+    v.mutable_data().clear();
+    for (int i = 0; i < pb.data_size(); ++i) {
+        v.mutable_data().push_back(pb.data(i));
+    }
+}
+
+void
+Vec2Str(const Vec &v, std::string &s) {
+    vectordb_rpc::Vec pb;
+    Vec2Pb(v, pb);
+    bool ret = pb.SerializeToString(&s);
+    assert(ret);
+}
+
+bool
+Str2Vec(const std::string &s, Vec &v) {
+    vectordb_rpc::Vec pb;
+    bool ret = pb.ParseFromString(s);
+    if (ret) {
+        Pb2Vec(pb, v);
+    }
+    return ret;
 }
 
 } // namespace vectordb

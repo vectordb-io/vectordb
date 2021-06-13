@@ -2,12 +2,11 @@
 
 namespace vectordb {
 
-Vec::Vec()
-    :dim_(0) {
+Vec::Vec() {
 }
 
-Vec::Vec(const std::vector<float> &data, int dim)
-    :data_(data), dim_(dim) {
+Vec::Vec(const std::vector<double> &data)
+    :data_(data) {
 }
 
 

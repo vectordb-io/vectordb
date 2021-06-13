@@ -8,27 +8,27 @@ namespace vectordb {
 class Vec {
   public:
     Vec();
-    Vec(const std::vector<float> &data, int dim);
+    Vec(const std::vector<double> &data);
     Vec(const Vec&) = default;
     Vec& operator=(const Vec&) = default;
     ~Vec() = default;
 
     int dim() const {
-        return dim_;
+        return data_.size();
     }
 
-    void set_dim(int dim) {
-        dim_ = dim;
+    const std::vector<double>&
+    data() const {
+        return data_;
     }
 
-    std::vector<float>&
-    data() {
+    std::vector<double>&
+    mutable_data() {
         return data_;
     }
 
   private:
-    std::vector<float> data_;
-    int dim_;
+    std::vector<double> data_;
 };
 
 } // namespace vectordb

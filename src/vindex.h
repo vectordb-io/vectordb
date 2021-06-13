@@ -1,5 +1,5 @@
-#ifndef __VECTORDB_VINDEX_H__
-#define __VECTORDB_VINDEX_H__
+#ifndef __VECTORVIndex_VINDEX_H__
+#define __VECTORVIndex_VINDEX_H__
 
 #include "vec.h"
 #include "status.h"
@@ -30,6 +30,12 @@ class VecDt {
 };
 
 class VIndex {
+  public:
+    VIndex() = default;
+    VIndex(const VIndex&) = delete;
+    VIndex& operator=(const VIndex&) = delete;
+    virtual ~VIndex();
+
     virtual Status GetKNN(const std::string &key, std::vector<VecDt> &results) = 0;
     virtual Status GetKNN(const Vec &vec, std::vector<VecDt> &results) = 0;
     virtual Status BuildIndex() = 0;

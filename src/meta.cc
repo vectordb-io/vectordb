@@ -117,10 +117,8 @@ Meta::ReplicaName(const std::string &table_name,
         msg.append(table_name);
         return Status::NotFound(msg);
     }
-
-    char buf[256];
-    snprintf(buf, sizeof(buf), "%s#partition0#replica0", table_name.c_str());
-    replica_name = std::string(buf);
+    int partition_id = util::RSHash(key.c_str()) % it_table->second->partition_num();
+    replica_name = util::ReplicaName(table_name, partition_id, 0);
     return Status::OK();
 }
 
@@ -201,6 +199,7 @@ jsonxx::json
 Table::ToJson() const {
     jsonxx::json j;
     j["name"] = name_;
+    j["dim"] = dim_;
     j["partition_num"] = partition_num_;
     j["replica_num"] = replica_num_;
     j["engine_type"] = engine_type_;

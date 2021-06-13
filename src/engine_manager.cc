@@ -19,7 +19,9 @@ EngineManager::GetVEngine(const std::string &replica_name) const {
 
 void
 EngineManager::AddVEngine(const std::string &replica_name, std::shared_ptr<VEngine> ve) {
-
+    auto it = vengines_.find(replica_name);
+    assert(it == vengines_.end());
+    vengines_.insert(std::pair<std::string, std::shared_ptr<VEngine>>(replica_name, ve));
 }
 
 } // namespace vectordb

@@ -52,6 +52,25 @@ VectorDBServiceImpl::Describe(grpc::ServerContext* context,
     return grpc::Status::OK;
 }
 
+grpc::Status
+VectorDBServiceImpl::PutVec(grpc::ServerContext* context,
+                            const vectordb_rpc::PutVecRequest* request,
+                            vectordb_rpc::PutVecReply* reply) {
+    auto s = Node::GetInstance().OnPutVec(request, reply);
+    assert(s.ok());
+    return grpc::Status::OK;
+
+}
+
+grpc::Status
+VectorDBServiceImpl::GetVec(grpc::ServerContext* context,
+                            const vectordb_rpc::GetVecRequest* request,
+                            vectordb_rpc::GetVecReply* reply) {
+    auto s = Node::GetInstance().OnGetVec(request, reply);
+    assert(s.ok());
+    return grpc::Status::OK;
+}
+
 GrpcServer::GrpcServer() {
 }
 

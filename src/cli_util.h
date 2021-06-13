@@ -25,6 +25,8 @@ std::string ToString(const vectordb_rpc::InfoReply &reply);
 std::string ToString(const vectordb_rpc::CreateTableReply &reply);
 std::string ToString(const vectordb_rpc::ShowTablesReply &reply);
 std::string ToString(const vectordb_rpc::DescribeReply &reply);
+std::string ToString(const vectordb_rpc::PutVecReply &reply);
+std::string ToString(const vectordb_rpc::GetVecReply &reply);
 
 
 

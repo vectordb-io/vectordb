@@ -8,6 +8,7 @@ namespace vectordb {
 
 namespace util {
 
+unsigned int RSHash(const char *str);
 void Split(const std::string &s, char separator, std::vector<std::string> &sv, const std::string ignore = "");
 
 void ToLower(std::string &str);

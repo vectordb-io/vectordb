@@ -29,6 +29,13 @@ class VectorDBServiceImpl final : public vectordb_rpc::VectorDB::Service {
                           const vectordb_rpc::DescribeRequest* request,
                           vectordb_rpc::DescribeReply* reply) override;
 
+    grpc::Status PutVec(grpc::ServerContext* context,
+                        const vectordb_rpc::PutVecRequest* request,
+                        vectordb_rpc::PutVecReply* reply) override;
+
+    grpc::Status GetVec(grpc::ServerContext* context,
+                        const vectordb_rpc::GetVecRequest* request,
+                        vectordb_rpc::GetVecReply* reply) override;
   private:
 };
 

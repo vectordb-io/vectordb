@@ -50,6 +50,7 @@ struct TableParam {
     int replica_num;
     std::string engine_type;
     std::string path;
+    int dim;
 };
 
 class Replica {
@@ -227,6 +228,7 @@ class Table {
     Table() = default;
     Table(const TableParam &param)
         :name_(param.name),
+         dim_(param.dim),
          partition_num_(param.partition_num),
          replica_num_(param.replica_num),
          engine_type_(param.engine_type),
@@ -250,6 +252,14 @@ class Table {
 
     int partition_num() const {
         return partition_num_;
+    }
+
+    int dim() const {
+        return dim_;
+    }
+
+    void set_dim(int dim) {
+        dim_ = dim;
     }
 
     void set_partition_num(int partition_num) {
@@ -313,6 +323,7 @@ class Table {
     jsonxx::json ToJson() const;
 
     std::string name_;
+    int dim_;
     int partition_num_;
     int replica_num_;
     std::string engine_type_;
