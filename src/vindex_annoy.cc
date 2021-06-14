@@ -42,6 +42,7 @@ VIndexAnnoy::GetKNN(const std::string &key, int limit, std::vector<VecDt> &resul
         VecDt vdt(find_key, distances[i]);
         results.push_back(vdt);
     }
+    std::sort(results.begin(), results.end());
     return Status::OK();
 }
 
