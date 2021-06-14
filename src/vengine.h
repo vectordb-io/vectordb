@@ -16,7 +16,7 @@ namespace vectordb {
 
 class VEngine {
   public:
-    VEngine(std::string path, const std::map<std::string, std::string> &indices);
+    VEngine(std::string path, int dim, const std::map<std::string, std::string> &indices);
     VEngine(const VEngine&) = delete;
     VEngine& operator=(const VEngine&) = delete;
     ~VEngine();
@@ -26,25 +26,37 @@ class VEngine {
     Status Delete(const std::string &key);
 
     bool HasIndex() const;
-    Status BuildIndex(std::string index_name, std::string index_type);
+    Status AddIndex(std::string index_name, std::string index_type);
     Status GetKNN(const std::string &key, std::vector<VecDt> &results, const std::string &index_type);
     Status GetKNN(const Vec &vec, std::vector<VecDt> &results, const std::string &index_type);
+
+    Status Init();
 
     leveldb::DB* data() {
         return data_;
     }
 
+    int dim() const {
+        return dim_;
+    }
+
   private:
-    Status Mkdir();
-    Status InitData();
-    Status InitIndices(const std::map<std::string, std::string> &indices);
+    Status Build();
+    Status BuildData();
+    Status Load();
+    Status BuildIndex();
+    Status LoadData();
+    Status LoadIndex();
 
     std::string path_;
     std::string data_path_;
     std::string index_path_;
 
+    int dim_;
     leveldb::DB* data_;
+    //std::map<std::string, VIndex*> indices_;
     std::map<std::string, std::shared_ptr<VIndex>> indices_;
+    std::map<std::string, std::string> indices_name_type_;
 };
 
 } // namespace vectordb

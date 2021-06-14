@@ -89,6 +89,14 @@ VectorDBServiceImpl::Keys(grpc::ServerContext* context,
     return grpc::Status::OK;
 }
 
+grpc::Status
+VectorDBServiceImpl::BuildIndex(grpc::ServerContext* context,
+                                const vectordb_rpc::BuildIndexRequest* request,
+                                vectordb_rpc::BuildIndexReply* reply) {
+    auto s = Node::GetInstance().OnBuildIndex(request, reply);
+    assert(s.ok());
+    return grpc::Status::OK;
+}
 
 GrpcServer::GrpcServer() {
 }

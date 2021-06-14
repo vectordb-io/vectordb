@@ -214,7 +214,7 @@ Table::ToJson() const {
         jsonxx::json ji;
         ji["index_name"] = kv.first;
         ji["index_type"] = kv.second;
-        j[k++] = ji;
+        j["indices"][k++] = ji;
     }
     return j;
 }

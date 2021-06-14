@@ -109,7 +109,19 @@ VClient::Do(const std::vector<std::string> &cmd_sv, const std::string &params_js
         reply = __VECTORDB__VERSION__;
 
     } else if (cmd_sv.size() == 2 && cmd_sv[0] == "build" && cmd_sv[1] == "index") {
+        try {
+            auto j = jsonxx::json::parse(params_json);
+            std::string table_name = j["table_name"].as_string();
+            std::string index_type = j["index_type"].as_string();
+            vectordb_rpc::BuildIndexRequest request;
+            request.set_table(table_name);
+            request.set_index_type(index_type);
+            request.set_k(0);
+            BuildIndex(request, reply);
 
+        } catch (std::exception &e) {
+            std::cout << e.what() << std::endl;
+        }
 
     } else if (cmd_sv.size() == 1 && cmd_sv[0] == "keys") {
         try {
@@ -317,5 +329,21 @@ VClient::Keys(const vectordb_rpc::KeysRequest &request, std::string &reply_msg) 
         reply_msg = status.error_message();
     }
 }
+
+void
+VClient::BuildIndex(const vectordb_rpc::BuildIndexRequest &request, std::string &reply_msg) {
+    vectordb_rpc::BuildIndexReply reply;
+    grpc::ClientContext context;
+    grpc::Status status = stub_->BuildIndex(&context, request, &reply);
+    if (status.ok()) {
+        reply_msg = cli_util::ToString(reply);
+    } else {
+        reply_msg = status.error_message();
+    }
+}
+
+
+
+
 
 } // namespace vectordb

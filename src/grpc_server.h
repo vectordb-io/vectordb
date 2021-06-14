@@ -45,8 +45,13 @@ class VectorDBServiceImpl final : public vectordb_rpc::VectorDB::Service {
                       const vectordb_rpc::KeysRequest* request,
                       vectordb_rpc::KeysReply* reply) override;
 
+    grpc::Status BuildIndex(grpc::ServerContext* context,
+                            const vectordb_rpc::BuildIndexRequest* request,
+                            vectordb_rpc::BuildIndexReply* reply) override;
+
 
   private:
+
 };
 
 class GrpcServer {

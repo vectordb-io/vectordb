@@ -1,19 +1,19 @@
-#ifndef __VECTORVIndex_VINDEX_H__
-#define __VECTORVIndex_VINDEX_H__
+#ifndef __VECTORDB_VINDEX_H__
+#define __VECTORDB_VINDEX_H__
 
-#include "vec.h"
+#include <string>
 #include "status.h"
 
 namespace vectordb {
 
 class VecDt {
   public:
-    VecDt(const Vec &vec, double distance)
-        :vec_(vec), distance_(distance) {
+    VecDt(const std::string key, double distance)
+        :key_(key), distance_(distance) {
     }
 
-    const Vec& vec() const {
-        return vec_;
+    const std::string& key() const {
+        return key_;
     }
 
     double distance() const {
@@ -25,7 +25,7 @@ class VecDt {
     }
 
   private:
-    Vec vec_;
+    std::string key_;
     double distance_;
 };
 
@@ -34,11 +34,12 @@ class VIndex {
     VIndex() = default;
     VIndex(const VIndex&) = delete;
     VIndex& operator=(const VIndex&) = delete;
-    virtual ~VIndex();
+    virtual ~VIndex() = default;
 
-    virtual Status GetKNN(const std::string &key, std::vector<VecDt> &results) = 0;
-    virtual Status GetKNN(const Vec &vec, std::vector<VecDt> &results) = 0;
-    virtual Status BuildIndex() = 0;
+    virtual Status GetKNN(const std::string &key, int limit, std::vector<VecDt> &results) = 0;
+    virtual Status GetKNN(const Vec &vec, int limit, std::vector<VecDt> &results) = 0;
+    virtual Status Distance(const std::string &key1, const std::string &key2, double &distance) = 0;
+    virtual Status Init() = 0;
 };
 
 } // namespace vectordb

@@ -12,6 +12,11 @@ service VectorDB {
   rpc GetVec (GetVecRequest) returns (GetVecReply) {}
   rpc DistKey (DistKeyRequest) returns (DistKeyReply) {}
   rpc Keys (KeysRequest) returns (KeysReply) {}
+  rpc BuildIndex (BuildIndexRequest) returns (BuildIndexReply) {}
+}
+
+message Int32 {
+  int32 data = 1;
 }
 
 message VecObj {
@@ -34,6 +39,17 @@ message KeysReply {
   int32 code = 1;
   string msg = 2;
   repeated string keys = 3;
+}
+
+message BuildIndexRequest {
+  string table = 1;
+  string index_type = 2;
+  int32 k = 3;
+}
+
+message BuildIndexReply {
+  int32 code = 1;
+  string msg = 2;
 }
 
 message DistKeyRequest {

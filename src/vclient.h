@@ -41,6 +41,7 @@ class VClient {
     void GetVec(const vectordb_rpc::GetVecRequest &request, std::string &reply_msg);
     void DistKey(const vectordb_rpc::DistKeyRequest &request, std::string &reply_msg);
     void Keys(const vectordb_rpc::KeysRequest &request, std::string &reply_msg);
+    void BuildIndex(const vectordb_rpc::BuildIndexRequest &request, std::string &reply_msg);
 
     std::shared_ptr<grpc::Channel> channel_;
     std::unique_ptr<vectordb_rpc::VectorDB::Stub> stub_;

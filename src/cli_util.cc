@@ -217,6 +217,14 @@ ToString(const vectordb_rpc::KeysReply &reply) {
     return j.dump(4, ' ');
 }
 
+std::string
+ToString(const vectordb_rpc::BuildIndexReply &reply) {
+    jsonxx::json j;
+    j["code"] = reply.code();
+    j["msg"] = reply.msg();
+    return j.dump(4, ' ');
+}
+
 void
 Split(const std::string &s, char separator, std::vector<std::string> &sv, const std::string ignore) {
     sv.clear();

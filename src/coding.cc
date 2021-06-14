@@ -248,6 +248,22 @@ Str2VecObj(const std::string &s, VecObj &vo) {
     return ret;
 }
 
+void
+Int322Str(int32_t i, std::string &s) {
+    vectordb_rpc::Int32 pb;
+    pb.set_data(i);
+    bool ret = pb.SerializeToString(&s);
+    assert(ret);
+}
 
+bool
+Str2Int32(const std::string &s, int32_t &i) {
+    vectordb_rpc::Int32 pb;
+    bool ret = pb.ParseFromString(s);
+    if (ret) {
+        i = pb.data();
+    }
+    return ret;
+}
 
 } // namespace vectordb

@@ -111,7 +111,7 @@ Node::OnCreateTable(const vectordb_rpc::CreateTableRequest* request, vectordb_rp
             for (auto &r : p.second->replicas()) {
                 auto replica_sp = r.second;
                 std::map<std::string, std::string> empty_indices;
-                auto vengine = std::make_shared<VEngine>(replica_sp->path(), empty_indices);
+                auto vengine = std::make_shared<VEngine>(replica_sp->path(), request->dim(), empty_indices);
                 if (!vengine) {
                     reply->set_code(1);
                     std::string msg = "create table ";
@@ -120,6 +120,8 @@ Node::OnCreateTable(const vectordb_rpc::CreateTableRequest* request, vectordb_rp
                     reply->set_msg(msg);
                     return Status::Corruption(msg);
                 }
+                auto s = vengine->Init();
+                assert(s.ok());
                 engine_manager_.AddVEngine(replica_sp->name(), vengine);
             }
         }
@@ -347,6 +349,45 @@ Node::OnKeys(const vectordb_rpc::KeysRequest* request, vectordb_rpc::KeysReply* 
     } else {
         reply->set_code(1);
         reply->set_msg("table not exist");
+    }
+
+    return Status::OK();
+}
+
+Status
+Node::OnBuildIndex(const vectordb_rpc::BuildIndexRequest* request, vectordb_rpc::BuildIndexReply* reply) {
+    std::string err_msg;
+    Status s;
+
+    auto it = meta_.tables().find(request->table());
+    if (it == meta_.tables().end()) {
+        reply->set_code(1);
+        reply->set_msg("table not exist");
+
+    } else {
+        std::string index_type = request->index_type();
+        util::ToLower(index_type);
+        std::string index_name;
+        char buf[128];
+        snprintf(buf, sizeof(buf), "%s%ld", index_type.c_str(), time(nullptr));
+        index_name = std::string(buf);
+
+        for (auto &partition_kv : it->second->partitions()) {
+            for (auto &replica_kv : partition_kv.second->replicas()) {
+                auto replica_sp = replica_kv.second;
+                auto engine_sp = engine_manager_.GetVEngine(replica_sp->name());
+                assert(engine_sp);
+
+                auto s = engine_sp->AddIndex(index_name, index_type);
+                assert(s.ok());
+            }
+        }
+
+        it->second->mutable_indices().insert(std::pair<std::string, std::string>(index_name, index_type));
+        meta_.Persist();
+
+        reply->set_code(0);
+        reply->set_msg("ok");
     }
 
     return Status::OK();

@@ -2,22 +2,15 @@
 #include "util.h"
 #include "coding.h"
 #include "vengine.h"
+#include "vindex_annoy.h"
 
 namespace vectordb {
 
-VEngine::VEngine(std::string path,
+VEngine::VEngine(std::string path, int dim,
                  const std::map<std::string, std::string> &indices)
-    :path_(path) {
+    :path_(path), dim_(dim), indices_name_type_(indices) {
     data_path_ = path_ + "/data";
     index_path_ = path_ + "/index";
-
-    Status s;
-    s = Mkdir();
-    assert(s.ok());
-    s = InitData();
-    assert(s.ok());
-    s = InitIndices(indices);
-    assert(s.ok());
 }
 
 VEngine::~VEngine() {
@@ -25,20 +18,32 @@ VEngine::~VEngine() {
 }
 
 Status
-VEngine::Mkdir() {
-    if (!util::DirOK(path_)) {
-        LOG(INFO) << "mkdir " << path_;
+VEngine::Init() {
+    Status s;
+    if (util::DirOK(path_)) {
+        s = Load();
+        assert(s.ok());
+
+    } else {
         util::Mkdir(path_);
-    }
-    if (!util::DirOK(index_path_)) {
-        LOG(INFO) << "mkdir " << index_path_;
-        util::Mkdir(index_path_);
+        s = Build();
+        assert(s.ok());
     }
     return Status::OK();
 }
 
 Status
-VEngine::InitData() {
+VEngine::Build() {
+    Status s;
+    s = BuildData();
+    assert(s.ok());
+    s = BuildIndex();
+    assert(s.ok());
+    return Status::OK();
+}
+
+Status
+VEngine::BuildData() {
     leveldb::Options options;
     options.create_if_missing = true;
     leveldb::Status status = leveldb::DB::Open(options, data_path_, &data_);
@@ -47,20 +52,50 @@ VEngine::InitData() {
 }
 
 Status
-VEngine::InitIndices(const std::map<std::string, std::string> &indices) {
-    for (auto &kv : indices) {
+VEngine::BuildIndex() {
+    util::Mkdir(index_path_);
+    return Status::OK();
+}
+
+Status
+VEngine::Load() {
+    Status s;
+    s = LoadData();
+    assert(s.ok());
+    s = LoadIndex();
+    assert(s.ok());
+    return Status::OK();
+}
+
+Status
+VEngine::LoadData() {
+    leveldb::Options options;
+    //options.create_if_missing = true;
+    leveldb::Status status = leveldb::DB::Open(options, data_path_, &data_);
+    assert(status.ok());
+    return Status::OK();
+}
+
+Status
+VEngine::LoadIndex() {
+    for (auto &kv : indices_name_type_) {
         std::string index_name = kv.first;
         std::string index_type = kv.second;
-        std::string index_path = index_path_ + "/" + index_name;
-        //auto sp = std::make_shared<VIndex>(index_path, index_type);
-        //assert(sp);
-        //indices_.insert(std::pair<std::string, std::shared_ptr<VIndex>>(index_name, sp));
+
+        auto s = AddIndex(index_name, index_type);
+        if (!s.ok()) {
+            ;
+        }
     }
     return Status::OK();
 }
 
 Status
 VEngine::Put(const std::string &key, const VecObj &vo) {
+    if (vo.vec().dim() != dim_) {
+        return Status::Corruption("dim error");
+    }
+
     std::string value;
     VecObj2Str(vo, value);
 
@@ -96,7 +131,25 @@ VEngine::Delete(const std::string &key) {
 }
 
 Status
-VEngine::BuildIndex(std::string index_name, std::string index_type) {
+VEngine::AddIndex(std::string index_name, std::string index_type) {
+    std::string index_path = index_path_ + "/" + index_name;
+    std::shared_ptr<VIndex> index_sp;
+    if (index_type == VECTOR_INDEX_ANNOY) {
+        index_sp = std::make_shared<VIndexAnnoy>(index_path, this);
+        assert(index_sp);
+        auto s = index_sp->Init();
+        assert(s.ok());
+    } else if (index_type == VECTOR_INDEX_KNNGRAPH) {
+
+    } else {
+        LOG(INFO) << "known index type:" << index_type;
+    }
+
+    if (index_sp) {
+        indices_.insert(std::pair<std::string, std::shared_ptr<VIndex>>(index_name, index_sp));
+        LOG(INFO) << "add index: " << index_name << " " << index_type;
+    }
+    return Status::OK();
 }
 
 bool

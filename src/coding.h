@@ -36,6 +36,8 @@ void Pb2VecObj(const vectordb_rpc::VecObj &pb, VecObj &vo);
 void VecObj2Str(const VecObj &vo, std::string &s);
 bool Str2VecObj(const std::string &s, VecObj &vo);
 
+void Int322Str(int32_t i, std::string &s);
+bool Str2Int32(const std::string &s, int32_t &i);
 
 } // namespace vectordb
 

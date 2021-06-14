@@ -11,8 +11,10 @@ EngineManager::Init() {
                 for (auto &replica_kv : partition_kv.second->replicas()) {
                     auto replica_sp = replica_kv.second;
                     std::map<std::string, std::string> empty_indices;
-                    auto vengine = std::make_shared<VEngine>(replica_sp->path(), empty_indices);
+                    auto vengine = std::make_shared<VEngine>(replica_sp->path(), table_kv.second->dim(), empty_indices);
                     assert(vengine);
+                    auto s = vengine->Init();
+                    assert(s.ok());
                     Node::GetInstance().mutable_engine_manager().AddVEngine(replica_sp->name(), vengine);
                 }
             }
