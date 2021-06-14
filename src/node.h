@@ -31,20 +31,31 @@ class Node {
     Status OnDescribe(const vectordb_rpc::DescribeRequest* request, vectordb_rpc::DescribeReply* reply);
     Status OnPutVec(const vectordb_rpc::PutVecRequest* request, vectordb_rpc::PutVecReply* reply);
     Status OnGetVec(const vectordb_rpc::GetVecRequest* request, vectordb_rpc::GetVecReply* reply);
+    Status OnDistKey(const vectordb_rpc::DistKeyRequest* request, vectordb_rpc::DistKeyReply* reply);
 
     GrpcServer& grpc_server() {
         return grpc_server_;
     }
 
-    EngineManager& engine_manager() {
+    const EngineManager& engine_manager() const {
         return engine_manager_;
     }
 
-    Meta& meta() {
+    EngineManager& mutable_engine_manager() {
+        return engine_manager_;
+    }
+
+    const Meta& meta() const {
+        return meta_;
+    }
+
+    Meta& mutable_meta() {
         return meta_;
     }
 
   private:
+    Status GetVec(const std::string &table, const std::string &key, VecObj &vo) const;
+
     Node();
     ~Node();
 

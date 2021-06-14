@@ -1,9 +1,23 @@
+#include "node.h"
 #include "engine_manager.h"
 
 namespace vectordb {
 
 Status
 EngineManager::Init() {
+    for (auto &table_kv : Node::GetInstance().meta().tables()) {
+        if (table_kv.second->engine_type() == VECTOR_ENGINE) {
+            for (auto &partition_kv : table_kv.second->partitions()) {
+                for (auto &replica_kv : partition_kv.second->replicas()) {
+                    auto replica_sp = replica_kv.second;
+                    std::map<std::string, std::string> empty_indices;
+                    auto vengine = std::make_shared<VEngine>(replica_sp->path(), empty_indices);
+                    assert(vengine);
+                    Node::GetInstance().mutable_engine_manager().AddVEngine(replica_sp->name(), vengine);
+                }
+            }
+        }
+    }
     return Status::OK();
 }
 

@@ -111,7 +111,7 @@ Node::OnCreateTable(const vectordb_rpc::CreateTableRequest* request, vectordb_rp
                 auto replica_sp = r.second;
                 std::map<std::string, std::string> empty_indices;
                 auto vengine = std::make_shared<VEngine>(replica_sp->path(), empty_indices);
-                if (!s.ok()) {
+                if (!vengine) {
                     reply->set_code(1);
                     std::string msg = "create table ";
                     msg.append(request->table_name());
@@ -201,7 +201,7 @@ Node::OnPutVec(const vectordb_rpc::PutVecRequest* request, vectordb_rpc::PutVecR
         return Status::OK();
     }
 
-    auto s = meta_.ReplicaName(request->table(), request->key(), replica_name);
+    auto s = meta_.ReplicaName(request->table(), request->vec_obj().key(), replica_name);
     if (!s.ok()) {
         err_msg = "get replica error";
         reply->set_code(1);
@@ -212,16 +212,16 @@ Node::OnPutVec(const vectordb_rpc::PutVecRequest* request, vectordb_rpc::PutVecR
     auto sp = engine_manager_.GetVEngine(replica_name);
     assert(sp);
 
-    Vec v;
-    Pb2Vec(request->vec(), v);
-    if (it->second->dim() != v.dim()) {
+    VecObj vo;
+    Pb2VecObj(request->vec_obj(), vo);
+    if (it->second->dim() != vo.vec().dim()) {
         err_msg = "dim error";
         reply->set_code(1);
         reply->set_msg(err_msg);
         return Status::OK();
     }
 
-    s = sp->Put(request->key(), v);
+    s = sp->Put(request->vec_obj().key(), vo);
     if (!s.ok()) {
         err_msg = "db put error";
         reply->set_code(1);
@@ -237,6 +237,20 @@ Node::OnPutVec(const vectordb_rpc::PutVecRequest* request, vectordb_rpc::PutVecR
 
 Status
 Node::OnGetVec(const vectordb_rpc::GetVecRequest* request, vectordb_rpc::GetVecReply* reply) {
+
+    VecObj vo;
+    auto s = GetVec(request->table(), request->key(), vo);
+    if (!s.ok()) {
+        reply->set_code(1);
+        reply->set_msg(s.ToString());
+    } else {
+        reply->set_code(0);
+        reply->set_msg("get vector ok");
+        VecObj2Pb(vo, *(reply->mutable_vec_obj()));
+    }
+    return Status::OK();
+
+    /*
     std::string replica_name;
     std::string err_msg;
     auto it = meta_.tables().find(request->table());
@@ -265,8 +279,8 @@ Node::OnGetVec(const vectordb_rpc::GetVecRequest* request, vectordb_rpc::GetVecR
     auto sp = engine_manager_.GetVEngine(replica_name);
     assert(sp);
 
-    Vec v;
-    s = sp->Get(request->key(), v);
+    VecObj vo;
+    s = sp->Get(request->key(), vo);
     if (!s.ok()) {
         err_msg = "db get error";
         reply->set_code(1);
@@ -277,8 +291,119 @@ Node::OnGetVec(const vectordb_rpc::GetVecRequest* request, vectordb_rpc::GetVecR
     err_msg = "get vector ok";
     reply->set_code(0);
     reply->set_msg(err_msg);
-    Vec2Pb(v, *(reply->mutable_vec()));
+    VecObj2Pb(vo, *(reply->mutable_vec_obj()));
+    return Status::OK();
+    */
+}
+
+Status
+Node::OnDistKey(const vectordb_rpc::DistKeyRequest* request, vectordb_rpc::DistKeyReply* reply) {
+    std::string replica_name;
+    std::string err_msg;
+    Status s;
+
+    auto it = meta_.tables().find(request->table());
+    if (it == meta_.tables().end()) {
+        err_msg = "table not exist";
+        reply->set_code(1);
+        reply->set_msg(err_msg);
+        return Status::OK();
+    }
+
+    if (it->second->engine_type() != VECTOR_ENGINE) {
+        err_msg = "engine type error";
+        reply->set_code(1);
+        reply->set_msg(err_msg);
+        return Status::OK();
+    }
+
+    s = meta_.ReplicaName(request->table(), request->key1(), replica_name);
+    if (!s.ok()) {
+        err_msg = "get replica error";
+        reply->set_code(1);
+        reply->set_msg(err_msg);
+        return Status::OK();
+    }
+
+    auto sp1 = engine_manager_.GetVEngine(replica_name);
+    assert(sp1);
+
+    VecObj vo1;
+    s = sp1->Get(request->key1(), vo1);
+    if (!s.ok()) {
+        err_msg = "db get error, key:";
+        err_msg.append(request->key1());
+        reply->set_code(1);
+        reply->set_msg(err_msg);
+        return Status::OK();
+    }
+
+    s = meta_.ReplicaName(request->table(), request->key2(), replica_name);
+    if (!s.ok()) {
+        err_msg = "get replica error";
+        reply->set_code(1);
+        reply->set_msg(err_msg);
+        return Status::OK();
+    }
+
+    auto sp2 = engine_manager_.GetVEngine(replica_name);
+    assert(sp2);
+
+    VecObj vo2;
+    s = sp2->Get(request->key2(), vo2);
+    if (!s.ok()) {
+        err_msg = "db get error, key:";
+        err_msg.append(request->key2());
+        reply->set_code(1);
+        reply->set_msg(err_msg);
+        return Status::OK();
+    }
+
+    double distance;
+    bool b = util::Distance(vo1.vec().data(), vo2.vec().data(), distance);
+    assert(b);
+
+    err_msg = "distance key ok";
+    reply->set_code(0);
+    reply->set_msg(err_msg);
+    reply->set_distance(distance);
     return Status::OK();
 }
+
+Status
+Node::GetVec(const std::string &table, const std::string &key, VecObj &vo) const {
+    std::string replica_name;
+    std::string err_msg;
+    Status s;
+
+    auto it = meta_.tables().find(table);
+    if (it == meta_.tables().end()) {
+        err_msg = "table not exist";
+        return Status::Corruption(err_msg);
+    }
+
+    if (it->second->engine_type() != VECTOR_ENGINE) {
+        err_msg = "engine type error";
+        return Status::Corruption(err_msg);
+    }
+
+    s = meta_.ReplicaName(table, key, replica_name);
+    if (!s.ok()) {
+        err_msg = "get replica error";
+        return Status::Corruption(err_msg);
+    }
+
+    auto sp = engine_manager_.GetVEngine(replica_name);
+    assert(sp);
+
+    s = sp->Get(key, vo);
+    if (!s.ok()) {
+        err_msg = "db get error, key:";
+        err_msg.append(key);
+        return Status::Corruption(err_msg);
+    }
+    return Status::OK();
+}
+
 
 } // namespace vectordb

@@ -10,16 +10,36 @@ service VectorDB {
   rpc Describe (DescribeRequest) returns (DescribeReply) {}
   rpc PutVec (PutVecRequest) returns (PutVecReply) {}
   rpc GetVec (GetVecRequest) returns (GetVecReply) {}
+  rpc DistKey (DistKeyRequest) returns (DistKeyReply) {}
+}
+
+message VecObj {
+  string key = 1;
+  Vec vec = 2;
+  string attach_value1 = 3;
+  string attach_value2 = 4;
+  string attach_value3 = 5;
 }
 
 message Vec {
   repeated double data = 1;
 }
 
+message DistKeyRequest {
+  string table = 1;
+  string key1 = 2;
+  string key2 = 3;
+}
+
+message DistKeyReply {
+  int32 code = 1;
+  string msg = 2;
+  double distance = 3;	
+}
+
 message PutVecRequest {
   string table = 1;
-  string key = 2;
-  Vec vec = 3;
+  VecObj vec_obj = 2;
 }
 
 message PutVecReply {
@@ -35,7 +55,7 @@ message GetVecRequest {
 message GetVecReply {
   int32 code = 1;
   string msg = 2;
-  Vec vec = 3;
+  VecObj vec_obj = 3;
 }
 
 message Replica {

@@ -36,6 +36,10 @@ class VectorDBServiceImpl final : public vectordb_rpc::VectorDB::Service {
     grpc::Status GetVec(grpc::ServerContext* context,
                         const vectordb_rpc::GetVecRequest* request,
                         vectordb_rpc::GetVecReply* reply) override;
+
+    grpc::Status DistKey(grpc::ServerContext* context,
+                         const vectordb_rpc::DistKeyRequest* request,
+                         vectordb_rpc::DistKeyReply* reply) override;
   private:
 };
 

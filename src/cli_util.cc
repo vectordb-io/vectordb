@@ -43,7 +43,7 @@ HelpStr() {
     s.append("desc partition_name").append("\n");
     s.append("desc replica_name").append("\n").append("\n");
 
-    s.append("create table {\"table_name\":\"vector_table\", \"engine_type\":\"vector\", \"dim\":100, \"partition_num\":1, \"replica_num\":1}").append("\n");
+    s.append("create table {\"table_name\":\"vector_table\", \"engine_type\":\"vector\", \"dim\":4, \"partition_num\":10, \"replica_num\":1}").append("\n");
     s.append("put {\"table_name\":\"vector_table\", \"key\":\"kkk\", \"vector\":[1.13, 2.25, 3.73, 4.99], \"attach_value1\":\"attach_value1\", \"attach_value2\":\"attach_value2\", \"attach_value3\":\"attach_value3\"}").append("\n");
     s.append("build index {\"table_name\":\"vector_table\", \"index_type\":\"annoy\"}").append("\n");
     s.append("build index {\"table_name\":\"vector_table\", \"index_type\":\"knn_graph\", \"k\":0}").append("\n");
@@ -174,17 +174,36 @@ ToString(const vectordb_rpc::PutVecReply &reply) {
     return j.dump(4, ' ');
 }
 
+jsonxx::json
+ToJson(const vectordb_rpc::VecObj &vec_obj) {
+    jsonxx::json j;
+    j["key"] = vec_obj.key();
+    j["attach_value1"] = vec_obj.attach_value1();
+    j["attach_value2"] = vec_obj.attach_value2();
+    j["attach_value3"] = vec_obj.attach_value3();
+    for (int i = 0; i < vec_obj.vec().data_size(); ++i) {
+        j["vec"][i] = vec_obj.vec().data(i);
+    }
+    return j;
+}
+
 std::string
 ToString(const vectordb_rpc::GetVecReply &reply) {
     jsonxx::json j;
     j["code"] = reply.code();
     j["msg"] = reply.msg();
-    for (int i = 0; i < reply.vec().data_size(); ++i) {
-        j["vec"][i] = reply.vec().data(i);
-    }
+    j["vec_obj"] = ToJson(reply.vec_obj());
     return j.dump(4, ' ');
 }
 
+std::string
+ToString(const vectordb_rpc::DistKeyReply &reply) {
+    jsonxx::json j;
+    j["code"] = reply.code();
+    j["msg"] = reply.msg();
+    j["distance"] = reply.distance();
+    return j.dump(4, ' ');
+}
 
 void
 Split(const std::string &s, char separator, std::vector<std::string> &sv, const std::string ignore) {

@@ -61,9 +61,6 @@ VClient::Do(const std::vector<std::string> &cmd_sv, const std::string &params_js
                 request.set_dim(dim);
                 CreateTable(request, reply);
             }
-            //std::cout << "table_name:" << table_name << std::endl;
-            //std::cout << "engine_type:" << engine_type << std::endl;
-            //std::cout << "dim:" << dim << std::endl;
 
         } catch (std::exception &e) {
             std::cout << e.what() << std::endl;
@@ -118,34 +115,38 @@ VClient::Do(const std::vector<std::string> &cmd_sv, const std::string &params_js
             auto j = jsonxx::json::parse(params_json);
             std::string table_name = j["table_name"].as_string();
             std::string key = j["key"].as_string();
-            const auto& vector_arr = j["vector"].as_array();
-
-            vectordb_rpc::PutVecRequest request;
-            request.set_table(table_name);
-            request.set_key(key);
-            for (auto &jobj : vector_arr) {
-                double dd = jobj.as_float();
-                request.mutable_vec()->add_data(dd);
-            }
-            PutVec(request, reply);
-
-
-            /*
             std::string attach_value1 = j["attach_value1"].as_string();
             std::string attach_value2 = j["attach_value2"].as_string();
             std::string attach_value3 = j["attach_value3"].as_string();
             const auto& vector_arr = j["vector"].as_array();
-            std::cout << "attach_value1:" << attach_value1 << std::endl;
-            std::cout << "attach_value2:" << attach_value2 << std::endl;
-            std::cout << "attach_value3:" << attach_value3 << std::endl;
+
+            vectordb_rpc::PutVecRequest request;
+            request.set_table(table_name);
+            request.mutable_vec_obj()->set_key(key);
+            request.mutable_vec_obj()->set_attach_value1(attach_value1);
+            request.mutable_vec_obj()->set_attach_value2(attach_value2);
+            request.mutable_vec_obj()->set_attach_value3(attach_value3);
             for (auto &jobj : vector_arr) {
-                double dd;
-                dd = jobj.as_float();
-                std::cout << "jobj.is_float(): " << jobj.is_float() << " data:" << dd << std::endl;
+                double dd = jobj.as_float();
+                request.mutable_vec_obj()->mutable_vec()->add_data(dd);
             }
+            PutVec(request, reply);
 
-            */
+        } catch (std::exception &e) {
+            std::cout << e.what() << std::endl;
+        }
 
+    } else if (cmd_sv.size() == 2 && cmd_sv[0] == "distance" && cmd_sv[1] == "key") {
+        try {
+            auto j = jsonxx::json::parse(params_json);
+            std::string table_name = j["table_name"].as_string();
+            std::string key1 = j["key1"].as_string();
+            std::string key2 = j["key2"].as_string();
+            vectordb_rpc::DistKeyRequest request;
+            request.set_table(table_name);
+            request.set_key1(key1);
+            request.set_key2(key2);
+            DistKey(request, reply);
 
         } catch (std::exception &e) {
             std::cout << e.what() << std::endl;
@@ -280,5 +281,16 @@ VClient::GetVec(const vectordb_rpc::GetVecRequest &request, std::string &reply_m
     }
 }
 
+void
+VClient::DistKey(const vectordb_rpc::DistKeyRequest &request, std::string &reply_msg) {
+    vectordb_rpc::DistKeyReply reply;
+    grpc::ClientContext context;
+    grpc::Status status = stub_->DistKey(&context, request, &reply);
+    if (status.ok()) {
+        reply_msg = cli_util::ToString(reply);
+    } else {
+        reply_msg = status.error_message();
+    }
+}
 
 } // namespace vectordb

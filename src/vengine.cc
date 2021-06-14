@@ -60,9 +60,9 @@ VEngine::InitIndices(const std::map<std::string, std::string> &indices) {
 }
 
 Status
-VEngine::Put(const std::string &key, const Vec &v) {
+VEngine::Put(const std::string &key, const VecObj &vo) {
     std::string value;
-    Vec2Str(v, value);
+    VecObj2Str(vo, value);
 
     leveldb::Status s;
     leveldb::WriteOptions write_options;
@@ -74,7 +74,7 @@ VEngine::Put(const std::string &key, const Vec &v) {
 }
 
 Status
-VEngine::Get(const std::string &key, Vec &v) {
+VEngine::Get(const std::string &key, VecObj &vo) const {
     bool b;
     leveldb::Status s;
     std::string value;
@@ -85,7 +85,7 @@ VEngine::Get(const std::string &key, Vec &v) {
         return Status::NotFound(msg);
     }
     assert(s.ok());
-    b = Str2Vec(value, v);
+    b = Str2VecObj(value, vo);
     assert(b);
     return Status::OK();
 }
@@ -102,14 +102,6 @@ VEngine::BuildIndex(std::string index_name, std::string index_type) {
 bool
 VEngine::HasIndex() const {
     return indices_.size() > 0;
-}
-
-Status
-VEngine::Distance(const Vec &v1, const Vec &v2, double &result) const {
-}
-
-Status
-VEngine::Distance(const std::string &key1, const std::string &key2, double &result) const {
 }
 
 Status

@@ -1,3 +1,4 @@
+#include <glog/logging.h>
 #include "coding.h"
 
 namespace vectordb {
@@ -33,12 +34,13 @@ Pb2Partition(const vectordb_rpc::Partition &pb, Partition &partition) {
 void
 Pb2Table(const vectordb_rpc::Table &pb, Table &table) {
     TableParam param;
-    param.name = pb.name();
-    param.partition_num = pb.partition_num();
-    param.replica_num = pb.replica_num();
-    param.engine_type = pb.engine_type();
-    param.path = pb.path();
-    param.dim = pb.dim();
+    table.set_name(pb.name());
+    table.set_partition_num(pb.partition_num());
+    table.set_replica_num(pb.replica_num());
+    table.set_engine_type(pb.engine_type());
+    table.set_path(pb.path());
+    table.set_dim(pb.dim());
+
     for (int i = 0; i < pb.partitions_size(); i++) {
         const vectordb_rpc::Partition &partition_pb = pb.partitions(i);
         Partition partition;
@@ -209,5 +211,43 @@ Str2Vec(const std::string &s, Vec &v) {
     }
     return ret;
 }
+
+void
+VecObj2Pb(const VecObj &vo, vectordb_rpc::VecObj &pb) {
+    pb.set_key(vo.key());
+    Vec2Pb(vo.vec(), *(pb.mutable_vec()));
+    pb.set_attach_value1(vo.attach_value1());
+    pb.set_attach_value2(vo.attach_value2());
+    pb.set_attach_value3(vo.attach_value3());
+}
+
+void
+Pb2VecObj(const vectordb_rpc::VecObj &pb, VecObj &vo) {
+    vo.set_key(pb.key());
+    Pb2Vec(pb.vec(), vo.mutable_vec());
+    vo.set_attach_value1(pb.attach_value1());
+    vo.set_attach_value2(pb.attach_value2());
+    vo.set_attach_value3(pb.attach_value3());
+}
+
+void
+VecObj2Str(const VecObj &vo, std::string &s) {
+    vectordb_rpc::VecObj pb;
+    VecObj2Pb(vo, pb);
+    bool ret = pb.SerializeToString(&s);
+    assert(ret);
+}
+
+bool
+Str2VecObj(const std::string &s, VecObj &vo) {
+    vectordb_rpc::VecObj pb;
+    bool ret = pb.ParseFromString(s);
+    if (ret) {
+        Pb2VecObj(pb, vo);
+    }
+    return ret;
+}
+
+
 
 } // namespace vectordb

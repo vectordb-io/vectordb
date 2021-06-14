@@ -21,14 +21,12 @@ class VEngine {
     VEngine& operator=(const VEngine&) = delete;
     ~VEngine();
 
-    Status Put(const std::string &key, const Vec &v);
-    Status Get(const std::string &key, Vec &v);
+    Status Put(const std::string &key, const VecObj &vo);
+    Status Get(const std::string &key, VecObj &vo) const;
     Status Delete(const std::string &key);
 
     bool HasIndex() const;
     Status BuildIndex(std::string index_name, std::string index_type);
-    Status Distance(const Vec &v1, const Vec &v2, double &result) const;
-    Status Distance(const std::string &key1, const std::string &key2, double &result) const;
     Status GetKNN(const std::string &key, std::vector<VecDt> &results, const std::string &index_type);
     Status GetKNN(const Vec &vec, std::vector<VecDt> &results, const std::string &index_type);
 

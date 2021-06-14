@@ -39,6 +39,7 @@ class VClient {
     void Describe(const vectordb_rpc::DescribeRequest &request, std::string &reply_msg);
     void PutVec(const vectordb_rpc::PutVecRequest &request, std::string &reply_msg);
     void GetVec(const vectordb_rpc::GetVecRequest &request, std::string &reply_msg);
+    void DistKey(const vectordb_rpc::DistKeyRequest &request, std::string &reply_msg);
 
     std::shared_ptr<grpc::Channel> channel_;
     std::unique_ptr<vectordb_rpc::VectorDB::Stub> stub_;

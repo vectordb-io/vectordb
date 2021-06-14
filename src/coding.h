@@ -31,6 +31,12 @@ void Pb2Vec(const vectordb_rpc::Vec &pb, Vec &v);
 void Vec2Str(const Vec &v, std::string &s);
 bool Str2Vec(const std::string &s, Vec &v);
 
+void VecObj2Pb(const VecObj &vo, vectordb_rpc::VecObj &pb);
+void Pb2VecObj(const vectordb_rpc::VecObj &pb, VecObj &vo);
+void VecObj2Str(const VecObj &vo, std::string &s);
+bool Str2VecObj(const std::string &s, VecObj &vo);
+
+
 } // namespace vectordb
 
 #endif
