@@ -1,4 +1,5 @@
 #include <glog/logging.h>
+#include "leveldb/db.h"
 #include "coding.h"
 #include "config.h"
 #include "util.h"
@@ -237,7 +238,6 @@ Node::OnPutVec(const vectordb_rpc::PutVecRequest* request, vectordb_rpc::PutVecR
 
 Status
 Node::OnGetVec(const vectordb_rpc::GetVecRequest* request, vectordb_rpc::GetVecReply* reply) {
-
     VecObj vo;
     auto s = GetVec(request->table(), request->key(), vo);
     if (!s.ok()) {
@@ -249,113 +249,25 @@ Node::OnGetVec(const vectordb_rpc::GetVecRequest* request, vectordb_rpc::GetVecR
         VecObj2Pb(vo, *(reply->mutable_vec_obj()));
     }
     return Status::OK();
-
-    /*
-    std::string replica_name;
-    std::string err_msg;
-    auto it = meta_.tables().find(request->table());
-    if (it == meta_.tables().end()) {
-        err_msg = "table not exist";
-        reply->set_code(1);
-        reply->set_msg(err_msg);
-        return Status::OK();
-    }
-
-    if (it->second->engine_type() != VECTOR_ENGINE) {
-        err_msg = "engine type error";
-        reply->set_code(1);
-        reply->set_msg(err_msg);
-        return Status::OK();
-    }
-
-    auto s = meta_.ReplicaName(request->table(), request->key(), replica_name);
-    if (!s.ok()) {
-        err_msg = "get replica error";
-        reply->set_code(1);
-        reply->set_msg(err_msg);
-        return Status::OK();
-    }
-
-    auto sp = engine_manager_.GetVEngine(replica_name);
-    assert(sp);
-
-    VecObj vo;
-    s = sp->Get(request->key(), vo);
-    if (!s.ok()) {
-        err_msg = "db get error";
-        reply->set_code(1);
-        reply->set_msg(err_msg);
-        return Status::OK();
-    }
-
-    err_msg = "get vector ok";
-    reply->set_code(0);
-    reply->set_msg(err_msg);
-    VecObj2Pb(vo, *(reply->mutable_vec_obj()));
-    return Status::OK();
-    */
 }
 
 Status
 Node::OnDistKey(const vectordb_rpc::DistKeyRequest* request, vectordb_rpc::DistKeyReply* reply) {
-    std::string replica_name;
-    std::string err_msg;
+    VecObj vo1, vo2;
     Status s;
+    std::string err_msg;
 
-    auto it = meta_.tables().find(request->table());
-    if (it == meta_.tables().end()) {
-        err_msg = "table not exist";
-        reply->set_code(1);
-        reply->set_msg(err_msg);
-        return Status::OK();
-    }
-
-    if (it->second->engine_type() != VECTOR_ENGINE) {
-        err_msg = "engine type error";
-        reply->set_code(1);
-        reply->set_msg(err_msg);
-        return Status::OK();
-    }
-
-    s = meta_.ReplicaName(request->table(), request->key1(), replica_name);
+    s = GetVec(request->table(), request->key1(), vo1);
     if (!s.ok()) {
-        err_msg = "get replica error";
         reply->set_code(1);
-        reply->set_msg(err_msg);
+        reply->set_msg(s.ToString());
         return Status::OK();
     }
 
-    auto sp1 = engine_manager_.GetVEngine(replica_name);
-    assert(sp1);
-
-    VecObj vo1;
-    s = sp1->Get(request->key1(), vo1);
+    s = GetVec(request->table(), request->key2(), vo2);
     if (!s.ok()) {
-        err_msg = "db get error, key:";
-        err_msg.append(request->key1());
         reply->set_code(1);
-        reply->set_msg(err_msg);
-        return Status::OK();
-    }
-
-    s = meta_.ReplicaName(request->table(), request->key2(), replica_name);
-    if (!s.ok()) {
-        err_msg = "get replica error";
-        reply->set_code(1);
-        reply->set_msg(err_msg);
-        return Status::OK();
-    }
-
-    auto sp2 = engine_manager_.GetVEngine(replica_name);
-    assert(sp2);
-
-    VecObj vo2;
-    s = sp2->Get(request->key2(), vo2);
-    if (!s.ok()) {
-        err_msg = "db get error, key:";
-        err_msg.append(request->key2());
-        reply->set_code(1);
-        reply->set_msg(err_msg);
+        reply->set_msg(s.ToString());
         return Status::OK();
     }
 
@@ -405,5 +317,39 @@ Node::GetVec(const std::string &table, const std::string &key, VecObj &vo) const
     return Status::OK();
 }
 
+Status
+Node::OnKeys(const vectordb_rpc::KeysRequest* request, vectordb_rpc::KeysReply* reply) {
+    //std::vector<std::string> keys;
+    auto it = meta_.tables().find(request->table());
+    if (it != meta_.tables().end()) {
+        for (auto &partition_kv : it->second->partitions()) {
+            for (auto &replica_kv : partition_kv.second->replicas()) {
+                auto replica_sp = replica_kv.second;
+                if (replica_sp->id() == 0) {
+                    auto engine_sp = engine_manager_.GetVEngine(replica_sp->name());
+                    assert(engine_sp);
+                    leveldb::DB* db = engine_sp->data();
+                    assert(db);
+
+                    leveldb::Iterator* it = db->NewIterator(leveldb::ReadOptions());
+                    for (it->SeekToFirst(); it->Valid(); it->Next()) {
+                        //keys.push_back(it->key().ToString());
+                        reply->add_keys(it->key().ToString());
+                    }
+                    assert(it->status().ok());  // Check for any errors found during the scan
+                    delete it;
+                }
+            }
+        }
+        reply->set_code(0);
+        reply->set_msg("ok");
+
+    } else {
+        reply->set_code(1);
+        reply->set_msg("table not exist");
+    }
+
+    return Status::OK();
+}
 
 } // namespace vectordb

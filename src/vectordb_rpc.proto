@@ -11,6 +11,7 @@ service VectorDB {
   rpc PutVec (PutVecRequest) returns (PutVecReply) {}
   rpc GetVec (GetVecRequest) returns (GetVecReply) {}
   rpc DistKey (DistKeyRequest) returns (DistKeyReply) {}
+  rpc Keys (KeysRequest) returns (KeysReply) {}
 }
 
 message VecObj {
@@ -23,6 +24,16 @@ message VecObj {
 
 message Vec {
   repeated double data = 1;
+}
+
+message KeysRequest {
+  string table = 1;
+}
+
+message KeysReply {
+  int32 code = 1;
+  string msg = 2;
+  repeated string keys = 3;
 }
 
 message DistKeyRequest {

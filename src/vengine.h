@@ -30,6 +30,10 @@ class VEngine {
     Status GetKNN(const std::string &key, std::vector<VecDt> &results, const std::string &index_type);
     Status GetKNN(const Vec &vec, std::vector<VecDt> &results, const std::string &index_type);
 
+    leveldb::DB* data() {
+        return data_;
+    }
+
   private:
     Status Mkdir();
     Status InitData();

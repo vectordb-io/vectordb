@@ -29,6 +29,7 @@ std::string ToString(const vectordb_rpc::PutVecReply &reply);
 jsonxx::json ToJson(const vectordb_rpc::VecObj &vec_obj);
 std::string ToString(const vectordb_rpc::GetVecReply &reply);
 std::string ToString(const vectordb_rpc::DistKeyReply &reply);
+std::string ToString(const vectordb_rpc::KeysReply &reply);
 
 
 

@@ -51,6 +51,7 @@ HelpStr() {
     s.append("getknn {\"table_name\":\"vector_table\", \"key\":\"kkk\", \"limit\":20}").append("\n");
     s.append("distance key {\"table_name\":\"vector_table\", \"key1\":\"xxx\", \"key2\":\"ooo\"}").append("\n");
     s.append("distance vector {\"vector1\":[1.13, 2.25, 3.73, 4.99], \"vector2\":[3.93, 9.27, 4.63, 2.91]}").append("\n").append("\n");
+    s.append("keys {\"table_name\":\"kv_table\"}").append("\n");
 
     s.append("create table {\"table_name\":\"kv_table\", \"engine_type\":\"kv\", \"partition_num\":1, \"replica_num\":1}").append("\n");
     s.append("put {\"table_name\":\"kv_table\", \"key\":\"kkk\", \"value\":\"vvv\"}").append("\n");
@@ -202,6 +203,17 @@ ToString(const vectordb_rpc::DistKeyReply &reply) {
     j["code"] = reply.code();
     j["msg"] = reply.msg();
     j["distance"] = reply.distance();
+    return j.dump(4, ' ');
+}
+
+std::string
+ToString(const vectordb_rpc::KeysReply &reply) {
+    jsonxx::json j;
+    j["code"] = reply.code();
+    j["msg"] = reply.msg();
+    for (int i = 0; i < reply.keys_size(); ++i) {
+        j["keys"][i] = reply.keys(i);
+    }
     return j.dump(4, ' ');
 }
 

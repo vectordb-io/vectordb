@@ -80,6 +80,16 @@ VectorDBServiceImpl::DistKey(grpc::ServerContext* context,
     return grpc::Status::OK;
 }
 
+grpc::Status
+VectorDBServiceImpl::Keys(grpc::ServerContext* context,
+                          const vectordb_rpc::KeysRequest* request,
+                          vectordb_rpc::KeysReply* reply) {
+    auto s = Node::GetInstance().OnKeys(request, reply);
+    assert(s.ok());
+    return grpc::Status::OK;
+}
+
+
 GrpcServer::GrpcServer() {
 }
 

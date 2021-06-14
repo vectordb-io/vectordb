@@ -32,6 +32,7 @@ class Node {
     Status OnPutVec(const vectordb_rpc::PutVecRequest* request, vectordb_rpc::PutVecReply* reply);
     Status OnGetVec(const vectordb_rpc::GetVecRequest* request, vectordb_rpc::GetVecReply* reply);
     Status OnDistKey(const vectordb_rpc::DistKeyRequest* request, vectordb_rpc::DistKeyReply* reply);
+    Status OnKeys(const vectordb_rpc::KeysRequest* request, vectordb_rpc::KeysReply* reply);
 
     GrpcServer& grpc_server() {
         return grpc_server_;

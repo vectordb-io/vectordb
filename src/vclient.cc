@@ -110,6 +110,19 @@ VClient::Do(const std::vector<std::string> &cmd_sv, const std::string &params_js
 
     } else if (cmd_sv.size() == 2 && cmd_sv[0] == "build" && cmd_sv[1] == "index") {
 
+
+    } else if (cmd_sv.size() == 1 && cmd_sv[0] == "keys") {
+        try {
+            auto j = jsonxx::json::parse(params_json);
+            std::string table_name = j["table_name"].as_string();
+            vectordb_rpc::KeysRequest request;
+            request.set_table(table_name);
+            Keys(request, reply);
+
+        } catch (std::exception &e) {
+            std::cout << e.what() << std::endl;
+        }
+
     } else if (cmd_sv.size() == 1 && cmd_sv[0] == "put") {
         try {
             auto j = jsonxx::json::parse(params_json);
@@ -286,6 +299,18 @@ VClient::DistKey(const vectordb_rpc::DistKeyRequest &request, std::string &reply
     vectordb_rpc::DistKeyReply reply;
     grpc::ClientContext context;
     grpc::Status status = stub_->DistKey(&context, request, &reply);
+    if (status.ok()) {
+        reply_msg = cli_util::ToString(reply);
+    } else {
+        reply_msg = status.error_message();
+    }
+}
+
+void
+VClient::Keys(const vectordb_rpc::KeysRequest &request, std::string &reply_msg) {
+    vectordb_rpc::KeysReply reply;
+    grpc::ClientContext context;
+    grpc::Status status = stub_->Keys(&context, request, &reply);
     if (status.ok()) {
         reply_msg = cli_util::ToString(reply);
     } else {
