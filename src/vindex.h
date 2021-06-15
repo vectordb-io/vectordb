@@ -6,10 +6,22 @@
 
 namespace vectordb {
 
+struct VecDtParam {
+    std::string key;
+    double distance;
+    std::string attach_value1;
+    std::string attach_value2;
+    std::string attach_value3;
+};
+
 class VecDt {
   public:
-    VecDt(const std::string key, double distance)
-        :key_(key), distance_(distance) {
+    VecDt(const VecDtParam &param)
+        :key_(param.key),
+         distance_(param.distance),
+         attach_value1_(param.attach_value1),
+         attach_value2_(param.attach_value2),
+         attach_value3_(param.attach_value3) {
     }
 
     const std::string& key() const {
@@ -24,9 +36,24 @@ class VecDt {
         return distance_ < rhs.distance_;
     }
 
+    const std::string& attach_value1() const {
+        return attach_value1_;
+    }
+
+    const std::string& attach_value2() const {
+        return attach_value2_;
+    }
+
+    const std::string& attach_value3() const {
+        return attach_value3_;
+    }
+
   private:
     std::string key_;
     double distance_;
+    std::string attach_value1_;
+    std::string attach_value2_;
+    std::string attach_value3_;
 };
 
 class VIndex {

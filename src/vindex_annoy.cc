@@ -40,7 +40,20 @@ VIndexAnnoy::GetKNN(const std::string &key, int limit, std::vector<VecDt> &resul
             std::string find_key;
             b = Id2Key(result[i], find_key);
             assert(b);
-            VecDt vdt(find_key, distances[i]);
+
+            VecObj vo;
+            auto s = vengine_->Get(find_key, vo);
+            assert(s.ok());
+            assert(find_key == vo.key());
+
+            VecDtParam param;
+            param.key = vo.key();
+            param.distance = distances[i];
+            param.attach_value1 = vo.attach_value1();
+            param.attach_value2 = vo.attach_value2();
+            param.attach_value3 = vo.attach_value3();
+
+            VecDt vdt(param);
             results.push_back(vdt);
 
             LOG(INFO) << "debug: " << "id:" << result[i] << " " << find_key << distances[i];
@@ -66,10 +79,23 @@ VIndexAnnoy::GetKNN(const Vec &vec, int limit, std::vector<VecDt> &results) {
             std::string find_key;
             b = Id2Key(result[i], find_key);
             assert(b);
-            VecDt vdt(find_key, distances[i]);
+
+            VecObj vo;
+            auto s = vengine_->Get(find_key, vo);
+            assert(s.ok());
+            assert(find_key == vo.key());
+
+            VecDtParam param;
+            param.key = vo.key();
+            param.distance = distances[i];
+            param.attach_value1 = vo.attach_value1();
+            param.attach_value2 = vo.attach_value2();
+            param.attach_value3 = vo.attach_value3();
+
+            VecDt vdt(param);
             results.push_back(vdt);
 
-            LOG(INFO) << "debug: " << "id:" << result[i] << " " << find_key << distances[i];
+            LOG(INFO) << "debug: getknn one " << vo.key() << " " << distances[i] << " " << vo.attach_value1() << "|" << vdt.attach_value1();
         }
         std::sort(results.begin(), results.end());
     }

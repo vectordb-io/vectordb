@@ -30,6 +30,9 @@ message GetKNNRequest {
 message VecDt {
   string key = 1;
   double distance = 2;
+  string attach_value1 = 3;
+  string attach_value2 = 4;
+  string attach_value3 = 5;
 }
 
 message GetKNNReply {

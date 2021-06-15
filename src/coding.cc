@@ -228,6 +228,8 @@ Pb2VecObj(const vectordb_rpc::VecObj &pb, VecObj &vo) {
     vo.set_attach_value1(pb.attach_value1());
     vo.set_attach_value2(pb.attach_value2());
     vo.set_attach_value3(pb.attach_value3());
+
+    //LOG(INFO) << "debug: " << pb.DebugString() << "===";
 }
 
 void

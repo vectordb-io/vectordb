@@ -16,7 +16,12 @@ INCLUDES_INSERTER=-I./
 LIBS_INSERTER=-lglog -lprotobuf -lgrpc++ -lgrpc -lpthread -lleveldb
 LFLAGS_INSERTER=-L/usr/local/lib
 
-cs: vectordb-server vectordb-cli vector-inserter
+OBJS_IMG=image_inserter.o vectordb_rpc.pb.o vectordb_rpc.grpc.pb.o vdb_client.o status.o 
+INCLUDES_IMG=-I./
+LIBS_IMG=-lglog -lprotobuf -lgrpc++ -lgrpc -lpthread -lleveldb
+LFLAGS_IMG=-L/usr/local/lib
+
+cs: vectordb-server vectordb-cli vector-inserter image-inserter
 	@echo ""
 	@echo "success, go go go!"
 	@echo ""
@@ -29,6 +34,9 @@ vectordb-cli: $(OBJS_CLIENT)
 
 vector-inserter: $(OBJS_INSERTER)
 	$(CC) $^ -o $@ $(LIBS_INSERTER) $(LFLAGS_INSERTER)
+
+image-inserter: $(OBJS_IMG)
+	$(CC) $^ -o $@ $(LIBS_IMG) $(LFLAGS_IMG)
 
 %.o: %.cc %.h
 	$(CC) $< $(INCLUDES_SERVER) $(CFLAGS) -o $@
@@ -46,6 +54,7 @@ clean:
 	rm -rf vectordb-server
 	rm -rf vectordb-cli
 	rm -rf vector-inserter
+	rm -rf image-inserter
 
 cleanall: clean
 	rm -f vectordb_rpc.pb.*

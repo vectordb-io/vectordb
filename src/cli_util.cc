@@ -234,6 +234,9 @@ ToString(const vectordb_rpc::GetKNNReply &reply) {
         jsonxx::json jvdt;
         jvdt["key"] = reply.vecdts(i).key();
         jvdt["distance"] = reply.vecdts(i).distance();
+        jvdt["attach_value1"] = reply.vecdts(i).attach_value1();
+        jvdt["attach_value2"] = reply.vecdts(i).attach_value2();
+        jvdt["attach_value3"] = reply.vecdts(i).attach_value3();
         j["vecdts"][i] = jvdt;
     }
     return j.dump(4, ' ');

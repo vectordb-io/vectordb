@@ -450,6 +450,9 @@ Node::OnGetKNN(const vectordb_rpc::GetKNNRequest* request, vectordb_rpc::GetKNNR
                 vectordb_rpc::VecDt* p = reply->add_vecdts();
                 p->set_key(vdt.key());
                 p->set_distance(vdt.distance());
+                p->set_attach_value1(vdt.attach_value1());
+                p->set_attach_value2(vdt.attach_value2());
+                p->set_attach_value3(vdt.attach_value3());
                 count++;
             } else {
                 break;

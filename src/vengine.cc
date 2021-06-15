@@ -121,6 +121,9 @@ VEngine::Get(const std::string &key, VecObj &vo) const {
     }
     assert(s.ok());
     b = Str2VecObj(value, vo);
+
+    LOG(INFO) << "debug: " << vo.attach_value1() << "++" << vo.attach_value2() << "++" << vo.attach_value3();
+
     assert(b);
     return Status::OK();
 }
