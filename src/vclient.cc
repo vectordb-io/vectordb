@@ -193,6 +193,23 @@ VClient::Do(const std::vector<std::string> &cmd_sv, const std::string &params_js
         }
 
     } else if (cmd_sv.size() == 1 && cmd_sv[0] == "getknn") {
+        try {
+            auto j = jsonxx::json::parse(params_json);
+            std::string table_name = j["table_name"].as_string();
+            std::string key = j["key"].as_string();
+            int limit = j["limit"].as_integer();
+            std::string index_name = j["index_name"].as_string();
+
+            vectordb_rpc::GetKNNRequest request;
+            request.set_table(table_name);
+            request.set_key(key);
+            request.set_limit(limit);
+            request.set_index_name(index_name);
+            GetKNN(request, reply);
+
+        } catch (std::exception &e) {
+            std::cout << e.what() << std::endl;
+        }
 
     } else {
         reply.append("unknown command: ");
@@ -342,7 +359,17 @@ VClient::BuildIndex(const vectordb_rpc::BuildIndexRequest &request, std::string 
     }
 }
 
-
+void
+VClient::GetKNN(const vectordb_rpc::GetKNNRequest &request, std::string &reply_msg) {
+    vectordb_rpc::GetKNNReply reply;
+    grpc::ClientContext context;
+    grpc::Status status = stub_->GetKNN(&context, request, &reply);
+    if (status.ok()) {
+        reply_msg = cli_util::ToString(reply);
+    } else {
+        reply_msg = status.error_message();
+    }
+}
 
 
 

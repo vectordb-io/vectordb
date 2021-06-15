@@ -13,10 +13,29 @@ service VectorDB {
   rpc DistKey (DistKeyRequest) returns (DistKeyReply) {}
   rpc Keys (KeysRequest) returns (KeysReply) {}
   rpc BuildIndex (BuildIndexRequest) returns (BuildIndexReply) {}
+  rpc GetKNN (GetKNNRequest) returns (GetKNNReply) {}
 }
 
 message Int32 {
   int32 data = 1;
+}
+
+message GetKNNRequest {
+  string table = 1;
+  string key = 2;
+  int32 limit = 3;
+  string index_name = 4;
+}
+
+message VecDt {
+  string key = 1;
+  double distance = 2;
+}
+
+message GetKNNReply {
+  int32 code = 1;
+  string msg = 2;
+  repeated VecDt vecdts = 3;
 }
 
 message VecObj {

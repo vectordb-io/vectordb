@@ -11,6 +11,9 @@ EngineManager::Init() {
                 for (auto &replica_kv : partition_kv.second->replicas()) {
                     auto replica_sp = replica_kv.second;
                     std::map<std::string, std::string> empty_indices;
+                    for (auto index_kv : table_kv.second->indices()) {
+                        empty_indices.insert(std::pair<std::string, std::string>(index_kv.first, index_kv.second));
+                    }
                     auto vengine = std::make_shared<VEngine>(replica_sp->path(), table_kv.second->dim(), empty_indices);
                     assert(vengine);
                     auto s = vengine->Init();

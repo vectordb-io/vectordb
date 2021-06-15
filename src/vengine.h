@@ -27,8 +27,8 @@ class VEngine {
 
     bool HasIndex() const;
     Status AddIndex(std::string index_name, std::string index_type);
-    Status GetKNN(const std::string &key, std::vector<VecDt> &results, const std::string &index_type);
-    Status GetKNN(const Vec &vec, std::vector<VecDt> &results, const std::string &index_type);
+    Status GetKNN(const std::string &key, int limit, std::vector<VecDt> &results, const std::string &index_name);
+    Status GetKNN(const Vec &vec, int limit, std::vector<VecDt> &results, const std::string &index_name);
 
     Status Init();
 
@@ -38,6 +38,11 @@ class VEngine {
 
     int dim() const {
         return dim_;
+    }
+
+    const std::map<std::string, std::shared_ptr<VIndex>>&
+    indices() const {
+        return indices_;
     }
 
   private:

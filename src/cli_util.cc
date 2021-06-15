@@ -48,7 +48,7 @@ HelpStr() {
     s.append("build index {\"table_name\":\"vector_table\", \"index_type\":\"annoy\"}").append("\n");
     s.append("build index {\"table_name\":\"vector_table\", \"index_type\":\"knn_graph\", \"k\":0}").append("\n");
     s.append("get {\"table_name\":\"vector_table\", \"key\":\"kkk\"}").append("\n");
-    s.append("getknn {\"table_name\":\"vector_table\", \"key\":\"kkk\", \"limit\":20}").append("\n");
+    s.append("getknn {\"table_name\":\"vector_table\", \"key\":\"kkk\", \"limit\":20, \"index_name\":\"my_index\"}").append("\n");
     s.append("distance key {\"table_name\":\"vector_table\", \"key1\":\"xxx\", \"key2\":\"ooo\"}").append("\n");
     s.append("distance vector {\"vector1\":[1.13, 2.25, 3.73, 4.99], \"vector2\":[3.93, 9.27, 4.63, 2.91]}").append("\n").append("\n");
     s.append("keys {\"table_name\":\"kv_table\"}").append("\n");
@@ -222,6 +222,20 @@ ToString(const vectordb_rpc::BuildIndexReply &reply) {
     jsonxx::json j;
     j["code"] = reply.code();
     j["msg"] = reply.msg();
+    return j.dump(4, ' ');
+}
+
+std::string
+ToString(const vectordb_rpc::GetKNNReply &reply) {
+    jsonxx::json j;
+    j["code"] = reply.code();
+    j["msg"] = reply.msg();
+    for (int i = 0; i < reply.vecdts_size(); ++i) {
+        jsonxx::json jvdt;
+        jvdt["key"] = reply.vecdts(i).key();
+        jvdt["distance"] = reply.vecdts(i).distance();
+        j["vecdts"][i] = jvdt;
+    }
     return j.dump(4, ' ');
 }
 

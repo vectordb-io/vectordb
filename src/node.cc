@@ -393,4 +393,75 @@ Node::OnBuildIndex(const vectordb_rpc::BuildIndexRequest* request, vectordb_rpc:
     return Status::OK();
 }
 
+void
+Node::AppendVecDt(std::vector<VecDt> &dst, const std::vector<VecDt> &src) const {
+    for (auto vdt : src) {
+        dst.push_back(vdt);
+    }
+}
+
+Status
+Node::OnGetKNN(const vectordb_rpc::GetKNNRequest* request, vectordb_rpc::GetKNNReply* reply) {
+    std::string err_msg;
+    Status s;
+    std::vector<VecDt> results;
+
+    auto it = meta_.tables().find(request->table());
+    if (it == meta_.tables().end()) {
+        reply->set_code(1);
+        reply->set_msg("table not exist");
+
+    } else {
+        for (auto &partition_kv : it->second->partitions()) {
+            for (auto &replica_kv : partition_kv.second->replicas()) {
+                auto replica_sp = replica_kv.second;
+                if (replica_sp->id() == 0) {
+                    auto engine_sp = engine_manager_.GetVEngine(replica_sp->name());
+                    assert(engine_sp);
+
+                    VecObj vo;
+                    s = GetVec(request->table(), request->key(), vo);
+                    if (!s.ok()) {
+                        reply->set_code(1);
+                        reply->set_msg(s.ToString());
+                        return Status::OK();
+                    }
+
+                    std::vector<VecDt> tmp_results;
+                    s = engine_sp->GetKNN(vo.vec(), request->limit(), tmp_results, request->index_name());
+                    if (!s.ok()) {
+                        reply->set_code(1);
+                        reply->set_msg(s.ToString());
+                        return Status::OK();
+                    }
+                    AppendVecDt(results, tmp_results);
+
+                    LOG(INFO) << replica_sp->name() << " getknn:";
+                    for (auto &vdt : tmp_results) {
+                        LOG(INFO) << vdt.key() << " " << vdt.distance();
+                    }
+                }
+            }
+        }
+        std::sort(results.begin(), results.end());
+        int count = 0;
+        for (auto &vdt : results) {
+            if (count < request->limit()) {
+                vectordb_rpc::VecDt* p = reply->add_vecdts();
+                p->set_key(vdt.key());
+                p->set_distance(vdt.distance());
+                count++;
+            } else {
+                break;
+            }
+        }
+        reply->set_code(0);
+        reply->set_msg("ok");
+
+        LOG(INFO) << "getknn: " << reply->DebugString();
+    }
+
+    return Status::OK();
+}
+
 } // namespace vectordb

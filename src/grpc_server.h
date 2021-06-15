@@ -49,6 +49,10 @@ class VectorDBServiceImpl final : public vectordb_rpc::VectorDB::Service {
                             const vectordb_rpc::BuildIndexRequest* request,
                             vectordb_rpc::BuildIndexReply* reply) override;
 
+    grpc::Status GetKNN(grpc::ServerContext* context,
+                        const vectordb_rpc::GetKNNRequest* request,
+                        vectordb_rpc::GetKNNReply* reply) override;
+
 
   private:
 

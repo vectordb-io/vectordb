@@ -35,7 +35,7 @@ class VIndexAnnoy : public VIndex {
     Status Load();
     Status Build();
     bool Key2Id(const std::string &key, int &id) const;
-    bool Id2Key(int id, std::string key) const;
+    bool Id2Key(int id, std::string &key) const;
 
     std::string path_;
     std::string db_key2id_path_;

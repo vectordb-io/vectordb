@@ -158,11 +158,33 @@ VEngine::HasIndex() const {
 }
 
 Status
-VEngine::GetKNN(const std::string &key, std::vector<VecDt> &results, const std::string &index_type) {
+VEngine::GetKNN(const std::string &key, int limit, std::vector<VecDt> &results, const std::string &index_name) {
+    auto it = indices_.find(index_name);
+    if (it == indices_.end()) {
+        LOG(INFO) << "index " << index_name << " not exist";
+        return Status::Corruption("index not exist");
+    }
+    auto index_sp = it->second;
+    assert(index_sp);
+
+    auto s = index_sp->GetKNN(key, limit, results);
+    assert(s.ok());
+    return Status::OK();
 }
 
 Status
-VEngine::GetKNN(const Vec &vec, std::vector<VecDt> &results, const std::string &index_type) {
+VEngine::GetKNN(const Vec &vec, int limit, std::vector<VecDt> &results, const std::string &index_name) {
+    auto it = indices_.find(index_name);
+    if (it == indices_.end()) {
+        LOG(INFO) << "index " << index_name << " not exist";
+        return Status::Corruption("index not exist");
+    }
+    auto index_sp = it->second;
+    assert(index_sp);
+
+    auto s = index_sp->GetKNN(vec, limit, results);
+    assert(s.ok());
+    return Status::OK();
 }
 
 } // namespace vectordb

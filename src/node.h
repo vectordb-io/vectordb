@@ -34,6 +34,7 @@ class Node {
     Status OnDistKey(const vectordb_rpc::DistKeyRequest* request, vectordb_rpc::DistKeyReply* reply);
     Status OnKeys(const vectordb_rpc::KeysRequest* request, vectordb_rpc::KeysReply* reply);
     Status OnBuildIndex(const vectordb_rpc::BuildIndexRequest* request, vectordb_rpc::BuildIndexReply* reply);
+    Status OnGetKNN(const vectordb_rpc::GetKNNRequest* request, vectordb_rpc::GetKNNReply* reply);
 
     GrpcServer& grpc_server() {
         return grpc_server_;
@@ -57,6 +58,7 @@ class Node {
 
   private:
     Status GetVec(const std::string &table, const std::string &key, VecObj &vo) const;
+    void AppendVecDt(std::vector<VecDt> &dst, const std::vector<VecDt> &src) const;
 
     Node();
     ~Node();
