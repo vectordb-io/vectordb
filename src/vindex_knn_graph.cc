@@ -1,6 +1,7 @@
 #include <glog/logging.h>
 #include "vengine.h"
 #include "util.h"
+#include "node.h"
 #include "status.h"
 #include "coding.h"
 #include "vindex_knn_graph.h"
@@ -27,7 +28,7 @@ VIndexKNNGraph::~VIndexKNNGraph() {
 Status
 VIndexKNNGraph::GetKNN(const std::string &key, int limit, std::vector<VecDt> &results) {
     std::string knn_key, knn_value;
-    leveldb::Status s;
+    leveldb::Status ls;
     int count;
     results.clear();
 
@@ -44,8 +45,8 @@ VIndexKNNGraph::GetKNN(const std::string &key, int limit, std::vector<VecDt> &re
     for (int i = 0; i < k_; ++i) {
         EncodeKey(key, i, knn_key);
 
-        s = db_knn_->Get(leveldb::ReadOptions(), knn_key, &knn_value);
-        assert(s.ok());
+        ls = db_knn_->Get(leveldb::ReadOptions(), knn_key, &knn_value);
+        assert(ls.ok());
 
         std::string find_key;
         double distance;
@@ -53,7 +54,12 @@ VIndexKNNGraph::GetKNN(const std::string &key, int limit, std::vector<VecDt> &re
         assert(b);
 
         VecObj vo;
-        auto s = vengine_->Get(find_key, vo);
+        std::string table_name;
+        int partition_id;
+        int replica_id;
+        b = util::ParseReplicaName(vengine_->replica_name(), table_name, partition_id, replica_id);
+        assert(b);
+        auto s = Node::GetInstance().GetVec(table_name, find_key, vo);
         assert(s.ok());
         assert(find_key == vo.key());
 
@@ -197,12 +203,19 @@ VIndexKNNGraph::Build() {
             //LOG(INFO) << "debug: build " <<  each_all_key << " " << each_my_key;
 
             VecObj vo_each_all_key, vo_each_my_key;
-            s = vengine_->Get(each_all_key, vo_each_all_key);
+
+            std::string table_name;
+            int partition_id;
+            int replica_id;
+            bool b = util::ParseReplicaName(vengine_->replica_name(), table_name, partition_id, replica_id);
+            assert(b);
+            s = Node::GetInstance().GetVec(table_name, each_all_key, vo_each_all_key);
             assert(s.ok());
+
             s = vengine_->Get(each_my_key, vo_each_my_key);
             assert(s.ok());
 
-            auto b = util::Distance(vo_each_all_key.vec().data(), vo_each_my_key.vec().data(), distance);
+            b = util::Distance(vo_each_all_key.vec().data(), vo_each_my_key.vec().data(), distance);
             assert(b);
 
             VecDtParam param;

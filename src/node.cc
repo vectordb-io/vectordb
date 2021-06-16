@@ -113,7 +113,7 @@ Node::OnCreateTable(const vectordb_rpc::CreateTableRequest* request, vectordb_rp
             for (auto &r : p.second->replicas()) {
                 auto replica_sp = r.second;
                 std::map<std::string, std::string> empty_indices;
-                auto vengine = std::make_shared<VEngine>(replica_sp->path(), request->dim(), empty_indices);
+                auto vengine = std::make_shared<VEngine>(replica_sp->path(), request->dim(), empty_indices, replica_sp->name());
                 if (!vengine) {
                     reply->set_code(1);
                     std::string msg = "create table ";

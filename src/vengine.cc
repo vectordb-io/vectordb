@@ -8,8 +8,11 @@
 namespace vectordb {
 
 VEngine::VEngine(std::string path, int dim,
-                 const std::map<std::string, std::string> &indices)
-    :path_(path), dim_(dim), indices_name_type_(indices) {
+                 const std::map<std::string, std::string> &indices,
+                 const std::string &replica_name)
+    :path_(path), dim_(dim),
+     indices_name_type_(indices),
+     replica_name_(replica_name) {
     data_path_ = path_ + "/data";
     index_path_ = path_ + "/index";
 }

@@ -16,7 +16,7 @@ namespace vectordb {
 
 class VEngine {
   public:
-    VEngine(std::string path, int dim, const std::map<std::string, std::string> &indices);
+    VEngine(std::string path, int dim, const std::map<std::string, std::string> &indices, const std::string &replica_name);
     VEngine(const VEngine&) = delete;
     VEngine& operator=(const VEngine&) = delete;
     ~VEngine();
@@ -47,6 +47,10 @@ class VEngine {
         return indices_;
     }
 
+    const std::string& replica_name() const {
+        return replica_name_;
+    }
+
   private:
     Status Build();
     Status BuildData();
@@ -58,6 +62,7 @@ class VEngine {
     std::string path_;
     std::string data_path_;
     std::string index_path_;
+    std::string replica_name_;
 
     int dim_;
     leveldb::DB* data_;

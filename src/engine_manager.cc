@@ -14,7 +14,7 @@ EngineManager::Init() {
                     for (auto index_kv : table_kv.second->indices()) {
                         empty_indices.insert(std::pair<std::string, std::string>(index_kv.first, index_kv.second));
                     }
-                    auto vengine = std::make_shared<VEngine>(replica_sp->path(), table_kv.second->dim(), empty_indices);
+                    auto vengine = std::make_shared<VEngine>(replica_sp->path(), table_kv.second->dim(), empty_indices, replica_sp->name());
                     assert(vengine);
                     auto s = vengine->Init();
                     assert(s.ok());
