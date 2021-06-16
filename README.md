@@ -19,7 +19,7 @@ More details at [vectordb.io](http://vectordb.io)
 #### 2. distributed storage
 * a huge store
 * use raft to ensure safty
-* auto balance
+* auto recovery, auto rebalance
 * high throughput, low latency
 
 ## Architecture
@@ -59,15 +59,27 @@ More details at [vectordb.io](http://vectordb.io)
 
 #### 5. get vector
 ```
-(vector-cli) 127.0.0.1:38000> get {"table_name":"vector_table", "key":"key8_358097794"}
+(vector-cli) 127.0.0.1:38000> get {"table_name":"test_vector_table", "key":"key72_261551668"}
 {
-    "code": 1,
-    "msg": "Corruption: table not exist",
+    "code": 0,
+    "msg": "get vector ok",
     "vec_obj": {
-        "attach_value1": "",
-        "attach_value2": "",
-        "attach_value3": "",
-        "key": ""
+        "attach_value1": "inserter_test_attach_value1",
+        "attach_value2": "inserter_test_attach_value2",
+        "attach_value3": "inserter_test_attach_value3",
+        "key": "key72_261551668",
+        "vec": [
+            0.6292882057043203,
+            0.5495009015079126,
+            0.9620135063128609,
+            0.1219228967660679,
+            0.6931321652108487,
+            0.8820888348306012,
+            0.2154071872194331,
+            0.8231134846914157,
+            0.4136770024959356,
+            0.4983163487623988
+        ]
     }
 }
 ```
