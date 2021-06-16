@@ -96,7 +96,7 @@ create table {"table_name":"graph_table", "engine_type":"graph", "partition_num"
 }
 ```
 
-### 7. desc table
+### 8. view metadata
 ```
 (vector-cli) 127.0.0.1:38000> show tables
 {
@@ -104,8 +104,9 @@ create table {"table_name":"graph_table", "engine_type":"graph", "partition_num"
         "test_vector_table"
     ]
 }
-(vector-cli) 127.0.0.1:38000>
-(vector-cli) 127.0.0.1:38000>
+```
+
+```
 (vector-cli) 127.0.0.1:38000> desc test_vector_table
 {
     "code": 0,
@@ -136,12 +137,44 @@ create table {"table_name":"graph_table", "engine_type":"graph", "partition_num"
         "path": "/tmp/vectordb/data/test_vector_table",
         "replica_num": 3
     }
-} }
+}
+```
+```
+(vector-cli) 127.0.0.1:38000> desc test_vector_table#partition_0
+{
+    "code": 0,
+    "msg": "desc test_vector_table#partition_0 ok",
+    "partition": {
+        "id": 0,
+        "name": "test_vector_table#partition_0",
+        "path": "/tmp/vectordb/data/test_vector_table/0",
+        "replica_num": 3,
+        "replicas": [
+            "test_vector_table#partition_0#replica_0",
+            "test_vector_table#partition_0#replica_1",
+            "test_vector_table#partition_0#replica_2"
+        ],
+        "table_name": "test_vector_table"
+    }
+}
+```
+```
+(vector-cli) 127.0.0.1:38000> desc test_vector_table#partition_0#replica_0
+{
+    "code": 0,
+    "msg": "desc test_vector_table#partition_0#replica_0 ok",
+    "replica": {
+        "address": "127.0.0.1:38000",
+        "id": 0,
+        "name": "test_vector_table#partition_0#replica_0",
+        "partition_name": "test_vector_table#partition_0",
+        "path": "/tmp/vectordb/data/test_vector_table/0/0",
+        "table_name": "test_vector_table"
+    }
 }
 ```
 
-
-### 7. get knn (k nearest neighbors)
+### 9. get knn (k nearest neighbors)
 ```
 (vector-cli) 127.0.0.1:38000> getknn {"table_name":"test_vector_table", "key":"key82_640136302", "limit":5, "index_name":"knn_graph1623826143"}
 {
