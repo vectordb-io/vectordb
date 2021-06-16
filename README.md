@@ -24,11 +24,14 @@ More details at [vectordb.io](http://vectordb.io)
 
 ## Architecture
 
-#### 1. stand-alone
+#### 1. metadata
+<img src="images/metadata.jpg" width="80%">
 
+#### 2. stand-alone
+<img src="images/stand-alone.jpg" width="70%">
 
-#### 2. cluster
-
+#### 3. cluster
+<img src="images/cluster.jpg" width="80%">
 
 ## Quick start
 
@@ -217,8 +220,5 @@ More details at [vectordb.io](http://vectordb.io)
 }
 ```
 
-## Build from source 
-1. build dependencies
-2. cd vectordb/src && make
 
 
