@@ -22,43 +22,7 @@ More details at [vectordb.io](http://vectordb.io)
 (vector-cli) 127.0.0.1:38000>
 ```
 
-### 3. show help
-```
-(vector-cli) 127.0.0.1:38000> help
--------------------------------------------------------------------------
-console command example:
-
-help
-info
-ping
-exit
-quit
-version
-show tables
-desc table_name
-desc partition_name
-desc replica_name
-
-create table {"table_name":"vector_table", "engine_type":"vector", "dim":4, "partition_num":10, "replica_num":1}
-put {"table_name":"vector_table", "key":"kkk", "vector":[1.13, 2.25, 3.73, 4.99], "attach_value1":"attach_value1", "attach_value2":"attach_value2", "attach_value3":"attach_value3"}
-build index {"table_name":"vector_table", "index_type":"annoy"}
-build index {"table_name":"vector_table", "index_type":"knn_graph", "k":100}
-get {"table_name":"vector_table", "key":"kkk"}
-getknn {"table_name":"vector_table", "key":"kkk", "limit":20, "index_name":"my_index"}
-distance key {"table_name":"vector_table", "key1":"xxx", "key2":"ooo"}
-distance vector {"vector1":[1.13, 2.25, 3.73, 4.99], "vector2":[3.93, 9.27, 4.63, 2.91]}
-
-keys {"table_name":"kv_table"}
-create table {"table_name":"kv_table", "engine_type":"kv", "partition_num":1, "replica_num":1}
-put {"table_name":"kv_table", "key":"kkk", "value":"vvv"}
-get {"table_name":"kv_table", "key":"kkk"}
-del {"table_name":"kv_table", "key":"kkk"}
-
-create table {"table_name":"graph_table", "engine_type":"graph", "partition_num":1, "replica_num":1}
--------------------------------------------------------------------------
-```
-
-### 4. create table
+### 3. create table
 ```
 (vector-cli) 127.0.0.1:38000> create table {"table_name":"test_vector_table", "engine_type":"vector", "dim":10, "partition_num":10, "replica_num":3}
 {
@@ -67,12 +31,12 @@ create table {"table_name":"graph_table", "engine_type":"graph", "partition_num"
 }
 ```
 
-### 5. generate random vectors
+### 4. generate random vectors
 ```
 ./vector-inserter 127.0.0.1:38000 test_vector_table 10 100
 ```
 
-### 6. get vector
+### 5. get vector
 ```
 (vector-cli) 127.0.0.1:38000> get {"table_name":"vector_table", "key":"key8_358097794"}
 {
@@ -87,7 +51,7 @@ create table {"table_name":"graph_table", "engine_type":"graph", "partition_num"
 }
 ```
 
-### 7. build index
+### 6. build index
 ```
 (vector-cli) 127.0.0.1:38000> build index {"table_name":"test_vector_table", "index_type":"knn_graph", "k":20}
 {
@@ -96,7 +60,7 @@ create table {"table_name":"graph_table", "engine_type":"graph", "partition_num"
 }
 ```
 
-### 8. view metadata
+### 7. view metadata
 ```
 (vector-cli) 127.0.0.1:38000> show tables
 {
@@ -174,7 +138,7 @@ create table {"table_name":"graph_table", "engine_type":"graph", "partition_num"
 }
 ```
 
-### 9. get knn (k nearest neighbors)
+### 8. get knn (k nearest neighbors)
 ```
 (vector-cli) 127.0.0.1:38000> getknn {"table_name":"test_vector_table", "key":"key82_640136302", "limit":5, "index_name":"knn_graph1623826143"}
 {
