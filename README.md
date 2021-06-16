@@ -25,13 +25,13 @@ More details at [vectordb.io](http://vectordb.io)
 ## Architecture
 
 #### 1. metadata
-<img src="images/metadata.jpg" width="80%">
+<img src="http://vectordb.io/images/metadata.jpg" width="80%">
 
 #### 2. stand-alone
-<img src="images/stand-alone.jpg" width="70%">
+<img src="http://vectordb.io/images/stand-alone.jpg" width="70%">
 
 #### 3. cluster
-<img src="images/cluster.jpg" width="80%">
+<img src="http://vectordb.io/images/cluster.jpg" width="80%">
 
 ## Quick start
 
