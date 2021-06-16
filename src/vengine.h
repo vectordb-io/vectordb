@@ -21,16 +21,18 @@ class VEngine {
     VEngine& operator=(const VEngine&) = delete;
     ~VEngine();
 
+    Status Init();
     Status Put(const std::string &key, const VecObj &vo);
     Status Get(const std::string &key, VecObj &vo) const;
     Status Delete(const std::string &key);
 
     bool HasIndex() const;
-    Status AddIndex(std::string index_name, std::string index_type);
+    Status AddIndex(std::string index_name, std::string index_type, void *param);
     Status GetKNN(const std::string &key, int limit, std::vector<VecDt> &results, const std::string &index_name);
     Status GetKNN(const Vec &vec, int limit, std::vector<VecDt> &results, const std::string &index_name);
 
-    Status Init();
+    // append into keys
+    Status Keys(std::vector<std::string> &keys) const;
 
     leveldb::DB* data() {
         return data_;

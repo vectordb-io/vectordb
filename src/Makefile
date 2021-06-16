@@ -1,7 +1,7 @@
 CC:=g++
 CFLAGS+=-c -Wall -g -std=c++17
 
-OBJS_SERVER=server_main.o config.o status.o vectordb_rpc.pb.o vectordb_rpc.grpc.pb.o node.o util.o grpc_server.o meta.o coding.o vengine.o vec.o engine_manager.o vindex_annoy.o
+OBJS_SERVER=server_main.o config.o status.o vectordb_rpc.pb.o vectordb_rpc.grpc.pb.o node.o util.o grpc_server.o meta.o coding.o vengine.o vec.o engine_manager.o vindex_annoy.o vindex_knn_graph.o
 INCLUDES_SERVER=-I./ -I ./annoy.v1.10.0/include
 LIBS_SERVER=-lglog -lprotobuf -lgrpc++ -lgrpc -lpthread -lleveldb
 LFLAGS_SERVER=-L/usr/local/lib

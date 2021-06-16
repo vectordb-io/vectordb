@@ -1,5 +1,7 @@
 #include <glog/logging.h>
 #include "leveldb/db.h"
+#include "vengine.h"
+#include "vindex_knn_graph.h"
 #include "coding.h"
 #include "config.h"
 #include "util.h"
@@ -355,9 +357,29 @@ Node::OnKeys(const vectordb_rpc::KeysRequest* request, vectordb_rpc::KeysReply* 
 }
 
 Status
+Node::Keys(std::vector<std::string> &keys) {
+    for (auto &table_kv : meta_.tables()) {
+        for (auto &partition_kv : table_kv.second->partitions()) {
+            for (auto &replica_kv : partition_kv.second->replicas()) {
+                if (replica_kv.second->id() == 0) {
+                    auto replica_sp = replica_kv.second;
+                    auto engine_sp = engine_manager_.GetVEngine(replica_sp->name());
+                    assert(engine_sp);
+                    auto s = engine_sp->Keys(keys);
+                    assert(s.ok());
+                }
+            }
+        }
+    }
+    return Status::OK();
+}
+
+Status
 Node::OnBuildIndex(const vectordb_rpc::BuildIndexRequest* request, vectordb_rpc::BuildIndexReply* reply) {
     std::string err_msg;
     Status s;
+    std::vector<std::string> *keys = new std::vector<std::string>();
+    KNNGraphParam knn_param;
 
     auto it = meta_.tables().find(request->table());
     if (it == meta_.tables().end()) {
@@ -372,16 +394,54 @@ Node::OnBuildIndex(const vectordb_rpc::BuildIndexRequest* request, vectordb_rpc:
         snprintf(buf, sizeof(buf), "%s%ld", index_type.c_str(), time(nullptr));
         index_name = std::string(buf);
 
+        void *param = nullptr;
+        if (index_type == VECTOR_INDEX_ANNOY) {
+            param = nullptr;
+        } else if (index_type == VECTOR_INDEX_KNNGRAPH) {
+            Keys(*keys);
+
+
+            knn_param.k = request->k();
+            knn_param.all_keys = keys;
+            param = &knn_param;
+
+            //for (auto &k : keys) {
+            //    std::cout << "debug haha" << k << std::endl;
+            //}
+
+            std::cout << "keys: " << keys << std::endl;
+            std::cout << "knn_param.all_keys:" << knn_param.all_keys << std::endl;
+            std::cout << "&knn_param" << &knn_param << std::endl;
+            std::cout << "param:" << param << std::endl;
+            std::cout << "param1:" << param << " static_cast<KNNGraphParam*>(param)->all_keys:" << static_cast<KNNGraphParam*>(param)->all_keys << std::endl;
+
+            std::cout << "knn_param.all_keys:" << knn_param.all_keys << std::endl;
+
+            LOG(INFO) << "debug param param " << param;
+            std::cout << "size1:" << knn_param.all_keys->size() << std::endl;
+            std::cout << "size2:" << static_cast<KNNGraphParam*>(param)->all_keys->size() << " " << static_cast<KNNGraphParam*>(param)->all_keys << std::endl;
+
+        } else {
+            reply->set_code(1);
+            reply->set_msg("unknown index type");
+            return Status::OK();
+        }
+
         for (auto &partition_kv : it->second->partitions()) {
             for (auto &replica_kv : partition_kv.second->replicas()) {
                 auto replica_sp = replica_kv.second;
                 auto engine_sp = engine_manager_.GetVEngine(replica_sp->name());
                 assert(engine_sp);
 
-                auto s = engine_sp->AddIndex(index_name, index_type);
+                if (param) {
+                    std::cout << "param2:" << param << " static_cast<KNNGraphParam*>(param)->all_keys:" << static_cast<KNNGraphParam*>(param)->all_keys << std::endl;
+                }
+                auto s = engine_sp->AddIndex(index_name, index_type, param);
                 assert(s.ok());
             }
         }
+
+        LOG(INFO) << "debug: " << "add index " << index_name << " " << index_type;
 
         it->second->mutable_indices().insert(std::pair<std::string, std::string>(index_name, index_type));
         meta_.Persist();
@@ -410,8 +470,19 @@ Node::OnGetKNN(const vectordb_rpc::GetKNNRequest* request, vectordb_rpc::GetKNNR
     if (it == meta_.tables().end()) {
         reply->set_code(1);
         reply->set_msg("table not exist");
+        return Status::OK();
 
     } else {
+        std::string index_type;
+        auto index_it = it->second->indices().find(request->index_name());
+        if (index_it == it->second->indices().end()) {
+            reply->set_code(1);
+            reply->set_msg("index not exist");
+            return Status::OK();
+        } else {
+            index_type = index_it->second;
+        }
+
         for (auto &partition_kv : it->second->partitions()) {
             for (auto &replica_kv : partition_kv.second->replicas()) {
                 auto replica_sp = replica_kv.second;
@@ -419,20 +490,32 @@ Node::OnGetKNN(const vectordb_rpc::GetKNNRequest* request, vectordb_rpc::GetKNNR
                     auto engine_sp = engine_manager_.GetVEngine(replica_sp->name());
                     assert(engine_sp);
 
-                    VecObj vo;
-                    s = GetVec(request->table(), request->key(), vo);
-                    if (!s.ok()) {
-                        reply->set_code(1);
-                        reply->set_msg(s.ToString());
-                        return Status::OK();
-                    }
-
                     std::vector<VecDt> tmp_results;
-                    s = engine_sp->GetKNN(vo.vec(), request->limit(), tmp_results, request->index_name());
-                    if (!s.ok()) {
-                        reply->set_code(1);
-                        reply->set_msg(s.ToString());
-                        return Status::OK();
+
+
+                    if (index_type == VECTOR_INDEX_KNNGRAPH) {
+                        s = engine_sp->GetKNN(request->key(), request->limit(), tmp_results, request->index_name());
+                        if (!s.ok()) {
+                            reply->set_code(1);
+                            reply->set_msg(s.ToString());
+                            return Status::OK();
+                        }
+
+                    } else if (index_type == VECTOR_INDEX_ANNOY) {
+                        VecObj vo;
+                        s = GetVec(request->table(), request->key(), vo);
+                        if (!s.ok()) {
+                            reply->set_code(1);
+                            reply->set_msg(s.ToString());
+                            return Status::OK();
+                        }
+
+                        s = engine_sp->GetKNN(vo.vec(), request->limit(), tmp_results, request->index_name());
+                        if (!s.ok()) {
+                            reply->set_code(1);
+                            reply->set_msg(s.ToString());
+                            return Status::OK();
+                        }
                     }
                     AppendVecDt(results, tmp_results);
 

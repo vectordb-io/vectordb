@@ -46,7 +46,7 @@ HelpStr() {
     s.append("create table {\"table_name\":\"vector_table\", \"engine_type\":\"vector\", \"dim\":4, \"partition_num\":10, \"replica_num\":1}").append("\n");
     s.append("put {\"table_name\":\"vector_table\", \"key\":\"kkk\", \"vector\":[1.13, 2.25, 3.73, 4.99], \"attach_value1\":\"attach_value1\", \"attach_value2\":\"attach_value2\", \"attach_value3\":\"attach_value3\"}").append("\n");
     s.append("build index {\"table_name\":\"vector_table\", \"index_type\":\"annoy\"}").append("\n");
-    s.append("build index {\"table_name\":\"vector_table\", \"index_type\":\"knn_graph\", \"k\":0}").append("\n");
+    s.append("build index {\"table_name\":\"vector_table\", \"index_type\":\"knn_graph\", \"k\":100}").append("\n");
     s.append("get {\"table_name\":\"vector_table\", \"key\":\"kkk\"}").append("\n");
     s.append("getknn {\"table_name\":\"vector_table\", \"key\":\"kkk\", \"limit\":20, \"index_name\":\"my_index\"}").append("\n");
     s.append("distance key {\"table_name\":\"vector_table\", \"key1\":\"xxx\", \"key2\":\"ooo\"}").append("\n");

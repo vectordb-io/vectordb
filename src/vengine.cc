@@ -3,6 +3,7 @@
 #include "coding.h"
 #include "vengine.h"
 #include "vindex_annoy.h"
+#include "vindex_knn_graph.h"
 
 namespace vectordb {
 
@@ -82,7 +83,7 @@ VEngine::LoadIndex() {
         std::string index_name = kv.first;
         std::string index_type = kv.second;
 
-        auto s = AddIndex(index_name, index_type);
+        auto s = AddIndex(index_name, index_type, nullptr);
         if (!s.ok()) {
             ;
         }
@@ -122,7 +123,7 @@ VEngine::Get(const std::string &key, VecObj &vo) const {
     assert(s.ok());
     b = Str2VecObj(value, vo);
 
-    LOG(INFO) << "debug: " << vo.attach_value1() << "++" << vo.attach_value2() << "++" << vo.attach_value3();
+    //LOG(INFO) << "debug: " << vo.attach_value1() << "++" << vo.attach_value2() << "++" << vo.attach_value3();
 
     assert(b);
     return Status::OK();
@@ -134,18 +135,31 @@ VEngine::Delete(const std::string &key) {
 }
 
 Status
-VEngine::AddIndex(std::string index_name, std::string index_type) {
+VEngine::AddIndex(std::string index_name, std::string index_type, void *param) {
     std::string index_path = index_path_ + "/" + index_name;
     std::shared_ptr<VIndex> index_sp;
+
     if (index_type == VECTOR_INDEX_ANNOY) {
         index_sp = std::make_shared<VIndexAnnoy>(index_path, this);
         assert(index_sp);
         auto s = index_sp->Init();
         assert(s.ok());
+
     } else if (index_type == VECTOR_INDEX_KNNGRAPH) {
 
+        LOG(INFO) << "debug: param:" << param;
+        if (param) {
+            std::cout << "size3:" << static_cast<KNNGraphParam*>(param)->all_keys->size() << " " << static_cast<KNNGraphParam*>(param)->all_keys << std::endl;
+        }
+
+        KNNGraphParam *p = static_cast<KNNGraphParam*>(param);
+        index_sp = std::make_shared<VIndexKNNGraph>(index_path, this, p);
+        assert(index_sp);
+        auto s = index_sp->Init();
+        assert(s.ok());
+
     } else {
-        LOG(INFO) << "known index type:" << index_type;
+        LOG(INFO) << "unknown index type:" << index_type;
     }
 
     if (index_sp) {
@@ -170,6 +184,8 @@ VEngine::GetKNN(const std::string &key, int limit, std::vector<VecDt> &results, 
     auto index_sp = it->second;
     assert(index_sp);
 
+    std::cout << "debug: getknn " << index_name;
+
     auto s = index_sp->GetKNN(key, limit, results);
     assert(s.ok());
     return Status::OK();
@@ -187,6 +203,20 @@ VEngine::GetKNN(const Vec &vec, int limit, std::vector<VecDt> &results, const st
 
     auto s = index_sp->GetKNN(vec, limit, results);
     assert(s.ok());
+    return Status::OK();
+}
+
+Status
+VEngine::Keys(std::vector<std::string> &keys) const {
+    leveldb::Iterator* it = data_->NewIterator(leveldb::ReadOptions());
+    for (it->SeekToFirst(); it->Valid(); it->Next()) {
+        keys.push_back(it->key().ToString());
+
+        //std::cout << "debug: " << it->key().ToString();
+    }
+    assert(it->status().ok());  // Check for any errors found during the scan
+    delete it;
+
     return Status::OK();
 }
 

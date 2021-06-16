@@ -116,7 +116,11 @@ VClient::Do(const std::vector<std::string> &cmd_sv, const std::string &params_js
             vectordb_rpc::BuildIndexRequest request;
             request.set_table(table_name);
             request.set_index_type(index_type);
-            request.set_k(0);
+
+            if (index_type == "knn_graph") {
+                int k = j["k"].as_integer();
+                request.set_k(k);
+            }
             BuildIndex(request, reply);
 
         } catch (std::exception &e) {
