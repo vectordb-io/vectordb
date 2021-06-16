@@ -35,12 +35,12 @@ More details at [vectordb.io](http://vectordb.io)
 
 ## Quick start
 
-#### 1. start server
+#### 1. run server
 ```
 ./vectordb-server --addr=127.0.0.1:38000 --data_path=/tmp/vectordb
 ```
 
-#### 2. start client
+#### 2. run client
 ```
 ./vectordb-cli --addr=127.0.0.1:38000
 (vector-cli) 127.0.0.1:38000>
