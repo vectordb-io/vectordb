@@ -9,20 +9,41 @@ Vectordb is an open-source database used in AI service. It supports operations o
 <br>
 More details at [vectordb.io](http://vectordb.io)
 
+
+## Features
+#### 1. multiple data structure
+* kv / document
+* vector
+* graph
+
+#### 2. distributed storage
+* a huge store
+* use raft to ensure safty
+* auto balance
+* high throughput, low latency
+
+## Architecture
+
+#### 1. stand-alone
+
+
+#### 2. cluster
+
+
 ## Quick start
 
-### 1. start server
+#### 1. start server
 ```
 ./vectordb-server --addr=127.0.0.1:38000 --data_path=/tmp/vectordb
 ```
 
-### 2. start client
+#### 2. start client
 ```
 ./vectordb-cli --addr=127.0.0.1:38000
 (vector-cli) 127.0.0.1:38000>
 ```
 
-### 3. create table
+#### 3. create table
 ```
 (vector-cli) 127.0.0.1:38000> create table {"table_name":"test_vector_table", "engine_type":"vector", "dim":10, "partition_num":10, "replica_num":3}
 {
@@ -31,12 +52,12 @@ More details at [vectordb.io](http://vectordb.io)
 }
 ```
 
-### 4. generate random vectors
+#### 4. generate random vectors
 ```
 ./vector-inserter 127.0.0.1:38000 test_vector_table 10 100
 ```
 
-### 5. get vector
+#### 5. get vector
 ```
 (vector-cli) 127.0.0.1:38000> get {"table_name":"vector_table", "key":"key8_358097794"}
 {
@@ -51,7 +72,7 @@ More details at [vectordb.io](http://vectordb.io)
 }
 ```
 
-### 6. build index
+#### 6. build index
 ```
 (vector-cli) 127.0.0.1:38000> build index {"table_name":"test_vector_table", "index_type":"knn_graph", "k":20}
 {
@@ -60,7 +81,7 @@ More details at [vectordb.io](http://vectordb.io)
 }
 ```
 
-### 7. view metadata
+#### 7. view metadata
 ```
 (vector-cli) 127.0.0.1:38000> show tables
 {
@@ -138,7 +159,7 @@ More details at [vectordb.io](http://vectordb.io)
 }
 ```
 
-### 8. get knn (k nearest neighbors)
+#### 8. get knn (k nearest neighbors)
 ```
 (vector-cli) 127.0.0.1:38000> getknn {"table_name":"test_vector_table", "key":"key82_640136302", "limit":5, "index_name":"knn_graph1623826143"}
 {
@@ -188,4 +209,4 @@ More details at [vectordb.io](http://vectordb.io)
 1. build dependencies
 2. cd vectordb/src && make
 
-## Architecture
+
