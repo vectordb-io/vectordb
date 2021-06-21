@@ -193,7 +193,9 @@ Node::OnPutVec(const vectordb_rpc::PutVecRequest* request, vectordb_rpc::PutVecR
     std::string err_msg;
     auto it = meta_.tables().find(request->table());
     if (it == meta_.tables().end()) {
-        err_msg = "table not exist";
+        err_msg = "table not exist:[";
+        err_msg.append(request->table());
+        err_msg.append("]");
         reply->set_code(1);
         reply->set_msg(err_msg);
         return Status::OK();
@@ -294,7 +296,9 @@ Node::GetVec(const std::string &table, const std::string &key, VecObj &vo) const
 
     auto it = meta_.tables().find(table);
     if (it == meta_.tables().end()) {
-        err_msg = "table not exist";
+        err_msg = "table not exist:[";
+        err_msg.append(table);
+        err_msg.append("]");
         return Status::Corruption(err_msg);
     }
 
@@ -350,7 +354,10 @@ Node::OnKeys(const vectordb_rpc::KeysRequest* request, vectordb_rpc::KeysReply* 
 
     } else {
         reply->set_code(1);
-        reply->set_msg("table not exist");
+        std::string msg = "table not exist:[";
+        msg.append(request->table());
+        msg.append("]");
+        reply->set_msg(msg);
     }
 
     return Status::OK();
@@ -384,7 +391,10 @@ Node::OnBuildIndex(const vectordb_rpc::BuildIndexRequest* request, vectordb_rpc:
     auto it = meta_.tables().find(request->table());
     if (it == meta_.tables().end()) {
         reply->set_code(1);
-        reply->set_msg("table not exist");
+        std::string msg = "table not exist:[";
+        msg.append(request->table());
+        msg.append("]");
+        reply->set_msg(msg);
 
     } else {
         std::string index_type = request->index_type();
@@ -414,12 +424,6 @@ Node::OnBuildIndex(const vectordb_rpc::BuildIndexRequest* request, vectordb_rpc:
             std::cout << "&knn_param" << &knn_param << std::endl;
             std::cout << "param:" << param << std::endl;
             std::cout << "param1:" << param << " static_cast<KNNGraphParam*>(param)->all_keys:" << static_cast<KNNGraphParam*>(param)->all_keys << std::endl;
-
-            std::cout << "knn_param.all_keys:" << knn_param.all_keys << std::endl;
-
-            LOG(INFO) << "debug param param " << param;
-            std::cout << "size1:" << knn_param.all_keys->size() << std::endl;
-            std::cout << "size2:" << static_cast<KNNGraphParam*>(param)->all_keys->size() << " " << static_cast<KNNGraphParam*>(param)->all_keys << std::endl;
 
         } else {
             reply->set_code(1);
@@ -469,7 +473,10 @@ Node::OnGetKNN(const vectordb_rpc::GetKNNRequest* request, vectordb_rpc::GetKNNR
     auto it = meta_.tables().find(request->table());
     if (it == meta_.tables().end()) {
         reply->set_code(1);
-        reply->set_msg("table not exist");
+        std::string msg = "table not exist:[";
+        msg.append(request->table());
+        msg.append("]");
+        reply->set_msg(msg);
         return Status::OK();
 
     } else {

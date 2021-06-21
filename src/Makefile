@@ -18,7 +18,11 @@ OBJS_IMG=image_inserter.o vectordb_rpc.pb.o vectordb_rpc.grpc.pb.o vdb_client.o 
 LIBS_IMG=-lglog -lprotobuf -lgrpc++ -lgrpc -lpthread -lleveldb
 LFLAGS_IMG=-L/usr/local/lib
 
-cs: vectordb-server vectordb-cli vector-inserter image-inserter
+OBJS_GETKNN=get_knn_by_key.o vectordb_rpc.pb.o vectordb_rpc.grpc.pb.o vdb_client.o status.o 
+LIBS_GETKNN=-lglog -lprotobuf -lgrpc++ -lgrpc -lpthread -lleveldb
+LFLAGS_GETKNN=-L/usr/local/lib
+
+cs: vectordb-server vectordb-cli vector-inserter image-inserter get-knn-by-key
 	@echo ""
 	@echo "success, go go go!"
 	@echo ""
@@ -33,6 +37,9 @@ vector-inserter: $(OBJS_INSERTER)
 	$(CC) $^ -o $@ $(LIBS_INSERTER) $(LFLAGS_INSERTER)
 
 image-inserter: $(OBJS_IMG)
+	$(CC) $^ -o $@ $(LIBS_IMG) $(LFLAGS_IMG)
+
+get-knn-by-key: $(OBJS_GETKNN)
 	$(CC) $^ -o $@ $(LIBS_IMG) $(LFLAGS_IMG)
 
 %.o: %.cc %.h
@@ -52,6 +59,7 @@ clean:
 	rm -rf vectordb-cli
 	rm -rf vector-inserter
 	rm -rf image-inserter
+	rm -rf get-knn-by-key
 
 cleanall: clean
 	rm -f vectordb_rpc.pb.*

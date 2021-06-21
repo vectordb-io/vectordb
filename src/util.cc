@@ -92,9 +92,6 @@ std::string
 ReplicaName(const std::string &table_name, int partition_id, int replica_id) {
     char buf[256];
     snprintf(buf, sizeof(buf), "%s#partition_%d#replica_%d", table_name.c_str(), partition_id, replica_id);
-
-    LOG(INFO) << "debug: replica name: " << std::string(buf);
-
     return std::string(buf);
 }
 

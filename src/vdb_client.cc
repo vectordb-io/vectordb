@@ -126,4 +126,16 @@ VdbClient::BuildIndex(const vectordb_rpc::BuildIndexRequest &request, vectordb_r
     return Status::OK();
 }
 
+Status
+VdbClient::GetKNN(const vectordb_rpc::GetKNNRequest &request, vectordb_rpc::GetKNNReply* reply) {
+    grpc::ClientContext context;
+    grpc::Status status = stub_->GetKNN(&context, request, reply);
+    if (!status.ok()) {
+        std::string reply_msg = status.error_message();
+        return Status::Corruption(reply_msg);
+    }
+    return Status::OK();
+}
+
+
 } // namespace vectordb

@@ -110,7 +110,7 @@ VIndexAnnoy::Key2Id(const std::string &key, int &id) const {
 
     s = db_key2id_->Get(leveldb::ReadOptions(), key, &value);
     if (!s.ok()) {
-        LOG(INFO) << s.ToString();
+        //LOG(INFO) << s.ToString();
     }
     assert(s.ok());
     b = Str2Int32(value, id);
@@ -214,19 +214,27 @@ VIndexAnnoy::Build() {
 
         s = db_id2key_->Put(write_options, id_string, key);
         assert(s.ok());
-        LOG(INFO) << "build index id2key: " << annoy_index_id << " " << key;
+        //LOG(INFO) << "build index id2key: " << annoy_index_id << " " << key;
 
         s = db_key2id_->Put(write_options, key, id_string);
         assert(s.ok());
-        LOG(INFO) << "build index key2id: " << key << " " << annoy_index_id;
+        //LOG(INFO) << "build index key2id: " << key << " " << annoy_index_id;
 
         annoy_index_id++;
+        if (annoy_index_id % 500 == 0) {
+            printf("build index: annoy_index_id: %d\n", annoy_index_id);
+            fflush(nullptr);
+        }
     }
     assert(it->status().ok());  // Check for any errors found during the scan
     delete it;
 
-    annoy_index_.build(2 * dim());
+    //annoy_index_.build(2 * dim());
+    annoy_index_.build(10);
+    LOG(INFO) << "build tree finish";
+
     annoy_index_.save(annoy_path_.c_str());
+    LOG(INFO) << "save tree finish";
 
     return Status::OK();
 }

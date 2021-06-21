@@ -27,6 +27,8 @@ class VdbClient {
     Status DistKey(const vectordb_rpc::DistKeyRequest &request, vectordb_rpc::DistKeyReply* reply);
     Status Keys(const vectordb_rpc::KeysRequest &request, vectordb_rpc::KeysReply* reply);
     Status BuildIndex(const vectordb_rpc::BuildIndexRequest &request, vectordb_rpc::BuildIndexReply* reply);
+    Status GetKNN(const vectordb_rpc::GetKNNRequest &request, vectordb_rpc::GetKNNReply* reply);
+
 
     const std::string& address() const {
         return address_;
