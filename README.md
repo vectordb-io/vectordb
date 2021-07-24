@@ -221,7 +221,7 @@ More details at [vectordb.io](http://vectordb.io)
 ```
 
 ## build from source
-#### 0. OS
+#### 0. os environment
 ```
 uname -a
 Linux ubuntu 5.4.0-70-generic #78~18.04.1-Ubuntu SMP Sat Mar 20 14:10:07 UTC 2021 x86_64 x86_64 x86_64 GNU/Linux
