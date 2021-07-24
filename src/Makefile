@@ -3,23 +3,23 @@ CFLAGS+=-c -Wall -g -std=c++17
 INCLUDES=-I./ -I../third_party/jsonxx.v0.9.2/include/ -I../third_party/annoy.v1.10.0/include/
 
 OBJS_SERVER=server_main.o config.o status.o vectordb_rpc.pb.o vectordb_rpc.grpc.pb.o node.o util.o grpc_server.o meta.o coding.o vengine.o vec.o engine_manager.o vindex_annoy.o vindex_knn_graph.o
-LIBS_SERVER=-lglog -lprotobuf -lgrpc++ -lgrpc -lpthread -lleveldb
+LIBS_SERVER=-static -lglog -lprotobuf -lgrpc++ -lgrpc -lpthread -lleveldb
 LFLAGS_SERVER=-L/usr/local/lib
 
 OBJS_CLIENT=client_main.o vectordb_rpc.pb.o vectordb_rpc.grpc.pb.o vclient.o cli_config.o status.o cli_util.o 
-LIBS_CLIENT=-lglog -lprotobuf -lgrpc++ -lgrpc -lpthread -lleveldb
+LIBS_CLIENT=-static -lglog -lprotobuf -lgrpc++ -lgrpc -lpthread -lleveldb
 LFLAGS_CLIENT=-L/usr/local/lib
 
 OBJS_INSERTER=vector_inserter.o vectordb_rpc.pb.o vectordb_rpc.grpc.pb.o vdb_client.o status.o 
-LIBS_INSERTER=-lglog -lprotobuf -lgrpc++ -lgrpc -lpthread -lleveldb
+LIBS_INSERTER=-static -lglog -lprotobuf -lgrpc++ -lgrpc -lpthread -lleveldb
 LFLAGS_INSERTER=-L/usr/local/lib
 
 OBJS_IMG=image_inserter.o vectordb_rpc.pb.o vectordb_rpc.grpc.pb.o vdb_client.o status.o 
-LIBS_IMG=-lglog -lprotobuf -lgrpc++ -lgrpc -lpthread -lleveldb
+LIBS_IMG=-static -lglog -lprotobuf -lgrpc++ -lgrpc -lpthread -lleveldb
 LFLAGS_IMG=-L/usr/local/lib
 
 OBJS_GETKNN=get_knn_by_key.o vectordb_rpc.pb.o vectordb_rpc.grpc.pb.o vdb_client.o status.o 
-LIBS_GETKNN=-lglog -lprotobuf -lgrpc++ -lgrpc -lpthread -lleveldb
+LIBS_GETKNN=-static -lglog -lprotobuf -lgrpc++ -lgrpc -lpthread -lleveldb
 LFLAGS_GETKNN=-L/usr/local/lib
 
 cs: vectordb-server vectordb-cli vector-inserter image-inserter get-knn-by-key
