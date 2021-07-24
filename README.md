@@ -220,5 +220,25 @@ More details at [vectordb.io](http://vectordb.io)
 }
 ```
 
+## build from source
+#### 1. install build tools
+```
+sudo apt install autoconf automake libtool -y
+sudo apt install pkg-config -y
 
+sudo apt install libssl-dev -y
+wget https://cmake.org/files/v3.18/cmake-3.18.4.tar.gz
+tar zxvf cmake-3.18.4.tar.gz
+cd cmake-3.18.4/
+./bootstrap
+make
+sudo make install
 
+cmake -version
+cmake version 3.18.4
+```
+
+#### 2. build source code
+```
+sh build.sh
+```
