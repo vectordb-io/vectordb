@@ -62,11 +62,11 @@ sudo ldconfig
 
 cd src/
 make all
+cd -
 
 
 # output
 
-cd -
 rm -rf output
 mkdir -p output/vectordb/bin
 mkdir -p output/vectordb/conf

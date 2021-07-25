@@ -226,7 +226,7 @@ tar zxvf vectordb.tar.gz
 }
 ```
 
-## build from source
+## Build from source
 #### 0. os environment
 ```
 uname -a
