@@ -251,6 +251,9 @@ cmake version 3.18.4
 ```
 
 #### 2. build source code
+
 ```
-sh build.sh
+cd script
+sh one_key_build.sh
 ```
+
