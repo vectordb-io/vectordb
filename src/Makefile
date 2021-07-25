@@ -50,6 +50,20 @@ proto:
 	protoc -I. --cpp_out=. vectordb_rpc.proto
 	protoc -I. --grpc_out=. --plugin=protoc-gen-grpc=`which grpc_cpp_plugin` vectordb_rpc.proto
 
+install:
+	rm -rf output
+	mkdir -p output/vectordb/bin
+	mkdir -p output/vectordb/conf
+	mkdir -p output/vectordb/data
+	mkdir -p output/vectordb/log
+	cp vectordb-server output/vectordb/bin/
+	cp vectordb-cli output/vectordb/bin/
+	cp vector-inserter output/vectordb/bin/
+	cp get-knn-by-key output/vectordb/bin/
+
+uninstall:
+	rm -rf output
+
 all:
 	make proto && make cs 
 
@@ -61,7 +75,7 @@ clean:
 	rm -rf image-inserter
 	rm -rf get-knn-by-key
 
-cleanall: clean
+cleanall: clean uninstall
 	rm -f vectordb_rpc.pb.*
 	rm -f vectordb_rpc.grpc.pb.*
 
