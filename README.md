@@ -243,7 +243,7 @@ wget https://cmake.org/files/v3.18/cmake-3.18.4.tar.gz
 tar zxvf cmake-3.18.4.tar.gz
 cd cmake-3.18.4/
 ./bootstrap
-make
+make -j 4
 sudo make install
 
 cmake -version
