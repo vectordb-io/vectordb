@@ -1,8 +1,6 @@
 #include "annoylib.h"
 #include "kissrandom.h"
 
-using namespace Annoy;
-
 namespace GoAnnoy {
 
 class AnnoyIndex {
@@ -88,14 +86,6 @@ class AnnoyIndexManhattan : public AnnoyIndex {
  public:
   AnnoyIndexManhattan(int f) {
     ptr = new ::AnnoyIndex<int32_t, float, ::Manhattan, ::Kiss64Random, AnnoyIndexSingleThreadedBuildPolicy>(f);
-    this->f = f;
-  }
-};
-
-class AnnoyIndexDotProduct : public AnnoyIndex {
- public:
-  AnnoyIndexDotProduct(int f) {
-    ptr = new ::AnnoyIndex<int32_t, float, ::DotProduct, ::Kiss64Random, AnnoyIndexSingleThreadedBuildPolicy>(f);
     this->f = f;
   }
 };

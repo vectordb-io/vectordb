@@ -28,8 +28,6 @@
 #define compat_rawlen lua_rawlen
 #endif
 
-using namespace Annoy;
-
 template<typename Distance>
 class LuaAnnoy {
 public:

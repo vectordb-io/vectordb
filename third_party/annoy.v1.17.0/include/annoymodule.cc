@@ -24,9 +24,9 @@ typedef signed __int32    int32_t;
 #endif
 
 
-#if defined(ANNOYLIB_USE_AVX512)
+#if defined(USE_AVX512)
 #define AVX_INFO "Using 512-bit AVX instructions"
-#elif defined(ANNOYLIB_USE_AVX128)
+#elif defined(USE_AVX128)
 #define AVX_INFO "Using 128-bit AVX instructions"
 #else
 #define AVX_INFO "Not using AVX instructions"
@@ -53,8 +53,6 @@ typedef signed __int32    int32_t;
 #ifdef IS_PY3K
     #define PyInt_FromLong PyLong_FromLong 
 #endif
-
-using namespace Annoy;
 
 #ifdef ANNOYLIB_MULTITHREADED_BUILD
   typedef AnnoyIndexMultiThreadedBuildPolicy AnnoyIndexThreadedBuildPolicy;
@@ -125,7 +123,7 @@ public:
     _index.get_item(item, &v_internal[0]);
     _unpack(&v_internal[0], v);
   };
-  void set_seed(uint64_t q) { _index.set_seed(q); };
+  void set_seed(int q) { _index.set_seed(q); };
   bool on_disk_build(const char* filename, char** error) { return _index.on_disk_build(filename, error); };
 };
 
@@ -238,46 +236,21 @@ py_an_save(py_annoy *self, PyObject *args, PyObject *kwargs) {
 
 PyObject*
 get_nns_to_python(const vector<int32_t>& result, const vector<float>& distances, int include_distances) {
-  PyObject* l = NULL;
-  PyObject* d = NULL;
-  PyObject* t = NULL;
-
-  if ((l = PyList_New(result.size())) == NULL) {
-    goto error;
-  }
-  for (size_t i = 0; i < result.size(); i++) {
-    PyObject* res = PyInt_FromLong(result[i]);
-    if (res == NULL) {
-      goto error;
-    }
-    PyList_SetItem(l, i, res);
-  }
+  PyObject* l = PyList_New(result.size());
+  for (size_t i = 0; i < result.size(); i++)
+    PyList_SetItem(l, i, PyInt_FromLong(result[i]));
   if (!include_distances)
     return l;
 
-  if ((d = PyList_New(distances.size())) == NULL) {
-    goto error;
-  }
+  PyObject* d = PyList_New(distances.size());
+  for (size_t i = 0; i < distances.size(); i++)
+    PyList_SetItem(d, i, PyFloat_FromDouble(distances[i]));
 
-  for (size_t i = 0; i < distances.size(); i++) {
-    PyObject* dist = PyFloat_FromDouble(distances[i]);
-    if (dist == NULL) {
-      goto error;
-    }
-    PyList_SetItem(d, i, dist);
-  }
-
-  if ((t = PyTuple_Pack(2, l, d)) == NULL) {
-    goto error;
-  }
+  PyObject* t = PyTuple_New(2);
+  PyTuple_SetItem(t, 0, l);
+  PyTuple_SetItem(t, 1, d);
 
   return t;
-
-  error:
-    Py_XDECREF(l);
-    Py_XDECREF(d);
-    Py_XDECREF(t);
-    return NULL;
 }
 
 
@@ -320,31 +293,24 @@ py_an_get_nns_by_item(py_annoy *self, PyObject *args, PyObject *kwargs) {
 
 bool
 convert_list_to_vector(PyObject* v, int f, vector<float>* w) {
-  Py_ssize_t length = PyObject_Size(v);
-  if (length == -1) {
+  if (PyObject_Size(v) == -1) {
+    char buf[256];
+    snprintf(buf, 256, "Expected an iterable, got an object of type \"%s\"", v->ob_type->tp_name);
+    PyErr_SetString(PyExc_ValueError, buf);
     return false;
   }
-  if (length != f) {
-    PyErr_Format(PyExc_IndexError, "Vector has wrong length (expected %d, got %ld)", f, length);
+  if (PyObject_Size(v) != f) {
+    char buf[128];
+    snprintf(buf, 128, "Vector has wrong length (expected %d, got %ld)", f, PyObject_Size(v));
+    PyErr_SetString(PyExc_IndexError, buf);
     return false;
   }
-
   for (int z = 0; z < f; z++) {
     PyObject *key = PyInt_FromLong(z);
-    if (key == NULL) {
-      return false;
-    }
     PyObject *pf = PyObject_GetItem(v, key);
+    (*w)[z] = PyFloat_AsDouble(pf);
     Py_DECREF(key);
-    if (pf == NULL) {
-      return false;
-    }
-    double value = PyFloat_AsDouble(pf);
     Py_DECREF(pf);
-    if (value == -1.0 && PyErr_Occurred()) {
-      return false;
-    }
-    (*w)[z] = value;
   }
   return true;
 }
@@ -391,22 +357,11 @@ py_an_get_item_vector(py_annoy *self, PyObject *args) {
   vector<float> v(self->f);
   self->ptr->get_item(item, &v[0]);
   PyObject* l = PyList_New(self->f);
-  if (l == NULL) {
-    return NULL;
-  }
   for (int z = 0; z < self->f; z++) {
-    PyObject* dist = PyFloat_FromDouble(v[z]);
-    if (dist == NULL) {
-      goto error;
-    }
-    PyList_SetItem(l, z, dist);
+    PyList_SetItem(l, z, PyFloat_FromDouble(v[z]));
   }
 
   return l;
-
-  error:
-    Py_XDECREF(l);
-    return NULL;
 }
 
 

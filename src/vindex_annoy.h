@@ -46,7 +46,7 @@ class VIndexAnnoy : public VIndex {
     leveldb::DB* db_id2key_;
     VEngine* vengine_;
 
-    AnnoyIndex<int, double, Angular, Kiss32Random> annoy_index_;
+    AnnoyIndex<int, double, Angular, Kiss32Random, AnnoyIndexMultiThreadedBuildPolicy> annoy_index_;
 };
 
 } // namespace vectordb

@@ -1,6 +1,6 @@
 CC:=g++
-CFLAGS+=-c -Wall -g -std=c++17
-INCLUDES=-I./ -I../third_party/jsonxx.v0.9.2/include/ -I../third_party/annoy.v1.10.0/include/
+CFLAGS+=-c -Wall -g -std=c++17 -DANNOYLIB_MULTITHREADED_BUILD
+INCLUDES=-I./ -I../third_party/jsonxx.v0.9.2/include/ -I../third_party/annoy.v1.17.0/include/
 
 OBJS_SERVER=server_main.o config.o status.o vectordb_rpc.pb.o vectordb_rpc.grpc.pb.o node.o util.o grpc_server.o meta.o coding.o vengine.o vec.o engine_manager.o vindex_annoy.o vindex_knn_graph.o
 LIBS_SERVER=-static -lglog -lprotobuf -lgrpc++ -lgrpc -lpthread -lleveldb
