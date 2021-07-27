@@ -178,9 +178,10 @@ VEngine::HasIndex() const {
 
 Status
 VEngine::GetKNN(const std::string &key, int limit, std::vector<VecDt> &results, const std::string &index_name) {
+    LOG(INFO) << "debug: GetKNN index_name:" << index_name;
 
     std::shared_ptr<VIndex> index_sp;
-    if (index_name == "") {
+    if (index_name == "default") {
         if (indices_.size() > 0) {
             index_sp =  indices_.begin()->second;
         } else {
@@ -206,12 +207,25 @@ VEngine::GetKNN(const std::string &key, int limit, std::vector<VecDt> &results, 
 
 Status
 VEngine::GetKNN(const Vec &vec, int limit, std::vector<VecDt> &results, const std::string &index_name) {
-    auto it = indices_.find(index_name);
-    if (it == indices_.end()) {
-        LOG(INFO) << "index " << index_name << " not exist";
-        return Status::Corruption("index not exist");
+    LOG(INFO) << "debug: GetKNN index_name:" << index_name;
+
+    std::shared_ptr<VIndex> index_sp;
+    if (index_name == "default") {
+        if (indices_.size() > 0) {
+            index_sp =  indices_.begin()->second;
+        } else {
+            LOG(INFO) << "index " << index_name << " not exist";
+            return Status::Corruption("index not exist");
+        }
+
+    } else {
+        auto it = indices_.find(index_name);
+        if (it == indices_.end()) {
+            LOG(INFO) << "index " << index_name << " not exist";
+            return Status::Corruption("index not exist");
+        }
+        index_sp = it->second;
     }
-    auto index_sp = it->second;
     assert(index_sp);
 
     auto s = index_sp->GetKNN(vec, limit, results);

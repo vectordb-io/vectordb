@@ -483,9 +483,13 @@ Node::OnGetKNN(const vectordb_rpc::GetKNNRequest* request, vectordb_rpc::GetKNNR
         std::string index_type;
         auto index_it = it->second->indices().find(request->index_name());
         if (index_it == it->second->indices().end()) {
-            reply->set_code(1);
-            reply->set_msg("index not exist");
-            return Status::OK();
+            if (request->index_name() == "default" && it->second->indices().size() > 0) {
+                index_type = it->second->indices().begin()->second;
+            } else {
+                reply->set_code(1);
+                reply->set_msg("index not exist");
+                return Status::OK();
+            }
         } else {
             index_type = index_it->second;
         }
