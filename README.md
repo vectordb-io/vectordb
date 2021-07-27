@@ -378,7 +378,9 @@ int main(int argc, char **argv) {
 ```
 
 #### 2. java
+* vectordb/example/java/test.java
 
 #### 3. python
+* vectordb/example/python/test.python
 
 
