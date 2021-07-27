@@ -5,42 +5,32 @@
 #include "status.h"
 #include "vdb_client.h"
 
-std::string exe_name;
-
-void Usage() {
-    std::cout << std::endl;
-    std::cout << "Usage: " << std::endl;
-    std::cout << exe_name << " address table_name dim count" << std::endl;
-    std::cout <<exe_name << " 127.0.0.1:38000 vector_table 10 100" << std::endl;
-    std::cout << std::endl;
-}
 
 int main(int argc, char **argv) {
     vectordb::Status s;
-    FLAGS_alsologtostderr = false;
-    exe_name = std::string(argv[0]);
     srand(static_cast<unsigned>(time(nullptr)));
 
-    if (argc < 5) {
-        Usage();
-        exit(-1);
-    }
-
     int dim, count;
-    std::string address, table_name, out_put_file;
+    std::string address, table_name;
 
-    address = argv[1];
-    table_name = argv[2];
-    sscanf(argv[3], "%d", &dim);
-    sscanf(argv[4], "%d", &count);
-    out_put_file = table_name + "." + std::string(argv[3]) + "." + std::string(argv[4]) + ".txt";
+    address = "127.0.0.1";
+    table_name = "test_table_dim10";
+    count = 10000;
 
     vectordb::VdbClient vdb_client(address);
     s = vdb_client.Connect();
     assert(s.ok());
 
-    std::ofstream outfile(out_put_file);
+    // create table
+    {
+        vectordb_rpc::CreateTableRequest request;
+        vectordb_rpc::CreateTableReply reply;
+        s = vdb_client.CreateTable(request, &reply);
+        assert(s.ok());
+    }
 
+    // put vectors
+    std::ofstream outfile("test.data");
     char buf[256];
     for (int i = 0; i < count; ++i) {
         std::string key;
@@ -64,9 +54,33 @@ int main(int argc, char **argv) {
 
         vectordb_rpc::PutVecReply reply;
         s = vdb_client.PutVec(request, &reply);
+        assert(s.ok());
         std::cout << "insert " << key << ", "<< reply.DebugString();
     }
-    std::cout << std::endl <<"output file:" << out_put_file << std::endl << std::endl;
+
+    // build index
+    {
+        vectordb_rpc::BuildIndexRequest request;
+        vectordb_rpc::BuildIndexReply reply;
+        s = vdb_client.BuildIndex(request, &reply);
+        assert(s.ok());
+    }
+
+    // get
+    {
+        vectordb_rpc::GetVecRequest request;
+        vectordb_rpc::GetVecReply reply;
+        s = vdb_client.GetVec(request, &reply);
+        assert(s.ok());
+    }
+
+    // get knn
+    {
+        vectordb_rpc::GetKNNRequest request;
+        vectordb_rpc::GetKNNReply reply;
+        s = vdb_client.GetKNN(request, &reply);
+        assert(s.ok());
+    }
 
     return 0;
 }

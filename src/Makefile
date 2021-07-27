@@ -80,7 +80,7 @@ uninstall:
 	rm -rf output
 
 all:
-	make proto && make api && make cs 
+	make proto && make api && make cs && make install
 
 clean:
 	rm -rf *.o 
