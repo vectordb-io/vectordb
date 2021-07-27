@@ -259,7 +259,7 @@ sh one_key_build.sh
 
 ## develop example
 
-#### cpp
+#### 1. cpp
 * vectordb/example/cpp/test.cpp
 ```
 #include <random>
@@ -377,5 +377,8 @@ int main(int argc, char **argv) {
 }
 ```
 
+#### 2. java
+
+#### 3. python
 
 
