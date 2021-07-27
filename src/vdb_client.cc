@@ -128,6 +128,7 @@ VdbClient::BuildIndex(const vectordb_rpc::BuildIndexRequest &request, vectordb_r
 
 Status
 VdbClient::GetKNN(const vectordb_rpc::GetKNNRequest &request, vectordb_rpc::GetKNNReply* reply) {
+
     grpc::ClientContext context;
     grpc::Status status = stub_->GetKNN(&context, request, reply);
     if (!status.ok()) {

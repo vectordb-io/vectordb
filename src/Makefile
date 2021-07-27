@@ -1,5 +1,5 @@
 CC:=g++
-CFLAGS+=-c -Wall -g -std=c++17 -DANNOYLIB_MULTITHREADED_BUILD 
+CFLAGS+=-c -Wall -g -std=c++17 -DANNOYLIB_MULTITHREADED_BUILD
 INCLUDES=-I./ -I../third_party/jsonxx.v0.9.2/include/ -I../third_party/annoy.v1.17.0/include/
 
 OBJS_SERVER=server_main.o config.o status.o vectordb_rpc.pb.o vectordb_rpc.grpc.pb.o node.o util.o grpc_server.o meta.o coding.o vengine.o vec.o engine_manager.o vindex_annoy.o vindex_knn_graph.o
@@ -71,6 +71,10 @@ install:
 	cp get-knn-by-key output/vectordb/bin/
 	cp libvdbclient.a output/vectordb/libs
 	cp vdb_client.h output/vectordb/include
+	cp status.h output/vectordb/include
+	cp slice.h output/vectordb/include
+	cp vectordb_rpc.grpc.pb.h output/vectordb/include
+	cp vectordb_rpc.pb.h output/vectordb/include
 
 uninstall:
 	rm -rf output
