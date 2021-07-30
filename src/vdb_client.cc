@@ -17,6 +17,75 @@ VdbClient::Connect() {
 }
 
 Status
+VdbClient::Ping(vectordb_rpc::PingReply* reply) {
+    vectordb_rpc::PingRequest request;
+    request.set_msg("ping");
+    auto s = Ping(request, reply);
+    return s;
+}
+
+Status
+VdbClient::CreateTable(const std::string &table_name, int dim, vectordb_rpc::CreateTableReply* reply) {
+    vectordb_rpc::CreateTableRequest request;
+    request.set_table_name(table_name);
+    request.set_dim(dim);
+    request.set_partition_num(1);
+    request.set_replica_num(1);
+    request.set_engine_type("vector");
+    auto s = CreateTable(request, reply);
+    return s;
+}
+
+Status
+VdbClient::PutVec(const std::string &table_name,
+                  const std::string &key,
+                  const std::vector<double> &vec,
+                  const std::vector<std::string> &attach_values,
+                  vectordb_rpc::PutVecReply* reply) {
+    vectordb_rpc::PutVecRequest request;
+    request.set_table(table_name);
+    request.mutable_vec_obj()->set_key(key);
+
+    if (attach_values.size() >= 1) {
+        request.mutable_vec_obj()->set_attach_value1(attach_values[0]);
+    }
+    if (attach_values.size() >= 2) {
+        request.mutable_vec_obj()->set_attach_value2(attach_values[1]);
+    }
+    if (attach_values.size() >= 3) {
+        request.mutable_vec_obj()->set_attach_value3(attach_values[2]);
+    }
+
+    for (auto &d: vec) {
+        request.mutable_vec_obj()->mutable_vec()->add_data(d);
+    }
+
+    auto s = PutVec(request, reply);
+    return s;
+}
+
+Status
+VdbClient::BuildIndex(const std::string &table_name, vectordb_rpc::BuildIndexReply* reply) {
+    vectordb_rpc::BuildIndexRequest request;
+    request.set_table(table_name);
+    request.set_index_type("annoy");
+    auto s = BuildIndex(request, reply);
+    return s;
+}
+
+Status
+VdbClient::GetKNN(const std::string &table_name, const std::string &key, int limit, vectordb_rpc::GetKNNReply* reply) {
+    vectordb_rpc::GetKNNRequest request;
+    request.set_table(table_name);
+    request.set_key(key);
+    request.set_limit(limit);
+    request.set_index_name("default");
+
+    auto s = GetKNN(request, reply);
+    return s;
+}
+
+Status
 VdbClient::Ping(const vectordb_rpc::PingRequest &request, vectordb_rpc::PingReply* reply) {
     grpc::ClientContext context;
     grpc::Status status = stub_->Ping(&context, request, reply);
@@ -137,6 +206,5 @@ VdbClient::GetKNN(const vectordb_rpc::GetKNNRequest &request, vectordb_rpc::GetK
     }
     return Status::OK();
 }
-
 
 } // namespace vectordb

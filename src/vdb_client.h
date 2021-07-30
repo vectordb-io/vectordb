@@ -17,6 +17,18 @@ class VdbClient {
     VdbClient& operator=(const VdbClient&) = delete;
     Status Connect();
 
+    // simply call
+    Status Ping(vectordb_rpc::PingReply* reply);
+    Status CreateTable(const std::string &table_name, int dim, vectordb_rpc::CreateTableReply* reply);
+    Status PutVec(const std::string &table_name,
+                  const std::string &key,
+                  const std::vector<double> &vec,
+                  const std::vector<std::string> &attach_values,
+                  vectordb_rpc::PutVecReply* reply);
+    Status BuildIndex(const std::string &table_name, vectordb_rpc::BuildIndexReply* reply);
+    Status GetKNN(const std::string &table_name, const std::string &key, int limit, vectordb_rpc::GetKNNReply* reply);
+
+    // original grpc call
     Status Ping(const vectordb_rpc::PingRequest &request, vectordb_rpc::PingReply* reply);
     Status Info(const vectordb_rpc::InfoRequest &request, vectordb_rpc::InfoReply* reply);
     Status CreateTable(const vectordb_rpc::CreateTableRequest &request, vectordb_rpc::CreateTableReply* reply);
@@ -28,7 +40,6 @@ class VdbClient {
     Status Keys(const vectordb_rpc::KeysRequest &request, vectordb_rpc::KeysReply* reply);
     Status BuildIndex(const vectordb_rpc::BuildIndexRequest &request, vectordb_rpc::BuildIndexReply* reply);
     Status GetKNN(const vectordb_rpc::GetKNNRequest &request, vectordb_rpc::GetKNNReply* reply);
-
 
     const std::string& address() const {
         return address_;

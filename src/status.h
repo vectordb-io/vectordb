@@ -44,6 +44,9 @@ class Status {
     static Status IOError(const Slice& msg, const Slice& msg2 = Slice()) {
         return Status(kIOError, msg, msg2);
     }
+    static Status OtherError(const Slice& msg, const Slice& msg2 = Slice()) {
+        return Status(kOtherError, msg, msg2);
+    }
 
     // Returns true iff the status indicates success.
     bool ok() const {
@@ -75,6 +78,11 @@ class Status {
         return code() == kInvalidArgument;
     }
 
+    // Returns true iff the status indicates an OtherError.
+    bool IsOtherError() const {
+        return code() == kOtherError;
+    }
+
     // Return a string representation of this status suitable for printing.
     // Returns the string "OK" for success.
     std::string ToString() const;
@@ -86,7 +94,8 @@ class Status {
         kCorruption = 2,
         kNotSupported = 3,
         kInvalidArgument = 4,
-        kIOError = 5
+        kIOError = 5,
+        kOtherError = 100
     };
 
     Code code() const {
