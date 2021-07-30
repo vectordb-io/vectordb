@@ -257,7 +257,7 @@ cd script
 sh one_key_build.sh
 ```
 
-## develop example
+## Develop example
 
 #### 1. cpp
 
