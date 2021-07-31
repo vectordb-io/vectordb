@@ -37,8 +37,8 @@ More details at [vectordb.io](http://vectordb.io)
 
 #### 0. get executable program
 ```
-wget http://vectordb.io/downloads/packages/vectordb_exe/vectordb.tar.gz
-tar zxvf vectordb.tar.gz
+wget http://vectordb.io/downloads/packages/vectordb_exe/output.tar.gz
+tar zxvf output.tar.gz
 ```
 
 #### 1. run server
