@@ -202,7 +202,6 @@ Table::ToJson() const {
     j["dim"] = dim_;
     j["partition_num"] = partition_num_;
     j["replica_num"] = replica_num_;
-    j["engine_type"] = engine_type_;
     j["path"] = path_;
     int k = 0;
     for (auto &p : partitions_) {

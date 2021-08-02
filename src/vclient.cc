@@ -45,21 +45,52 @@ VClient::Do(const std::vector<std::string> &cmd_sv, const std::string &params_js
         return;
 
     } else if (cmd_sv.size() == 2 && cmd_sv[0] == "create" && cmd_sv[1] == "table") {
+        bool ok = true;
+        std::string table_name;
+        int partition_num;
+        int replica_num;
+        int dim;
+        auto j = jsonxx::json::parse(params_json);
+
+        // optional value
         try {
-            auto j = jsonxx::json::parse(params_json);
-            std::string table_name = j["table_name"].as_string();
-            int partition_num = j["partition_num"].as_integer();
-            int replica_num = j["replica_num"].as_integer();
-            int dim = j["dim"].as_integer();
+            partition_num = j["partition_num"].as_integer();
+        } catch (std::exception &e) {
+            partition_num = 1;
+        }
+
+        // optional value
+        try {
+            replica_num = j["replica_num"].as_integer();
+        } catch (std::exception &e) {
+            replica_num = 1;
+        }
+
+        // required value
+        try {
+            table_name = j["table_name"].as_string();
+        } catch (std::exception &e) {
+            reply = "table_name error, ";
+            reply.append(e.what());
+            ok = false;
+        }
+
+        // required value
+        try {
+            dim = j["dim"].as_integer();
+        } catch (std::exception &e) {
+            reply = "dim error, ";
+            reply.append(e.what());
+            ok = false;
+        }
+
+        if (ok) {
             vectordb_rpc::CreateTableRequest request;
             request.set_table_name(table_name);
             request.set_partition_num(partition_num);
             request.set_replica_num(replica_num);
             request.set_dim(dim);
             CreateTable(request, reply);
-
-        } catch (std::exception &e) {
-            std::cout << e.what() << std::endl;
         }
 
     } else if (cmd_sv.size() == 2 && cmd_sv[0] == "show" && cmd_sv[1] == "tables") {

@@ -268,14 +268,6 @@ class Table {
         replica_num_ = replica_num;
     }
 
-    std::string engine_type() const {
-        return engine_type_;
-    }
-
-    void set_engine_type(const std::string& engine_type) {
-        engine_type_ = engine_type;
-    }
-
     std::string path() const {
         return path_;
     }
@@ -320,7 +312,6 @@ class Table {
     int dim_;
     int partition_num_;
     int replica_num_;
-    std::string engine_type_;
     std::string path_;
     std::map<std::string, std::shared_ptr<Partition>> partitions_;
     std::map<std::string, std::string> indices_;

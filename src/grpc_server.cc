@@ -29,7 +29,8 @@ VectorDBServiceImpl::CreateTable(grpc::ServerContext* context,
                                  const vectordb_rpc::CreateTableRequest* request,
                                  vectordb_rpc::CreateTableReply* reply) {
     auto s = Node::GetInstance().OnCreateTable(request, reply);
-    assert(s.ok());
+    // maybe not ok
+    //assert(s.ok());
     return grpc::Status::OK;
 }
 

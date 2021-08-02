@@ -86,6 +86,7 @@ class Status {
     // Return a string representation of this status suitable for printing.
     // Returns the string "OK" for success.
     std::string ToString() const;
+    std::string Msg() const;
 
   private:
     enum Code {

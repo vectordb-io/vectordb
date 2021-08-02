@@ -37,7 +37,6 @@ Pb2Table(const vectordb_rpc::Table &pb, Table &table) {
     table.set_name(pb.name());
     table.set_partition_num(pb.partition_num());
     table.set_replica_num(pb.replica_num());
-    table.set_engine_type(pb.engine_type());
     table.set_path(pb.path());
     table.set_dim(pb.dim());
 
@@ -86,7 +85,6 @@ Table2Pb(const Table &table, vectordb_rpc::Table &pb) {
     pb.set_name(table.name());
     pb.set_partition_num(table.partition_num());
     pb.set_replica_num(table.replica_num());
-    pb.set_engine_type(table.engine_type());
     pb.set_path(table.path());
     pb.set_dim(table.dim());
     for (auto &p : table.partitions()) {

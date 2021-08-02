@@ -75,9 +75,7 @@ Status
 Node::OnCreateTable(const vectordb_rpc::CreateTableRequest* request, vectordb_rpc::CreateTableReply* reply) {
     std::string table_path = Config::GetInstance().engine_path();
     table_path.append("/").append(request->table_name());
-
-    reply->set_code(1);
-    reply->set_msg("create table error");
+    std::string msg = "create table error: ";
 
     TableParam tp;
     tp.name = request->table_name();
@@ -89,13 +87,12 @@ Node::OnCreateTable(const vectordb_rpc::CreateTableRequest* request, vectordb_rp
     auto s = meta_.AddTable(tp);
     if (!s.ok()) {
         reply->set_code(1);
-        std::string msg = "create table ";
-        msg.append(request->table_name());
-        msg.append(" error");
+        msg.append(s.Msg());
         reply->set_msg(msg);
-        return Status::Corruption(msg);
+        return Status::OtherError(s.Msg());
     }
-    meta_.Persist();
+    s = meta_.Persist();
+    assert(s.ok());
 
     auto it_table = meta_.tables().find(request->table_name());
     assert(it_table != meta_.tables().end());
@@ -113,22 +110,21 @@ Node::OnCreateTable(const vectordb_rpc::CreateTableRequest* request, vectordb_rp
             std::map<std::string, std::string> empty_indices;
             auto vengine = std::make_shared<VEngine>(replica_sp->path(), request->dim(), empty_indices, replica_sp->name());
             if (!vengine) {
-                reply->set_code(1);
-                std::string msg = "create table ";
-                msg.append(request->table_name());
-                msg.append(" error");
+                reply->set_code(2);
+                msg.append(s.Msg());
                 reply->set_msg(msg);
-                return Status::Corruption(msg);
+                return Status::OtherError(s.Msg());
             }
             auto s = vengine->Init();
             assert(s.ok());
             engine_manager_.AddVEngine(replica_sp->name(), vengine);
         }
     }
+    s = meta_.Persist();
+    assert(s.ok());
 
-    meta_.Persist();
     reply->set_code(0);
-    std::string msg = "create table ";
+    msg = "create table ";
     msg.append(request->table_name());
     msg.append(" ok");
     reply->set_msg(msg);

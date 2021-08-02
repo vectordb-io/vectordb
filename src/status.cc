@@ -70,4 +70,16 @@ std::string Status::ToString() const {
     }
 }
 
+std::string Status::Msg() const {
+    if (state_ == nullptr) {
+        return "OK";
+    } else {
+        std::string result;
+        uint32_t length;
+        memcpy(&length, state_, sizeof(length));
+        result.append(state_ + 5, length);
+        return result;
+    }
+}
+
 } // namespace vectordb
