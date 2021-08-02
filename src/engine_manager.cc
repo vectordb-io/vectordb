@@ -6,20 +6,18 @@ namespace vectordb {
 Status
 EngineManager::Init() {
     for (auto &table_kv : Node::GetInstance().meta().tables()) {
-        if (table_kv.second->engine_type() == VECTOR_ENGINE) {
-            for (auto &partition_kv : table_kv.second->partitions()) {
-                for (auto &replica_kv : partition_kv.second->replicas()) {
-                    auto replica_sp = replica_kv.second;
-                    std::map<std::string, std::string> empty_indices;
-                    for (auto index_kv : table_kv.second->indices()) {
-                        empty_indices.insert(std::pair<std::string, std::string>(index_kv.first, index_kv.second));
-                    }
-                    auto vengine = std::make_shared<VEngine>(replica_sp->path(), table_kv.second->dim(), empty_indices, replica_sp->name());
-                    assert(vengine);
-                    auto s = vengine->Init();
-                    assert(s.ok());
-                    Node::GetInstance().mutable_engine_manager().AddVEngine(replica_sp->name(), vengine);
+        for (auto &partition_kv : table_kv.second->partitions()) {
+            for (auto &replica_kv : partition_kv.second->replicas()) {
+                auto replica_sp = replica_kv.second;
+                std::map<std::string, std::string> empty_indices;
+                for (auto index_kv : table_kv.second->indices()) {
+                    empty_indices.insert(std::pair<std::string, std::string>(index_kv.first, index_kv.second));
                 }
+                auto vengine = std::make_shared<VEngine>(replica_sp->path(), table_kv.second->dim(), empty_indices, replica_sp->name());
+                assert(vengine);
+                auto s = vengine->Init();
+                assert(s.ok());
+                Node::GetInstance().mutable_engine_manager().AddVEngine(replica_sp->name(), vengine);
             }
         }
     }

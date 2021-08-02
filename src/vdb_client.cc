@@ -31,7 +31,6 @@ VdbClient::CreateTable(const std::string &table_name, int dim, vectordb_rpc::Cre
     request.set_dim(dim);
     request.set_partition_num(1);
     request.set_replica_num(1);
-    request.set_engine_type("vector");
     auto s = CreateTable(request, reply);
     return s;
 }

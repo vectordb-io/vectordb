@@ -50,17 +50,13 @@ VClient::Do(const std::vector<std::string> &cmd_sv, const std::string &params_js
             std::string table_name = j["table_name"].as_string();
             int partition_num = j["partition_num"].as_integer();
             int replica_num = j["replica_num"].as_integer();
-            std::string engine_type = j["engine_type"].as_string();
-            if (engine_type == "vector") {
-                int dim = j["dim"].as_integer();
-                vectordb_rpc::CreateTableRequest request;
-                request.set_table_name(table_name);
-                request.set_partition_num(partition_num);
-                request.set_replica_num(replica_num);
-                request.set_engine_type(engine_type);
-                request.set_dim(dim);
-                CreateTable(request, reply);
-            }
+            int dim = j["dim"].as_integer();
+            vectordb_rpc::CreateTableRequest request;
+            request.set_table_name(table_name);
+            request.set_partition_num(partition_num);
+            request.set_replica_num(replica_num);
+            request.set_dim(dim);
+            CreateTable(request, reply);
 
         } catch (std::exception &e) {
             std::cout << e.what() << std::endl;

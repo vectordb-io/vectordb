@@ -310,7 +310,6 @@ Meta::AddIndex(const IndexParam &param) {
         return Status::Corruption(msg);
     }
     assert(param.index_type == VECTOR_INDEX_ANNOY || param.index_type == VECTOR_INDEX_KNNGRAPH);
-    assert(it_table->second->engine_type() == VECTOR_ENGINE);
 
     auto it_index = it_table->second->indices().find(param.index_name);
     if (it_index != it_table->second->indices().end()) {

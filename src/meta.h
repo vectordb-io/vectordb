@@ -15,10 +15,6 @@ namespace vectordb {
 
 #define META_PERSIST_KEY_TABLES "META_PERSIST_KEY_TABLES"
 
-#define KV_ENGINE "kv"
-#define VECTOR_ENGINE "vector"
-#define GRAPH_ENGINE "graph"
-
 #define VECTOR_INDEX_ANNOY "annoy"
 #define VECTOR_INDEX_KNNGRAPH "knn_graph"
 
@@ -48,7 +44,6 @@ struct TableParam {
     std::string name;
     int partition_num;
     int replica_num;
-    std::string engine_type;
     std::string path;
     int dim;
 };
@@ -231,7 +226,6 @@ class Table {
          dim_(param.dim),
          partition_num_(param.partition_num),
          replica_num_(param.replica_num),
-         engine_type_(param.engine_type),
          path_(param.path) {
         AddAllPartitions();
     }

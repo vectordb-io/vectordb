@@ -167,8 +167,7 @@ message CreateTableRequest {
   string table_name = 1;
   int32 partition_num = 2;
   int32 replica_num = 3;
-  string engine_type = 4;
-  int32 dim = 5;
+  int32 dim = 4;
 }
 
 message CreateTableReply {

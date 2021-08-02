@@ -7,6 +7,7 @@
 #include <iostream>
 #include "jsonxx/json.hpp"
 #include "cli_util.h"
+#include "usage_string.h"
 
 namespace vectordb {
 
@@ -28,38 +29,7 @@ void DelTail(std::string &s, char c) {
 
 std::string
 HelpStr() {
-    std::string s;
-    s.append("-------------------------------------------------------------------------\n");
-    s.append("console command example:").append("\n").append("\n");
-
-    s.append("help").append("\n");
-    s.append("info").append("\n");
-    s.append("ping").append("\n");
-    s.append("exit").append("\n");
-    s.append("quit").append("\n");
-    s.append("version").append("\n");
-    s.append("show tables").append("\n");
-    s.append("desc table_name").append("\n");
-    s.append("desc partition_name").append("\n");
-    s.append("desc replica_name").append("\n").append("\n");
-
-    s.append("create table {\"table_name\":\"vector_table\", \"engine_type\":\"vector\", \"dim\":4, \"partition_num\":10, \"replica_num\":1}").append("\n");
-    s.append("put {\"table_name\":\"vector_table\", \"key\":\"kkk\", \"vector\":[1.13, 2.25, 3.73, 4.99], \"attach_value1\":\"attach_value1\", \"attach_value2\":\"attach_value2\", \"attach_value3\":\"attach_value3\"}").append("\n");
-    s.append("build index {\"table_name\":\"vector_table\", \"index_type\":\"annoy\"}").append("\n");
-    s.append("build index {\"table_name\":\"vector_table\", \"index_type\":\"knn_graph\", \"k\":100}").append("\n");
-    s.append("get {\"table_name\":\"vector_table\", \"key\":\"kkk\"}").append("\n");
-    s.append("getknn {\"table_name\":\"vector_table\", \"key\":\"kkk\", \"limit\":20, \"index_name\":\"my_index\"}").append("\n");
-    s.append("distance key {\"table_name\":\"vector_table\", \"key1\":\"xxx\", \"key2\":\"ooo\"}").append("\n");
-    s.append("distance vector {\"vector1\":[1.13, 2.25, 3.73, 4.99], \"vector2\":[3.93, 9.27, 4.63, 2.91]}").append("\n").append("\n");
-    s.append("keys {\"table_name\":\"kv_table\"}").append("\n");
-
-    s.append("create table {\"table_name\":\"kv_table\", \"engine_type\":\"kv\", \"partition_num\":1, \"replica_num\":1}").append("\n");
-    s.append("put {\"table_name\":\"kv_table\", \"key\":\"kkk\", \"value\":\"vvv\"}").append("\n");
-    s.append("get {\"table_name\":\"kv_table\", \"key\":\"kkk\"}").append("\n");
-    s.append("del {\"table_name\":\"kv_table\", \"key\":\"kkk\"}").append("\n").append("\n");
-
-    s.append("create table {\"table_name\":\"graph_table\", \"engine_type\":\"graph\", \"partition_num\":1, \"replica_num\":1}").append("\n");
-    s.append("-------------------------------------------------------------------------\n");
+    std::string s(command_help_str);
     return s;
 }
 
