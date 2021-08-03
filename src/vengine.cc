@@ -97,7 +97,7 @@ VEngine::LoadIndex() {
 Status
 VEngine::Put(const std::string &key, const VecObj &vo) {
     if (vo.vec().dim() != dim_) {
-        return Status::Corruption("dim error");
+        return Status::Corruption("dim not equal");
     }
 
     std::string value;
@@ -141,8 +141,11 @@ VEngine::AddIndex(std::string index_name, std::string index_type, void *param) {
     std::string index_path = index_path_ + "/" + index_name;
     std::shared_ptr<VIndex> index_sp;
 
+
+    /*
     if (index_type == VECTOR_INDEX_ANNOY) {
-        index_sp = std::make_shared<VIndexAnnoy>(index_path, this);
+        AnnoyParam *p = static_cast<AnnoyParam*>(param);
+        index_sp = std::make_shared<VIndexAnnoy>(index_path, this, p);
         assert(index_sp);
         auto s = index_sp->Init();
         assert(s.ok());
@@ -168,6 +171,14 @@ VEngine::AddIndex(std::string index_name, std::string index_type, void *param) {
         indices_.insert(std::pair<std::string, std::shared_ptr<VIndex>>(index_name, index_sp));
         LOG(INFO) << "add index: " << index_name << " " << index_type;
     }
+    */
+
+    return Status::OK();
+}
+
+Status
+VEngine::LoadIndex(std::string index_name, std::string index_type) {
+
     return Status::OK();
 }
 

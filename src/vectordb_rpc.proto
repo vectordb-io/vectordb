@@ -73,10 +73,20 @@ message KeysReply {
   repeated string keys = 3;
 }
 
+message AnnoyParam {
+  string distance_type = 1;
+}
+
+message KNNGraphParam {
+  string distance_type = 1;
+  int32 k = 2;
+}
+
 message BuildIndexRequest {
   string table = 1;
   string index_type = 2;
-  int32 k = 3;
+  AnnoyParam annoy_param = 3;
+  KNNGraphParam knn_graph_param = 4;
 }
 
 message BuildIndexReply {

@@ -66,7 +66,8 @@ class VIndex {
     virtual Status GetKNN(const std::string &key, int limit, std::vector<VecDt> &results) = 0;
     virtual Status GetKNN(const Vec &vec, int limit, std::vector<VecDt> &results) = 0;
     virtual Status Distance(const std::string &key1, const std::string &key2, double &distance) = 0;
-    virtual Status Init() = 0;
+    virtual Status Build() = 0;
+    virtual Status Load() = 0;
 };
 
 } // namespace vectordb

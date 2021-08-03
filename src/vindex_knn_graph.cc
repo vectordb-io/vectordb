@@ -21,12 +21,18 @@ VIndexKNNGraph::VIndexKNNGraph(const std::string &path, VEngine* vengine, KNNGra
     db_knn_path_ = path_ + "/knn";
 }
 
+VIndexKNNGraph::VIndexKNNGraph(const std::string &path, VEngine* vengine) {
+
+}
+
 VIndexKNNGraph::~VIndexKNNGraph() {
     delete db_knn_;
+    delete db_meta_;
 }
 
 Status
 VIndexKNNGraph::GetKNN(const std::string &key, int limit, std::vector<VecDt> &results) {
+    /*
     std::string knn_key, knn_value;
     leveldb::Status ls;
     int count;
@@ -36,50 +42,51 @@ VIndexKNNGraph::GetKNN(const std::string &key, int limit, std::vector<VecDt> &re
 
 
     if (limit <= 0) {
-        return Status::OK();
+    return Status::OK();
     }
 
     std::cout << "debug: k_: " << k_ << std::endl;
 
     count = 0;
     for (int i = 0; i < k_; ++i) {
-        EncodeKey(key, i, knn_key);
+    EncodeKey(key, i, knn_key);
 
-        ls = db_knn_->Get(leveldb::ReadOptions(), knn_key, &knn_value);
-        assert(ls.ok());
+    ls = db_knn_->Get(leveldb::ReadOptions(), knn_key, &knn_value);
+    assert(ls.ok());
 
-        std::string find_key;
-        double distance;
-        auto b = DecodeValue(knn_value, find_key, distance);
-        assert(b);
+    std::string find_key;
+    double distance;
+    auto b = DecodeValue(knn_value, find_key, distance);
+    assert(b);
 
-        VecObj vo;
-        std::string table_name;
-        int partition_id;
-        int replica_id;
-        b = util::ParseReplicaName(vengine_->replica_name(), table_name, partition_id, replica_id);
-        assert(b);
-        auto s = Node::GetInstance().GetVec(table_name, find_key, vo);
-        assert(s.ok());
-        assert(find_key == vo.key());
+    VecObj vo;
+    std::string table_name;
+    int partition_id;
+    int replica_id;
+    b = util::ParseReplicaName(vengine_->replica_name(), table_name, partition_id, replica_id);
+    assert(b);
+    auto s = Node::GetInstance().GetVec(table_name, find_key, vo);
+    assert(s.ok());
+    assert(find_key == vo.key());
 
-        VecDtParam param;
-        param.key = vo.key();
-        param.distance = distance;
-        param.attach_value1 = vo.attach_value1();
-        param.attach_value2 = vo.attach_value2();
-        param.attach_value3 = vo.attach_value3();
+    VecDtParam param;
+    param.key = vo.key();
+    param.distance = distance;
+    param.attach_value1 = vo.attach_value1();
+    param.attach_value2 = vo.attach_value2();
+    param.attach_value3 = vo.attach_value3();
 
-        VecDt vdt(param);
-        results.push_back(vdt);
+    VecDt vdt(param);
+    results.push_back(vdt);
 
-        std::cout << "debug getknn graph " << count;
+    std::cout << "debug getknn graph " << count;
 
-        count++;
-        if (count >= limit) {
-            break;
-        }
+    count++;
+    if (count >= limit) {
+        break;
     }
+    }
+    */
     return Status::OK();
 }
 
@@ -99,21 +106,6 @@ VIndexKNNGraph::Distance(const std::string &key1, const std::string &key2, doubl
 
     auto b = util::Distance(vo1.vec().data(), vo2.vec().data(), distance);
     assert(b);
-    return Status::OK();
-}
-
-Status
-VIndexKNNGraph::Init() {
-    Status s;
-    if (util::DirOK(path_)) {
-        s = Load();
-        assert(s.ok());
-
-    } else {
-        util::Mkdir(path_);
-        s = Build();
-        assert(s.ok());
-    }
     return Status::OK();
 }
 

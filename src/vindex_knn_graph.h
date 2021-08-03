@@ -16,7 +16,8 @@ struct KNNGraphParam {
 
 class VIndexKNNGraph : public VIndex {
   public:
-    VIndexKNNGraph(const std::string &path, VEngine* vengine, KNNGraphParam *param);
+    VIndexKNNGraph(const std::string &path, VEngine* vengine, KNNGraphParam *param);  // call Build
+    VIndexKNNGraph(const std::string &path, VEngine* vengine);                        // call Load
     VIndexKNNGraph(const VIndexKNNGraph&) = delete;
     VIndexKNNGraph& operator=(const VIndexKNNGraph&) = delete;
     ~VIndexKNNGraph();
@@ -24,7 +25,8 @@ class VIndexKNNGraph : public VIndex {
     Status GetKNN(const std::string &key, int limit, std::vector<VecDt> &results) override;
     Status GetKNN(const Vec &vec, int limit, std::vector<VecDt> &results) override;
     Status Distance(const std::string &key1, const std::string &key2, double &distance) override;
-    Status Init() override;
+    Status Load() override;
+    Status Build() override;
 
     int k() const {
         return k_;
@@ -41,8 +43,6 @@ class VIndexKNNGraph : public VIndex {
   private:
 #define KEY_KNN_GRAPH_K "KEY_KNN_GRAPH_K"
 
-    Status Load();
-    Status Build();
     Status WriteK();
     Status LoadK();
     void EncodeKey(const std::string &key, int sequence, std::string &s) const;
@@ -54,6 +54,7 @@ class VIndexKNNGraph : public VIndex {
     std::string db_knn_path_;
 
     leveldb::DB* db_knn_;
+    leveldb::DB* db_meta_;
     VEngine* vengine_;
     int k_;
     std::vector<std::string>* all_keys_;

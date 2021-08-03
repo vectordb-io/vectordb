@@ -69,10 +69,10 @@ DirOK(const std::string &path) {
     }
 }
 
-void
+bool
 Mkdir(const std::string &path) {
     int ret = mkdir(path.c_str(), 0775);
-    assert(ret == 0);
+    return ret == 0;
 }
 
 void

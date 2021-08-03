@@ -1,4 +1,3 @@
-#include <glog/logging.h>
 #include "vengine.h"
 #include "util.h"
 #include "coding.h"
@@ -6,19 +5,27 @@
 
 namespace vectordb {
 
+// call Build
+VIndexAnnoy::VIndexAnnoy(const std::string &path, VEngine* vengine, AnnoyParam* param)
+    :distance_type_(param->distance_type),
+     path_(path),
+     vengine_(vengine) {
+    assert(vengine);
+    InitPath();
+}
+
+// call Load
 VIndexAnnoy::VIndexAnnoy(const std::string &path, VEngine* vengine)
     :path_(path),
-     vengine_(vengine),
-     annoy_index_(vengine->dim()) {
+     vengine_(vengine) {
     assert(vengine);
-    db_key2id_path_ = path_ + "/key2id";
-    db_id2key_path_ = path_ + "/id2key";
-    annoy_path_ = path_ + "/annoy.idx";
+    InitPath();
 }
 
 VIndexAnnoy::~VIndexAnnoy() {
     delete db_key2id_;
     delete db_id2key_;
+    delete db_meta_;
 }
 
 Status
@@ -33,7 +40,7 @@ VIndexAnnoy::GetKNN(const std::string &key, int limit, std::vector<VecDt> &resul
 
         std::vector<int> result;
         std::vector<double> distances;
-        annoy_index_.get_nns_by_item(id, limit, search_k, &result, &distances);
+        annoy_index_->get_nns_by_item(id, limit, search_k, &result, &distances);
         assert(result.size() == distances.size());
 
         for (size_t i = 0; i < result.size(); ++i) {
@@ -72,7 +79,7 @@ VIndexAnnoy::GetKNN(const Vec &vec, int limit, std::vector<VecDt> &results) {
         std::vector<int> result;
         std::vector<double> distances;
 
-        annoy_index_.get_nns_by_vector(vec.data().data(), vec.data().size(), search_k, &result, &distances);
+        annoy_index_->get_nns_by_vector(vec.data().data(), vec.data().size(), search_k, &result, &distances);
         assert(result.size() == distances.size());
 
         for (size_t i = 0; i < result.size(); ++i) {
@@ -141,37 +148,36 @@ VIndexAnnoy::Distance(const std::string &key1, const std::string &key2, double &
     b = Key2Id(key2, id2);
     assert(b);
 
-    distance = annoy_index_.get_distance(id1, id2);
-    return Status::OK();
-}
-
-Status
-VIndexAnnoy::Init() {
-    Status s;
-    if (util::DirOK(path_)) {
-        s = Load();
-        assert(s.ok());
-
-    } else {
-        util::Mkdir(path_);
-        s = Build();
-        assert(s.ok());
-    }
+    distance = annoy_index_->get_distance(id1, id2);
     return Status::OK();
 }
 
 Status
 VIndexAnnoy::Load() {
+    bool b = util::DirOK(path_);
+    assert(b);
+
     leveldb::Options options;
-    //options.create_if_missing = true;
-    leveldb::Status status;
+    leveldb::Status ls;
 
-    status = leveldb::DB::Open(options, db_key2id_path_, &db_key2id_);
-    assert(status.ok());
-    status = leveldb::DB::Open(options, db_id2key_path_, &db_id2key_);
-    assert(status.ok());
+    ls = leveldb::DB::Open(options, db_key2id_path_, &db_key2id_);
+    assert(ls.ok());
+    ls= leveldb::DB::Open(options, db_id2key_path_, &db_id2key_);
+    assert(ls.ok());
+    ls = leveldb::DB::Open(options, db_meta_path_, &db_meta_);
+    assert(ls.ok());
 
-    auto b = annoy_index_.load(annoy_path_.c_str());
+    std::string buf;
+    ls = db_meta_->Get(leveldb::ReadOptions(), KEY_META_ANNOY_INDEX, &buf);
+    assert(ls.ok());
+
+    AnnoyParam param;
+    auto s = param.ParseFromString(buf);
+    assert(s.ok());
+    distance_type_ = param.distance_type;
+
+    annoy_index_ = AnnoyIndexFactory::Create(distance_type_, vengine_->dim());
+    b = annoy_index_->load(annoy_path_.c_str());
     assert(b);
 
     return Status::OK();
@@ -179,14 +185,30 @@ VIndexAnnoy::Load() {
 
 Status
 VIndexAnnoy::Build() {
+    bool b = util::Mkdir(path_);
+    assert(b);
+
     leveldb::Options options;
     options.create_if_missing = true;
-    leveldb::Status status;
+    leveldb::Status ls;
 
-    status = leveldb::DB::Open(options, db_key2id_path_, &db_key2id_);
-    assert(status.ok());
-    status = leveldb::DB::Open(options, db_id2key_path_, &db_id2key_);
-    assert(status.ok());
+    ls = leveldb::DB::Open(options, db_key2id_path_, &db_key2id_);
+    assert(ls.ok());
+    ls= leveldb::DB::Open(options, db_id2key_path_, &db_id2key_);
+    assert(ls.ok());
+    ls = leveldb::DB::Open(options, db_meta_path_, &db_meta_);
+    assert(ls.ok());
+
+    AnnoyParam param;
+    param.distance_type = distance_type_;
+    std::string buf;
+    param.SerializeToString(buf);
+    leveldb::WriteOptions wo;
+    wo.sync = true;
+    ls = db_meta_->Put(wo, KEY_META_ANNOY_INDEX, buf);
+    assert(ls.ok());
+
+    annoy_index_ = AnnoyIndexFactory::Create(distance_type_, vengine_->dim());
 
     int annoy_index_id = 0;
     leveldb::Iterator* it = vengine_->data()->NewIterator(leveldb::ReadOptions());
@@ -203,7 +225,7 @@ VIndexAnnoy::Build() {
         for (int j = 0; j < vo.vec().dim(); ++j) {
             arr[j] = vo.vec().data()[j];
         }
-        annoy_index_.add_item(annoy_index_id, reinterpret_cast<const double*>(arr));
+        annoy_index_->add_item(annoy_index_id, reinterpret_cast<const double*>(arr));
 
         std::string id_string;
         Int322Str(annoy_index_id, id_string);
@@ -230,10 +252,10 @@ VIndexAnnoy::Build() {
     delete it;
 
     //annoy_index_.build(2 * dim());
-    annoy_index_.build(10);
+    annoy_index_->build(20);
     LOG(INFO) << "build tree finish";
 
-    annoy_index_.save(annoy_path_.c_str());
+    annoy_index_->save(annoy_path_.c_str());
     LOG(INFO) << "save tree finish";
 
     return Status::OK();

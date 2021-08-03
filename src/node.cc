@@ -196,9 +196,8 @@ Node::OnPutVec(const vectordb_rpc::PutVecRequest* request, vectordb_rpc::PutVecR
 
     auto s = meta_.ReplicaName(request->table(), request->vec_obj().key(), replica_name);
     if (!s.ok()) {
-        err_msg = "get replica error";
         reply->set_code(1);
-        reply->set_msg(err_msg);
+        reply->set_msg(s.Msg());
         return Status::OK();
     }
 
@@ -208,7 +207,7 @@ Node::OnPutVec(const vectordb_rpc::PutVecRequest* request, vectordb_rpc::PutVecR
     VecObj vo;
     Pb2VecObj(request->vec_obj(), vo);
     if (it->second->dim() != vo.vec().dim()) {
-        err_msg = "dim error";
+        err_msg = "dim not equal";
         reply->set_code(1);
         reply->set_msg(err_msg);
         return Status::OK();
@@ -216,9 +215,8 @@ Node::OnPutVec(const vectordb_rpc::PutVecRequest* request, vectordb_rpc::PutVecR
 
     s = sp->Put(request->vec_obj().key(), vo);
     if (!s.ok()) {
-        err_msg = "db put error";
         reply->set_code(1);
-        reply->set_msg(err_msg);
+        reply->set_msg(s.Msg());
         return Status::OK();
     }
 
@@ -392,20 +390,17 @@ Node::OnBuildIndex(const vectordb_rpc::BuildIndexRequest* request, vectordb_rpc:
             Keys(*keys);
 
 
+            /*
             knn_param.k = request->k();
             knn_param.all_keys = keys;
             param = &knn_param;
-
-            //for (auto &k : keys) {
-            //    std::cout << "debug haha" << k << std::endl;
-            //}
 
             std::cout << "keys: " << keys << std::endl;
             std::cout << "knn_param.all_keys:" << knn_param.all_keys << std::endl;
             std::cout << "&knn_param" << &knn_param << std::endl;
             std::cout << "param:" << param << std::endl;
             std::cout << "param1:" << param << " static_cast<KNNGraphParam*>(param)->all_keys:" << static_cast<KNNGraphParam*>(param)->all_keys << std::endl;
-
+            */
         } else {
             reply->set_code(1);
             reply->set_msg("unknown index type");

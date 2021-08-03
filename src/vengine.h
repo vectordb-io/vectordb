@@ -14,6 +14,28 @@
 
 namespace vectordb {
 
+class VIndexFactory {
+  public:
+    static VIndex*
+    Create(const std::string &index_type, const std::string &path, VEngine* vengine, void *param) {
+        VIndex *vindex = nullptr;
+        if (index_type == VECTOR_INDEX_ANNOY) {
+            AnnoyParam *annoy_param = static_cast<AnnoyParam*>(param);
+            vindex = new VIndexAnnoy(path, vengine, annoy_param);
+
+        } else if (index_type == VECTOR_INDEX_KNNGRAPH) {
+            KNNGraphParam *knn_graph_param = static_cast<KNNGraphParam*>(param);
+            vindex = new VIndexKNNGraph(path, vengine, knn_graph_param);
+
+        } else {
+            std::string msg = "create vindex error, unknown index_type ";
+            msg.append(index_type);
+            LOG(INFO) << msg;
+        }
+        return vindex;
+    }
+};
+
 class VEngine {
   public:
     VEngine(std::string path, int dim, const std::map<std::string, std::string> &indices, const std::string &replica_name);
@@ -28,6 +50,7 @@ class VEngine {
 
     bool HasIndex() const;
     Status AddIndex(std::string index_name, std::string index_type, void *param);
+    Status LoadIndex(std::string index_name, std::string index_type);
     Status GetKNN(const std::string &key, int limit, std::vector<VecDt> &results, const std::string &index_name);
     Status GetKNN(const Vec &vec, int limit, std::vector<VecDt> &results, const std::string &index_name);
 
@@ -55,9 +78,7 @@ class VEngine {
     Status Build();
     Status BuildData();
     Status Load();
-    Status BuildIndex();
     Status LoadData();
-    Status LoadIndex();
 
     std::string path_;
     std::string data_path_;
@@ -66,7 +87,6 @@ class VEngine {
 
     int dim_;
     leveldb::DB* data_;
-    //std::map<std::string, VIndex*> indices_;
     std::map<std::string, std::shared_ptr<VIndex>> indices_;
     std::map<std::string, std::string> indices_name_type_;
 };

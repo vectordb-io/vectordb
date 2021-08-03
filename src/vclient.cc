@@ -45,53 +45,60 @@ VClient::Do(const std::vector<std::string> &cmd_sv, const std::string &params_js
         return;
 
     } else if (cmd_sv.size() == 2 && cmd_sv[0] == "create" && cmd_sv[1] == "table") {
-        bool ok = true;
-        std::string table_name;
-        int partition_num;
-        int replica_num;
-        int dim;
-        auto j = jsonxx::json::parse(params_json);
+        do {
+            std::string table_name;
+            int partition_num;
+            int replica_num;
+            int dim;
+            jsonxx::json j;
 
-        // optional value
-        try {
-            partition_num = j["partition_num"].as_integer();
-        } catch (std::exception &e) {
-            partition_num = 1;
-        }
+            try {
+                j = jsonxx::json::parse(params_json);
+            } catch (std::exception &e) {
+                reply = "parameters error";
+                break;
+            }
 
-        // optional value
-        try {
-            replica_num = j["replica_num"].as_integer();
-        } catch (std::exception &e) {
-            replica_num = 1;
-        }
+            // optional value
+            try {
+                partition_num = j["partition_num"].as_integer();
+            } catch (std::exception &e) {
+                partition_num = 1;
+            }
 
-        // required value
-        try {
-            table_name = j["table_name"].as_string();
-        } catch (std::exception &e) {
-            reply = "table_name error, ";
-            reply.append(e.what());
-            ok = false;
-        }
+            // optional value
+            try {
+                replica_num = j["replica_num"].as_integer();
+            } catch (std::exception &e) {
+                replica_num = 1;
+            }
 
-        // required value
-        try {
-            dim = j["dim"].as_integer();
-        } catch (std::exception &e) {
-            reply = "dim error, ";
-            reply.append(e.what());
-            ok = false;
-        }
+            // required value
+            try {
+                table_name = j["table_name"].as_string();
+            } catch (std::exception &e) {
+                reply = "table_name error, ";
+                reply.append(e.what());
+                break;
+            }
 
-        if (ok) {
+            // required value
+            try {
+                dim = j["dim"].as_integer();
+            } catch (std::exception &e) {
+                reply = "dim error, ";
+                reply.append(e.what());
+                break;
+            }
+
             vectordb_rpc::CreateTableRequest request;
             request.set_table_name(table_name);
             request.set_partition_num(partition_num);
             request.set_replica_num(replica_num);
             request.set_dim(dim);
             CreateTable(request, reply);
-        }
+
+        } while (0);
 
     } else if (cmd_sv.size() == 2 && cmd_sv[0] == "show" && cmd_sv[1] == "tables") {
         vectordb_rpc::ShowTablesRequest request;
@@ -135,24 +142,75 @@ VClient::Do(const std::vector<std::string> &cmd_sv, const std::string &params_js
     } else if (cmd_sv.size() == 1 && cmd_sv[0] == "version") {
         reply = __VECTORDB__VERSION__;
 
+    } else if (cmd_sv.size() == 3 && cmd_sv[0] == "build" && cmd_sv[1] == "index") {
+        vectordb_rpc::BuildIndexRequest request;
+        request.set_table(cmd_sv[2]);
+        request.set_index_type("annoy");
+        request.mutable_annoy_param()->set_distance_type("cosine");
+        BuildIndex(request, reply);
+
     } else if (cmd_sv.size() == 2 && cmd_sv[0] == "build" && cmd_sv[1] == "index") {
-        try {
-            auto j = jsonxx::json::parse(params_json);
-            std::string table_name = j["table_name"].as_string();
-            std::string index_type = j["index_type"].as_string();
+        do {
+            std::string table_name;
+            std::string index_type;
+            std::string distance_type;
+            int k;
+            jsonxx::json j;
+
+            try {
+                j = jsonxx::json::parse(params_json);
+            } catch (std::exception &e) {
+                reply = "parameters error";
+                break;
+            }
+
+            // required value
+            try {
+                table_name = j["table_name"].as_string();
+            } catch (std::exception &e) {
+                reply = "table_name error, ";
+                reply.append(e.what());
+                break;
+            }
+
+            // optional value
+            try {
+                index_type = j["index_type"].as_string();
+            } catch (std::exception &e) {
+                index_type = "annoy";
+            }
+
+            // optional value
+            try {
+                distance_type = j["distance_type"].as_string();
+            } catch (std::exception &e) {
+                index_type = "cosine";
+            }
+
+            if (index_type == "knn_graph") {
+                // optional value
+                try {
+                    k = j["k"].as_integer();
+                } catch (std::exception &e) {
+                    k = 20;
+                }
+            }
+
             vectordb_rpc::BuildIndexRequest request;
             request.set_table(table_name);
             request.set_index_type(index_type);
-
-            if (index_type == "knn_graph") {
-                int k = j["k"].as_integer();
-                request.set_k(k);
+            if (index_type == "annoy") {
+                request.mutable_annoy_param()->set_distance_type(distance_type);
+            } else if (index_type == "knn_graph") {
+                request.mutable_knn_graph_param()->set_distance_type(distance_type);
+                request.mutable_knn_graph_param()->set_k(k);
+            } else {
+                reply = "parameters error: unknown index_type";
+                break;
             }
             BuildIndex(request, reply);
 
-        } catch (std::exception &e) {
-            std::cout << e.what() << std::endl;
-        }
+        } while (0);
 
     } else if (cmd_sv.size() == 1 && cmd_sv[0] == "keys") {
         try {
@@ -167,13 +225,72 @@ VClient::Do(const std::vector<std::string> &cmd_sv, const std::string &params_js
         }
 
     } else if (cmd_sv.size() == 1 && cmd_sv[0] == "put") {
-        try {
-            auto j = jsonxx::json::parse(params_json);
-            std::string table_name = j["table_name"].as_string();
-            std::string key = j["key"].as_string();
-            std::string attach_value1 = j["attach_value1"].as_string();
-            std::string attach_value2 = j["attach_value2"].as_string();
-            std::string attach_value3 = j["attach_value3"].as_string();
+        do {
+            std::string table_name;
+            std::string key;
+            std::string attach_value1;
+            std::string attach_value2;
+            std::string attach_value3;
+            jsonxx::json j;
+
+            try {
+                j = jsonxx::json::parse(params_json);
+            } catch (std::exception &e) {
+                reply = "parameters error";
+                break;
+            }
+
+            // optional value
+            try {
+                attach_value1 = j["attach_value1"].as_string();
+            } catch (std::exception &e) {
+                attach_value1 = "";
+            }
+
+            // optional value
+            try {
+                attach_value2 = j["attach_value2"].as_string();
+            } catch (std::exception &e) {
+                attach_value2 = "";
+            }
+
+            // optional value
+            try {
+                attach_value3 = j["attach_value3"].as_string();
+            } catch (std::exception &e) {
+                attach_value3 = "";
+            }
+
+            // required value
+            try {
+                table_name = j["table_name"].as_string();
+            } catch (std::exception &e) {
+                reply = "table_name error, ";
+                reply.append(e.what());
+                break;
+            }
+
+            // required value
+            try {
+                key = j["key"].as_string();
+            } catch (std::exception &e) {
+                reply = "key error, ";
+                reply.append(e.what());
+                break;
+            }
+
+            // required value
+            try {
+                bool b = j["vector"].is_array();
+                if (!b) {
+                    reply = "vector error";
+                    break;
+                }
+            } catch (std::exception &e) {
+                reply = "vector error, ";
+                reply.append(e.what());
+                break;
+            }
             const auto& vector_arr = j["vector"].as_array();
 
             vectordb_rpc::PutVecRequest request;
@@ -188,9 +305,7 @@ VClient::Do(const std::vector<std::string> &cmd_sv, const std::string &params_js
             }
             PutVec(request, reply);
 
-        } catch (std::exception &e) {
-            std::cout << e.what() << std::endl;
-        }
+        } while (0);
 
     } else if (cmd_sv.size() == 2 && cmd_sv[0] == "distance" && cmd_sv[1] == "key") {
         try {
