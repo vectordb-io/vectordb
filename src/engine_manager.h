@@ -11,20 +11,6 @@
 namespace vectordb {
 
 class EngineManager {
-  public:
-    EngineManager() = default;
-    EngineManager(const EngineManager&) = delete;
-    EngineManager& operator=(const EngineManager&) = delete;
-    ~EngineManager() = default;
-
-    Status Init();
-    void AddVEngine(const std::string &replica_name, std::shared_ptr<VEngine> ve);
-
-    std::shared_ptr<VEngine>
-    GetVEngine(const std::string &replica_name) const;
-
-  private:
-    std::map<std::string, std::shared_ptr<VEngine>> vengines_;
 };
 
 } // namespace vectordb

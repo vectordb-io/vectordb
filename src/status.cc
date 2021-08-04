@@ -53,6 +53,9 @@ std::string Status::ToString() const {
         case kIOError:
             type = "IO error: ";
             break;
+        case kHelp:
+            type = "Help: ";
+            break;
         case kOtherError:
             type = "Other error: ";
             break;

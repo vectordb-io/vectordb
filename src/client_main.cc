@@ -22,27 +22,6 @@ void PrintHelp() {
 }
 
 int main(int argc, char **argv) {
-    vectordb::Status s;
-    FLAGS_alsologtostderr = false;
-    google::InitGoogleLogging(argv[0]);
-    exe_name = std::string(argv[0]);
-
-    if (argc < 2) {
-        PrintHelp();
-        exit(0);
-    }
-
-    s = vectordb::CliConfig::GetInstance().Load(argc, argv);
-    if (!s.ok()) {
-        PrintHelp();
-        exit(-1);
-    }
-
-    s = vectordb::VClient::GetInstance().Init();
-    assert(s.ok());
-
-    s = vectordb::VClient::GetInstance().Start();
-    assert(s.ok());
 
     return 0;
 }

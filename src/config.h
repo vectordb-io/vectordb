@@ -3,10 +3,13 @@
 
 #include <getopt.h>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <vector>
 #include <memory>
+#include "jsonxx/json.hpp"
+#include "util.h"
 #include "status.h"
 
 namespace vectordb {
@@ -25,6 +28,17 @@ class HostAndPort {
         char buf[64];
         snprintf(buf, sizeof(buf), "%s:%d", host_.c_str(), port_);
         return std::string(buf);
+    }
+
+    bool ParseFromString(const std::string &s) {
+        std::vector<std::string> sv;
+        util::Split(s, ':', sv, " \t");
+        if (sv.size() != 2) {
+            return false;
+        }
+        host_ = sv[0];
+        sscanf(sv[1].c_str(), "%d", &port_);
+        return true;
     }
 
     void set_host(const std::string &host) {
@@ -79,10 +93,8 @@ class Config {
     }
 
   private:
-    Config();
-    ~Config();
-
-    void ParseHostPort(const std::string &hp, std::string &host, int &port);
+    Config() {}
+    ~Config() {}
 
     HostAndPort address_;
     std::string data_path_;

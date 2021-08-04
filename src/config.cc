@@ -5,24 +5,14 @@
 
 namespace vectordb {
 
-Config::Config() {
-}
-
-Config::~Config() {
-}
-
 std::string
 Config::ToString() const {
-    std::string s;
-    s.append("[\n");
-    s.append("address:");
-    s.append(address_.ToString());
-    s.append("\n");
-    s.append("data_path:");
-    s.append(data_path_);
-    s.append("\n");
-    s.append("]\n");
-    return s;
+    jsonxx::json j;
+    j["address"] = address_.ToString();
+    j["data_path"] = data_path();
+    j["meta_path"] = meta_path();
+    j["engine_path"] = engine_path();
+    return j.dump(4, ' ');
 }
 
 Status
@@ -40,45 +30,40 @@ Config::Load(int argc, char **argv) {
     while ((option_value = getopt_long(argc, argv, "hva:d:", long_options, &option_index)) != -1) {
         switch (option_value) {
         case 'a': {
-            std::string host;
-            int port;
-            ParseHostPort(std::string(optarg), host, port);
-            address_.set_host(host);
-            address_.set_port(port);
+            bool b = address_.ParseFromString(std::string(optarg));
+            if (!b) {
+                std::string msg = "parse host:port error, ";
+                msg.append(std::string(optarg));
+                return Status::OtherError(msg);
+            }
             break;
         }
 
-        case 'd':
+        case 'd': {
             data_path_ = std::string(optarg);
             break;
+        }
 
-        case 'v':
+        case 'v': {
             printf("%s\n", __VECTORDB__VERSION__);
             fflush(nullptr);
             exit(0);
             break;
+        }
 
-        case 'h':
-            return Status::InvalidArgument("-h", "help");
-            exit(0);
+        case 'h': {
+            return Status::Help("help");
+            break;
+        }
 
-        default:
-            return Status::InvalidArgument("-h", "help");
-            exit(0);
+        default: {
+            return Status::Help("help");
+            break;
+        }
+
         }
     }
     return Status::OK();
-}
-
-void
-Config::ParseHostPort(const std::string &hp, std::string &host, int &port) {
-    char* psave = nullptr;
-    const char *d = ":";
-    char *p;
-    p = strtok_r((char*)hp.c_str(), d, &psave);
-    host = std::string(p);
-    p = strtok_r(nullptr, d, &psave);
-    sscanf(p, "%d", &port);
 }
 
 } // namespace vectordb

@@ -13,7 +13,7 @@ void Split(const std::string &s, char separator, std::vector<std::string> &sv, c
 
 void ToLower(std::string &str);
 bool DirOK(const std::string &path);
-bool Mkdir(const std::string &path);
+bool MakeDir(const std::string &path);
 
 std::string PartitionName(const std::string &table_name, int partition_id);
 std::string ReplicaName(const std::string &table_name, int partition_id, int replica_id);

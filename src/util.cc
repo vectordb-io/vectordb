@@ -70,7 +70,7 @@ DirOK(const std::string &path) {
 }
 
 bool
-Mkdir(const std::string &path) {
+MakeDir(const std::string &path) {
     int ret = mkdir(path.c_str(), 0775);
     return ret == 0;
 }

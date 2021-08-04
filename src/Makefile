@@ -2,6 +2,14 @@ CC:=g++
 CFLAGS+=-c -Wall -g -std=c++17 -DANNOYLIB_MULTITHREADED_BUILD
 INCLUDES=-I./ -I../third_party/jsonxx.v0.9.2/include/ -I../third_party/annoy.v1.17.0/include/
 
+OBJS_CONFIG_TEST=config_test.o config.o status.o util.o
+LIBS_CONFIG_TEST=-lglog -lprotobuf -lgrpc++ -lgrpc -lleveldb -lpthread
+LFLAGS_CONFIG_TEST=-L/usr/local/lib
+
+OBJS_LOG_TEST=log_test.o config.o status.o util.o
+LIBS_LOG_TEST=-lglog -lprotobuf -lgrpc++ -lgrpc -lleveldb -lpthread
+LFLAGS_LOG_TEST=-L/usr/local/lib
+
 OBJS_SERVER=server_main.o config.o status.o vectordb_rpc.pb.o vectordb_rpc.grpc.pb.o node.o util.o grpc_server.o meta.o coding.o vengine.o vec.o engine_manager.o vindex_annoy.o vindex_knn_graph.o
 LIBS_SERVER=/usr/local/lib/libglog.a /usr/local/lib/libprotobuf.a /usr/local/lib/libgrpc++.a /usr/local/lib/libgrpc.a /usr/local/lib/libleveldb.a -lpthread
 LFLAGS_SERVER=-L/usr/local/lib
@@ -26,11 +34,6 @@ OBJS_GETKNN=get_knn_by_key.o vectordb_rpc.pb.o vectordb_rpc.grpc.pb.o vdb_client
 LIBS_GETKNN=/usr/local/lib/libglog.a /usr/local/lib/libprotobuf.a /usr/local/lib/libgrpc++.a /usr/local/lib/libgrpc.a /usr/local/lib/libleveldb.a -lpthread
 LFLAGS_GETKNN=-L/usr/local/lib
 
-cs: vectordb-server vectordb-cli vector-inserter image-inserter get-knn-by-key 
-	@echo ""
-	@echo "success, go go go!"
-	@echo ""
-
 vectordb-server: $(OBJS_SERVER)
 	$(CC) $^ -o $@ $(LIBS_SERVER) $(LFLAGS_SERVER)
 
@@ -46,12 +49,27 @@ image-inserter: $(OBJS_IMG)
 get-knn-by-key: $(OBJS_GETKNN)
 	$(CC) $^ -o $@ $(LIBS_IMG) $(LFLAGS_IMG)
 
+config_test: $(OBJS_CONFIG_TEST)
+	$(CC) $^ -o $@ $(LIBS_CONFIG_TEST) $(LFLAGS_CONFIG_TEST)
+
+log_test: $(OBJS_LOG_TEST)
+	$(CC) $^ -o $@ $(LIBS_LOG_TEST) $(LFLAGS_LOG_TEST)
+
 %.o: %.cc %.h
 	$(CC) $< $(INCLUDES) $(CFLAGS) -o $@
 
 .PHONY:
+
+test: config_test log_test
+	@echo "make test finish!"
+
 api: $(OBJS_API)
 	ar rcs libvdbclient.a $^ 
+
+cs: vectordb-server vectordb-cli vector-inserter image-inserter get-knn-by-key 
+	@echo ""
+	@echo "success, go go go!"
+	@echo ""
 
 proto:
 	protoc -I. --cpp_out=. vectordb_rpc.proto
@@ -90,6 +108,8 @@ clean:
 	rm -rf image-inserter
 	rm -rf get-knn-by-key
 	rm -rf libvdbclient.a
+	rm -rf config_test
+	rm -rf log_test
 
 cleanall: clean uninstall
 	rm -f vectordb_rpc.pb.*

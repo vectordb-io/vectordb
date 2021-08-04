@@ -44,6 +44,9 @@ class Status {
     static Status IOError(const Slice& msg, const Slice& msg2 = Slice()) {
         return Status(kIOError, msg, msg2);
     }
+    static Status Help(const Slice& msg, const Slice& msg2 = Slice()) {
+        return Status(kHelp, msg, msg2);
+    }
     static Status OtherError(const Slice& msg, const Slice& msg2 = Slice()) {
         return Status(kOtherError, msg, msg2);
     }
@@ -78,6 +81,11 @@ class Status {
         return code() == kInvalidArgument;
     }
 
+    // Returns true iff the status indicates an Help.
+    bool IsHelp() const {
+        return code() == kHelp;
+    }
+
     // Returns true iff the status indicates an OtherError.
     bool IsOtherError() const {
         return code() == kOtherError;
@@ -96,6 +104,7 @@ class Status {
         kNotSupported = 3,
         kInvalidArgument = 4,
         kIOError = 5,
+        kHelp = 10,
         kOtherError = 100
     };
 

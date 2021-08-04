@@ -1,0 +1,5 @@
+
+mkdir -p /tmp/xx
+export GLOG_log_dir=/tmp/xx
+echo $GLOG_log_dir
+
