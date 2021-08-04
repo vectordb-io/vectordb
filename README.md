@@ -42,6 +42,15 @@ tar zxvf output.tar.gz
 ```
 
 #### 1. run server
+
+* set log path, if needed. default log path is /tmp
+```
+export GLOG_log_dir=/tmp/vectordb_log
+mkdir -p /tmp/vectordb_log
+echo $GLOG_log_dir
+```
+
+* run server
 ```
 ./vectordb-server --addr=127.0.0.1:38000 --data_path=/tmp/vectordb
 ```
