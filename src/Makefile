@@ -2,6 +2,7 @@ CC:=g++
 CFLAGS+=-c -Wall -g -std=c++17 -DANNOYLIB_MULTITHREADED_BUILD
 INCLUDES=-I./ -I../third_party/jsonxx.v0.9.2/include/ -I../third_party/annoy.v1.17.0/include/
 
+OBJS_META_FOREACH_TEST=meta_foreach_test.o meta.o config.o status.o util.o vectordb_rpc.pb.o coding.o
 OBJS_META_LOAD_TEST=meta_load_test.o meta.o config.o status.o util.o vectordb_rpc.pb.o coding.o
 OBJS_META_TEST=meta_test.o meta.o config.o status.o util.o vectordb_rpc.pb.o coding.o
 LIBS_META_TEST=-lglog -lprotobuf -lgrpc++ -lgrpc -lleveldb -lpthread
@@ -66,12 +67,15 @@ meta_test: $(OBJS_META_TEST)
 meta_load_test: $(OBJS_META_LOAD_TEST)
 	$(CC) $^ -o $@ $(LIBS_META_TEST) $(LFLAGS_META_TEST)
 
+meta_foreach_test: $(OBJS_META_FOREACH_TEST)
+	$(CC) $^ -o $@ $(LIBS_META_TEST) $(LFLAGS_META_TEST)
+
 %.o: %.cc %.h
 	$(CC) $< $(INCLUDES) $(CFLAGS) -o $@
 
 .PHONY:
 
-test: config_test log_test meta_test meta_load_test
+test: config_test log_test meta_test meta_load_test meta_foreach_test
 	@echo "make test finish!"
 
 api: $(OBJS_API)
@@ -123,6 +127,7 @@ clean:
 	rm -rf log_test
 	rm -rf meta_load_test
 	rm -rf meta_test
+	rm -rf meta_foreach_test
 
 cleanall: clean uninstall
 	rm -f vectordb_rpc.pb.*
