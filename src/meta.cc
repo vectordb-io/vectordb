@@ -188,6 +188,59 @@ Meta::GetReplica(const std::string &name) const {
     return pr;
 }
 
+Status
+Meta::ForEachTable(std::function<Status(std::shared_ptr<Table>)> func) {
+    std::unique_lock<std::mutex> guard(mutex_);
+    for (auto &table_kv : tables_) {
+        auto s = func(table_kv.second);
+        if (!s.ok()) {
+            std::string msg = "ForEachTable do ";
+            msg.append(table_kv.first).append(" error");
+            LOG(INFO) << msg;
+            return s;
+        }
+    }
+    return Status::OK();
+}
+
+Status
+Meta::ForEachPartition(std::function<Status(std::shared_ptr<Partition>)> func) {
+    std::unique_lock<std::mutex> guard(mutex_);
+    for (auto &table_kv : tables_) {
+        for (auto &partition_kv : table_kv.second->partitions()) {
+            auto partition_sp = partition_kv.second;
+            auto s = func(partition_sp);
+            if (!s.ok()) {
+                std::string msg = "ForEachPartition do ";
+                msg.append(partition_kv.first).append(" error");
+                LOG(INFO) << msg;
+                return s;
+            }
+        }
+    }
+    return Status::OK();
+}
+
+Status
+Meta::ForEachReplica(std::function<Status(std::shared_ptr<Replica>)> func) {
+    std::unique_lock<std::mutex> guard(mutex_);
+    for (auto &table_kv : tables_) {
+        for (auto &partition_kv : table_kv.second->partitions()) {
+            for (auto &replica_kv : partition_kv.second->replicas()) {
+                auto replica_sp = replica_kv.second;
+                auto s = func(replica_sp);
+                if (!s.ok()) {
+                    std::string msg = "ForEachReplica do ";
+                    msg.append(replica_kv.first).append(" error");
+                    LOG(INFO) << msg;
+                    return s;
+                }
+            }
+        }
+    }
+    return Status::OK();
+}
+
 jsonxx::json
 Replica::ToJson() const {
     jsonxx::json j;

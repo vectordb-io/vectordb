@@ -49,7 +49,7 @@ class Node {
     ~Node();
 
     Meta meta_;
-    //EngineManager engine_manager_;
+    EngineManager engine_manager_;
     GrpcServer grpc_server_;
 };
 

@@ -14,6 +14,9 @@
 
 namespace vectordb {
 
+class VEngine {
+};
+
 } // namespace vectordb
 
 #endif

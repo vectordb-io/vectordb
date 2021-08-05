@@ -35,10 +35,8 @@ Node::Init() {
     auto s = meta_.Init();
     assert(s.ok());
 
-    /*
     s = engine_manager_.Init();
     assert(s.ok());
-    */
 
     s = grpc_server_.Init();
     assert(s.ok());

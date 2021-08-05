@@ -7,6 +7,7 @@
 #include <string>
 #include <mutex>
 #include <thread>
+#include <functional>
 #include <leveldb/db.h>
 #include "jsonxx/json.hpp"
 #include "status.h"
@@ -347,6 +348,10 @@ class Meta {
     std::string ToString() const;
     std::string ToStringPretty() const;
 
+    Status ForEachTable(std::function<Status(std::shared_ptr<Table>)> func);
+    Status ForEachPartition(std::function<Status(std::shared_ptr<Partition>)> func);
+    Status ForEachReplica(std::function<Status(std::shared_ptr<Replica>)> func);
+
     std::shared_ptr<Table>
     GetTable(const std::string &name) const;
 
@@ -355,6 +360,11 @@ class Meta {
 
     std::shared_ptr<Replica>
     GetReplica(const std::string &name) const;
+
+    std::map<std::string, std::shared_ptr<Table>>
+    tables_copy() {
+        return tables_;
+    }
 
   private:
     std::map<std::string, std::shared_ptr<Table>> tables_;

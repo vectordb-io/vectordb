@@ -7,5 +7,4 @@
 
 namespace vectordb {
 
-
 } // namespace vectordb
