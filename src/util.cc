@@ -75,6 +75,21 @@ MakeDir(const std::string &path) {
     return ret == 0;
 }
 
+bool
+RecurMakeDir(const std::string &path) {
+    std::vector<std::string> sv;
+    Split(path, '/', sv, "");
+
+    bool b;
+    std::string s = "/";
+    for (auto &level : sv) {
+        s.append(level);
+        b = MakeDir(s);
+        s.append("/");
+    }
+    return b;
+}
+
 void
 ToLower(std::string &str) {
     for (size_t i = 0; i < str.size(); i++)

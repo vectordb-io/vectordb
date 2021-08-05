@@ -13,7 +13,7 @@ std::string exe_name;
 void PrintHelp() {
     std::cout << std::endl;
     std::cout << "Usage: " << std::endl << std::endl;
-    std::cout << exe_name << " --addr=127.0.0.1:38000 --data_path=/tmp/vectordb" << std::endl;
+    std::cout << exe_name << " --addr=127.0.0.1:38000 --data_path=/tmp/test_log" << std::endl;
     std::cout << exe_name << " -h" << std::endl;
     std::cout << exe_name << " --help" << std::endl;
     std::cout << exe_name << " -v" << std::endl;
