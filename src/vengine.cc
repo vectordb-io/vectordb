@@ -189,11 +189,52 @@ VEngine::LoadIndex() {
 
 Status
 VEngine::Put(const std::string &key, const VecObj &vo) {
+    if (vo.vec().dim() != dim_) {
+        return Status::OtherError("dim not equal");
+    }
+
+    std::string value;
+    vo.SerializeToString(value);
+
+    leveldb::Status ls;
+    leveldb::WriteOptions wo;
+    wo.sync = true;
+    ls = db_data_->Put(wo, key, value);
+    if (!ls.ok()) {
+        std::string msg = "put vec to db error: ";
+        msg.append(ls.ToString());
+        return Status::OtherError(msg);
+    }
     return Status::OK();
 }
 
 Status
 VEngine::Get(const std::string &key, VecObj &vo) const {
+    leveldb::Status ls;
+    std::string value;
+    ls = db_data_->Get(leveldb::ReadOptions(), key, &value);
+    if (ls.IsNotFound()) {
+        std::string msg = key;
+        msg.append(" not found");
+        LOG(INFO) << msg;
+        return Status::NotFound(msg);
+    }
+
+    if (!ls.ok()) {
+        std::string msg = "get vec from db error, key:";
+        msg.append(key).append(", ").append(ls.ToString());
+        LOG(INFO) << msg;
+        return Status::NotFound(msg);
+    }
+
+    auto b = vo.ParseFromString(value);
+    if (!b) {
+        std::string msg = "get vec from db, parse from string error, key:";
+        msg.append(key);
+        LOG(INFO) << msg;
+        return Status::NotFound(msg);
+    }
+
     return Status::OK();
 }
 

@@ -9,6 +9,8 @@ LFLAGS_VEC_TEST=-L/usr/local/lib
 
 OBJS_VENGINE_LOAD_TEST=vengine_load_test.o vengine.o vec.o status.o util.o vectordb_rpc.pb.o
 OBJS_VENGINE_TEST=vengine_test.o vengine.o vec.o status.o util.o vectordb_rpc.pb.o
+OBJS_VENGINE_PUT_TEST=vengine_put_test.o vengine.o vec.o status.o util.o vectordb_rpc.pb.o
+OBJS_VENGINE_GET_TEST=vengine_get_test.o vengine.o vec.o status.o util.o vectordb_rpc.pb.o
 LIBS_VENGINE_TEST=-lglog -lprotobuf -lgrpc++ -lgrpc -lleveldb -lpthread
 LFLAGS_VENGINE_TEST=-L/usr/local/lib
 
@@ -83,6 +85,12 @@ meta_foreach_test: $(OBJS_META_FOREACH_TEST)
 vengine_test: $(OBJS_VENGINE_TEST)
 	$(CC) $^ -o $@ $(LIBS_VENGINE_TEST) $(LFLAGS_VENGINE_TEST)
 
+vengine_put_test: $(OBJS_VENGINE_PUT_TEST)
+	$(CC) $^ -o $@ $(LIBS_VENGINE_TEST) $(LFLAGS_VENGINE_TEST)
+
+vengine_get_test: $(OBJS_VENGINE_GET_TEST)
+	$(CC) $^ -o $@ $(LIBS_VENGINE_TEST) $(LFLAGS_VENGINE_TEST)
+
 vengine_load_test: $(OBJS_VENGINE_LOAD_TEST)
 	$(CC) $^ -o $@ $(LIBS_VENGINE_TEST) $(LFLAGS_VENGINE_TEST)
 
@@ -97,7 +105,7 @@ vecobj_test: $(OBJS_VECOBJ_TEST)
 
 .PHONY:
 
-test: config_test log_test meta_test meta_load_test meta_foreach_test vengine_test vengine_load_test vec_test vecobj_test
+test: config_test log_test meta_test meta_load_test meta_foreach_test vengine_test vengine_load_test vec_test vecobj_test vengine_put_test vengine_get_test
 	@echo "make test finish!"
 
 api: $(OBJS_API)
@@ -154,6 +162,8 @@ clean:
 	rm -rf vengine_load_test
 	rm -rf vec_test
 	rm -rf vecobj_test
+	rm -rf vengine_put_test
+	rm -rf vengine_get_test 
 
 cleanall: clean uninstall
 	rm -f vectordb_rpc.pb.*
