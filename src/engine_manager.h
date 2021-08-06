@@ -21,14 +21,13 @@ class EngineManager {
 
     Status Init();
     void AddVEngine(const std::string &replica_name, std::shared_ptr<VEngine> ve);
+    Status LoadEngine(std::shared_ptr<Replica> r);
+    Status LoadEngineByPath(const std::string &path);
 
     std::shared_ptr<VEngine>
     GetVEngine(const std::string &replica_name) const;
 
   private:
-    Status LoadEngine(std::shared_ptr<Replica> r);
-    Status LoadEngineByPath(const std::string &path);
-
     std::map<std::string, std::shared_ptr<VEngine>> vengines_;
     mutable std::mutex mutex_;
 };

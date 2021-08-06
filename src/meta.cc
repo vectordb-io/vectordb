@@ -241,6 +241,26 @@ Meta::ForEachReplica(std::function<Status(std::shared_ptr<Replica>)> func) {
     return Status::OK();
 }
 
+Status
+Meta::ForEachReplica2(std::function<Status(std::shared_ptr<Table>, std::shared_ptr<Partition>, std::shared_ptr<Replica>)> func) {
+    std::unique_lock<std::mutex> guard(mutex_);
+    for (auto &table_kv : tables_) {
+        for (auto &partition_kv : table_kv.second->partitions()) {
+            for (auto &replica_kv : partition_kv.second->replicas()) {
+                auto replica_sp = replica_kv.second;
+                auto s = func(table_kv.second, partition_kv.second, replica_sp);
+                if (!s.ok()) {
+                    std::string msg = "ForEachReplica do ";
+                    msg.append(replica_kv.first).append(" error");
+                    LOG(INFO) << msg;
+                    return s;
+                }
+            }
+        }
+    }
+    return Status::OK();
+}
+
 jsonxx::json64
 Replica::ToJson() const {
     jsonxx::json64 j;

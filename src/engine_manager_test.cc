@@ -8,6 +8,7 @@
 #include "status.h"
 #include "config.h"
 #include "meta.h"
+#include "engine_manager.h"
 
 #define gettid() (syscall(SYS_gettid))
 
@@ -15,11 +16,12 @@
 std::string exe_name;
 
 vectordb::Meta *g_meta;
+vectordb::EngineManager *g_em;
 
 void PrintHelp() {
     std::cout << std::endl;
     std::cout << "Usage: " << std::endl << std::endl;
-    std::cout << exe_name << " --addr=127.0.0.1:38000 --data_path=/tmp/test_meta" << std::endl;
+    std::cout << exe_name << " --addr=127.0.0.1:38000 --data_path=/tmp/test_engine_manager" << std::endl;
     std::cout << exe_name << " -h" << std::endl;
     std::cout << exe_name << " --help" << std::endl;
     std::cout << exe_name << " -v" << std::endl;
@@ -51,27 +53,23 @@ void AddTable(const std::string table_name, int partition_num, int replica_num, 
     fflush(nullptr);
 }
 
-vectordb::Status DoTable(std::shared_ptr<vectordb::Table> t) {
-    printf("for each : %s \n", t->ToString().c_str());
-    fflush(nullptr);
-    return vectordb::Status::OK();
-}
+vectordb::Status AddEngine(std::shared_ptr<vectordb::Table> t, std::shared_ptr<vectordb::Partition> p, std::shared_ptr<vectordb::Replica> r) {
 
-vectordb::Status DoPartition(std::shared_ptr<vectordb::Partition> p) {
-    printf("for each : %s \n", p->ToString().c_str());
-    fflush(nullptr);
-    return vectordb::Status::OK();
-}
+    vectordb::VEngineParam param;
+    param.dim = t->dim();
+    param.replica_name = r->name();
+    std::string path = r->path();
 
-vectordb::Status DoReplica(std::shared_ptr<vectordb::Replica> r) {
-    printf("for each : %s \n", r->ToString().c_str());
-    fflush(nullptr);
-    return vectordb::Status::OK();
-}
+    auto vengine_sp = std::make_shared<vectordb::VEngine>(path, param);
+    assert(vengine_sp);
+    auto s = vengine_sp->Init();
+    if (!s.ok()) {
+        printf("%s \n", s.ToString().c_str());
+        return s;
+    }
+    printf("add vengine: %s \n", vengine_sp->ToString().c_str());
+    g_em->AddVEngine(vengine_sp->replica_name(), vengine_sp);
 
-vectordb::Status DoReplica2(std::shared_ptr<vectordb::Table> t, std::shared_ptr<vectordb::Partition> p, std::shared_ptr<vectordb::Replica> r) {
-    printf("for each %s\t\t%s\t\t%s \n", t->ToString().c_str(), p->ToString().c_str(), r->ToString().c_str());
-    fflush(nullptr);
     return vectordb::Status::OK();
 }
 
@@ -97,6 +95,22 @@ int main(int argc, char** argv) {
         exit(-1);
     }
 
+    vectordb::util::RecurMakeDir(vectordb::Config::GetInstance().data_path());
+    if (!vectordb::util::DirOK(vectordb::Config::GetInstance().data_path())) {
+        std::string msg = "data_dir error: ";
+        msg.append(vectordb::Config::GetInstance().data_path());
+        printf("%s \n", msg.c_str());
+        return -1;
+    }
+
+    vectordb::util::RecurMakeDir(vectordb::Config::GetInstance().engine_path());
+    if (!vectordb::util::DirOK(vectordb::Config::GetInstance().engine_path())) {
+        std::string msg = "engine_dir error: ";
+        msg.append(vectordb::Config::GetInstance().engine_path());
+        printf("%s \n", msg.c_str());
+        return -1;
+    }
+
     vectordb::Meta meta(vectordb::Config::GetInstance().meta_path());
     g_meta = &meta;
 
@@ -104,7 +118,7 @@ int main(int argc, char** argv) {
     assert(s.ok());
     LOG(INFO) << meta.ToStringPretty();
 
-    int thread_num = 5;
+    int thread_num = 3;
     std::vector<std::thread*> threads;
     for (int i = 0; i < thread_num; ++i) {
         char buf[32];
@@ -112,7 +126,7 @@ int main(int argc, char** argv) {
         std::string table_name(buf);
         printf("begin create table: %s \n", table_name.c_str());
         fflush(nullptr);
-        std::thread *t = new std::thread(AddTable, table_name, 10, 3, 512);
+        std::thread *t = new std::thread(AddTable, table_name, 5, 3, 512);
         threads.push_back(t);
     }
 
@@ -120,25 +134,17 @@ int main(int argc, char** argv) {
         t->join();
     }
 
-    printf("\n----------------------\n");
-    s = meta.ForEachTable(std::bind(DoTable, std::placeholders::_1));
-    assert(s.ok());
-
-    printf("\n----------------------\n");
-    s = meta.ForEachPartition(std::bind(DoPartition, std::placeholders::_1));
-    assert(s.ok());
-
-    printf("\n----------------------\n");
-    s = meta.ForEachReplica(std::bind(DoReplica, std::placeholders::_1));
-    assert(s.ok());
-
-    printf("\n----------------------\n");
-    s = meta.ForEachReplica2(std::bind(DoReplica2, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-    assert(s.ok());
-
     s = meta.Persist();
     assert(s.ok());
     LOG(INFO) << "meta persist ok!";
+
+    vectordb::EngineManager engine_manager;
+    g_em = &engine_manager;
+    s = engine_manager.Init();
+    assert(s.ok());
+
+    s = meta.ForEachReplica(std::bind(&vectordb::EngineManager::LoadEngine, &engine_manager, std::placeholders::_1));
+    assert(s.ok());
 
     google::ShutdownGoogleLogging();
     return 0;

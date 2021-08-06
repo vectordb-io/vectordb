@@ -351,6 +351,7 @@ class Meta {
     Status ForEachTable(std::function<Status(std::shared_ptr<Table>)> func);
     Status ForEachPartition(std::function<Status(std::shared_ptr<Partition>)> func);
     Status ForEachReplica(std::function<Status(std::shared_ptr<Replica>)> func);
+    Status ForEachReplica2(std::function<Status(std::shared_ptr<Table>, std::shared_ptr<Partition>, std::shared_ptr<Replica>)> func);
 
     std::shared_ptr<Table>
     GetTable(const std::string &name) const;

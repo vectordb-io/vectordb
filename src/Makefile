@@ -2,6 +2,10 @@ CC:=g++
 CFLAGS+=-c -Wall -g -std=c++17 -DANNOYLIB_MULTITHREADED_BUILD
 INCLUDES=-I./ -I../third_party/jsonxx.v0.9.2/include/ -I../third_party/annoy.v1.17.0/include/
 
+OBJS_ENGINE_MANAGER_TEST=engine_manager_test.o engine_manager.o vengine.o vec.o status.o util.o vectordb_rpc.pb.o meta.o config.o node.o grpc_server.o vectordb_rpc.pb.o vectordb_rpc.grpc.pb.o coding.o
+LIBS_ENGINE_MANAGER_TEST=-lglog -lprotobuf -lgrpc++ -lgrpc -lleveldb -lpthread
+LFLAGS_ENGINE_MANAGER_TEST=-L/usr/local/lib
+
 OBJS_VEC_TEST=vec_test.o vec.o vectordb_rpc.pb.o
 OBJS_VECOBJ_TEST=vecobj_test.o vec.o vectordb_rpc.pb.o
 LIBS_VEC_TEST=-lglog -lprotobuf -lgrpc++ -lgrpc -lleveldb -lpthread
@@ -100,12 +104,15 @@ vec_test: $(OBJS_VEC_TEST)
 vecobj_test: $(OBJS_VECOBJ_TEST)
 	$(CC) $^ -o $@ $(LIBS_VEC_TEST) $(LFLAGS_VEC_TEST)
 
+engine_manager_test : $(OBJS_ENGINE_MANAGER_TEST)
+	$(CC) $^ -o $@ $(LIBS_ENGINE_MANAGER_TEST) $(LFLAGS_ENGINE_MANAGER_TEST)
+
 %.o: %.cc %.h
 	$(CC) $< $(INCLUDES) $(CFLAGS) -o $@
 
 .PHONY:
 
-test: config_test log_test meta_test meta_load_test meta_foreach_test vengine_test vengine_load_test vec_test vecobj_test vengine_put_test vengine_get_test
+test: config_test log_test meta_test meta_load_test meta_foreach_test vengine_test vengine_load_test vec_test vecobj_test vengine_put_test vengine_get_test engine_manager_test
 	@echo "make test finish!"
 
 api: $(OBJS_API)
@@ -164,6 +171,7 @@ clean:
 	rm -rf vecobj_test
 	rm -rf vengine_put_test
 	rm -rf vengine_get_test 
+	rm -rf engine_manager_test
 
 cleanall: clean uninstall
 	rm -f vectordb_rpc.pb.*
