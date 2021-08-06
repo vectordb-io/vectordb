@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include "jsonxx/json.hpp"
 
 namespace vectordb {
 
@@ -27,6 +28,8 @@ class Vec {
     mutable_data() {
         return data_;
     }
+
+    std::string ToString() const;
 
   private:
     std::vector<double> data_;
@@ -78,6 +81,8 @@ class VecObj {
     void set_attach_value3(const std::string &attach_value3) {
         attach_value3_ = attach_value3;
     }
+
+    std::string ToString() const;
 
   private:
     std::string key_;
