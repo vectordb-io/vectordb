@@ -5,26 +5,12 @@ namespace vectordb {
 
 Status
 EngineManager::Init() {
-    /*
-    for (auto &table_kv : Node::GetInstance().meta().tables_copy()) {
-    for (auto &partition_kv : table_kv.second->partitions()) {
-    for (auto &replica_kv : partition_kv.second->replicas()) {
-    auto replica_sp = replica_kv.second;
-
-    std::map<std::string, std::string> empty_indices;
-    for (auto index_kv : table_kv.second->indices()) {
-        empty_indices.insert(std::pair<std::string, std::string>(index_kv.first, index_kv.second));
+    auto s = Node::GetInstance().mutable_meta().ForEachReplica(std::bind(&EngineManager::LoadEngine, this, std::placeholders::_1));
+    if (!s.ok()) {
+        std::string msg = "engien manager init error: ";
+        msg.append(s.ToString());
+        return s;
     }
-    auto vengine = std::make_shared<VEngine>(replica_sp->path(), table_kv.second->dim(), empty_indices, replica_sp->name());
-    assert(vengine);
-    auto s = vengine->Init();
-    assert(s.ok());
-    Node::GetInstance().mutable_engine_manager().AddVEngine(replica_sp->name(), vengine);
-
-    }
-    }
-    }
-    */
     return Status::OK();
 }
 
@@ -42,9 +28,36 @@ EngineManager::GetVEngine(const std::string &replica_name) const {
 
 void
 EngineManager::AddVEngine(const std::string &replica_name, std::shared_ptr<VEngine> ve) {
+    std::unique_lock<std::mutex> guard(mutex_);
+
     auto it = vengines_.find(replica_name);
     assert(it == vengines_.end());
     vengines_.insert(std::pair<std::string, std::shared_ptr<VEngine>>(replica_name, ve));
+}
+
+Status
+EngineManager::LoadEngine(std::shared_ptr<Replica> r) {
+    auto s = LoadEngineByPath(r->path());
+    return s;
+}
+
+Status
+EngineManager::LoadEngineByPath(const std::string &path) {
+    auto vengine_sp = std::make_shared<VEngine>(path);
+    assert(vengine_sp);
+
+    auto s = vengine_sp->Load();
+    if (!s.ok()) {
+        std::string msg = "load engine error, path: ";
+        msg.append(path).append(", ").append(s.ToString());
+        LOG(INFO) << msg;
+        return s;
+    } else {
+        AddVEngine(vengine_sp->replica_name(), vengine_sp);
+        std::string msg = "load engine success: ";
+        msg.append(vengine_sp->ToString());
+    }
+    return Status::OK();
 }
 
 } // namespace vectordb

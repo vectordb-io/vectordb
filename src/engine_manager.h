@@ -26,6 +26,9 @@ class EngineManager {
     GetVEngine(const std::string &replica_name) const;
 
   private:
+    Status LoadEngine(std::shared_ptr<Replica> r);
+    Status LoadEngineByPath(const std::string &path);
+
     std::map<std::string, std::shared_ptr<VEngine>> vengines_;
     mutable std::mutex mutex_;
 };

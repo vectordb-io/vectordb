@@ -38,15 +38,30 @@ class Node {
     Status OnGetKNN(const vectordb_rpc::GetKNNRequest* request, vectordb_rpc::GetKNNReply* reply);
     Status Keys(std::vector<std::string> &keys);
 
-    GrpcServer& mutable_grpc_server() {
+    GrpcServer& grpc_server() {
         return grpc_server_;
     }
 
-  private:
-    //void AppendVecDt(std::vector<VecDt> &dst, const std::vector<VecDt> &src) const;
+    const EngineManager& engine_manager() const {
+        return engine_manager_;
+    }
 
+    EngineManager& mutable_engine_manager() {
+        return engine_manager_;
+    }
+
+    const Meta& meta() const {
+        return meta_;
+    }
+
+    Meta& mutable_meta() {
+        return meta_;
+    }
+
+  private:
     Node();
     ~Node();
+    //void AppendVecDt(std::vector<VecDt> &dst, const std::vector<VecDt> &src) const;
 
     Meta meta_;
     EngineManager engine_manager_;
