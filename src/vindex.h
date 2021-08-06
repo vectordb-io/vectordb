@@ -8,7 +8,7 @@ namespace vectordb {
 
 struct VecDtParam {
     std::string key;
-    double distance;
+    float distance;
     std::string attach_value1;
     std::string attach_value2;
     std::string attach_value3;
@@ -28,7 +28,7 @@ class VecDt {
         return key_;
     }
 
-    double distance() const {
+    float distance() const {
         return distance_;
     }
 
@@ -50,7 +50,7 @@ class VecDt {
 
   private:
     std::string key_;
-    double distance_;
+    float distance_;
     std::string attach_value1_;
     std::string attach_value2_;
     std::string attach_value3_;
@@ -65,7 +65,7 @@ class VIndex {
 
     virtual Status GetKNN(const std::string &key, int limit, std::vector<VecDt> &results) = 0;
     virtual Status GetKNN(const Vec &vec, int limit, std::vector<VecDt> &results) = 0;
-    virtual Status Distance(const std::string &key1, const std::string &key2, double &distance) = 0;
+    virtual Status Distance(const std::string &key1, const std::string &key2, float &distance) = 0;
     virtual Status Build() = 0;
     virtual Status Load() = 0;
 };

@@ -2,7 +2,8 @@ CC:=g++
 CFLAGS+=-c -Wall -g -std=c++17 -DANNOYLIB_MULTITHREADED_BUILD
 INCLUDES=-I./ -I../third_party/jsonxx.v0.9.2/include/ -I../third_party/annoy.v1.17.0/include/
 
-OBJS_VEC_TEST=vec_test.o vec.o 
+OBJS_VEC_TEST=vec_test.o vec.o vectordb_rpc.pb.o
+OBJS_VECOBJ_TEST=vecobj_test.o vec.o vectordb_rpc.pb.o
 LIBS_VEC_TEST=-lglog -lprotobuf -lgrpc++ -lgrpc -lleveldb -lpthread
 LFLAGS_VEC_TEST=-L/usr/local/lib
 
@@ -88,12 +89,15 @@ vengine_load_test: $(OBJS_VENGINE_LOAD_TEST)
 vec_test: $(OBJS_VEC_TEST)
 	$(CC) $^ -o $@ $(LIBS_VEC_TEST) $(LFLAGS_VEC_TEST)
 
+vecobj_test: $(OBJS_VECOBJ_TEST)
+	$(CC) $^ -o $@ $(LIBS_VEC_TEST) $(LFLAGS_VEC_TEST)
+
 %.o: %.cc %.h
 	$(CC) $< $(INCLUDES) $(CFLAGS) -o $@
 
 .PHONY:
 
-test: config_test log_test meta_test meta_load_test meta_foreach_test vengine_test vengine_load_test vec_test
+test: config_test log_test meta_test meta_load_test meta_foreach_test vengine_test vengine_load_test vec_test vecobj_test
 	@echo "make test finish!"
 
 api: $(OBJS_API)
@@ -149,6 +153,7 @@ clean:
 	rm -rf vengine_test
 	rm -rf vengine_load_test
 	rm -rf vec_test
+	rm -rf vecobj_test
 
 cleanall: clean uninstall
 	rm -f vectordb_rpc.pb.*

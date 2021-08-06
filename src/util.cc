@@ -150,24 +150,24 @@ ParseReplicaName(const std::string &replica_name, std::string &table_name, int &
     return true;
 }
 
-bool Distance(const std::vector<double> &v1, const std::vector<double> &v2, double &d) {
+bool Distance(const std::vector<float> &v1, const std::vector<float> &v2, float &d) {
     if (v1.size() != v2.size()) {
         return false;
     }
-    double pp = 0, qq = 0, pq = 0;
+    float pp = 0, qq = 0, pq = 0;
     for (size_t i = 0; i < v1.size(); ++i) {
         pp += v1[i] * v1[i];
         qq += v2[i] * v2[i];
         pq += v1[i] * v2[i];
     }
-    double tmpd;
-    double ppqq = pp * qq;
+    float tmpd;
+    float ppqq = pp * qq;
     if (ppqq > 0) {
         tmpd = 2.0 - 2.0 * pq / sqrt(ppqq);
     } else {
         tmpd = 2.0;
     }
-    d = sqrt(std::max(tmpd, double(0)));
+    d = sqrt(std::max(tmpd, float(0)));
     return true;
 }
 

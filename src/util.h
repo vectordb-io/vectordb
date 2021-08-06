@@ -21,7 +21,7 @@ std::string ReplicaName(const std::string &table_name, int partition_id, int rep
 bool ParsePartitionName(const std::string &partition_name, std::string &table_name, int &partition_id);
 bool ParseReplicaName(const std::string &replica_name, std::string &table_name, int &partition_id, int &replica_id);
 
-bool Distance(const std::vector<double> &v1, const std::vector<double> &v2, double &d);
+bool Distance(const std::vector<float> &v1, const std::vector<float> &v2, float &d);
 
 } // namespace util
 

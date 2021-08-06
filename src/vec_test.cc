@@ -3,35 +3,31 @@
 #include <random>
 #include "vec.h"
 
-double random_double(double min, double max) {
-    double r = min + static_cast<double>(rand()) / (static_cast<double>(RAND_MAX / (max - min)));
+float random_float(float min, float max) {
+    float r = min + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / (max - min)));
     return r;
 }
 
 int main() {
     srand(static_cast<unsigned>(time(nullptr)));
 
-    std::vector<double> data;
+    std::vector<float> data;
     int dim = 10;
     for (int i = 0; i < dim; ++i) {
-        double d = random_double(0, 1);
+        float d = random_float(0, 1);
         data.push_back(d);
     }
 
     vectordb::Vec v(data);
-    printf("vec: %s \n", v.ToString().c_str());
-    printf("\n");
+    printf("v: %s \n\n", v.ToString().c_str());
 
-    vectordb::VecObj vec_obj;
-    for (int i = 0; i < dim; ++i) {
-        double d = random_double(0, 1);
-        vec_obj.mutable_vec().mutable_data().push_back(d);
-    }
-    vec_obj.set_key("test_key");
-    vec_obj.set_attach_value1("test_attach_value1");
-    vec_obj.set_attach_value2("test_attach_value2");
-    vec_obj.set_attach_value3("test_attach_value3");
-    printf("vec_obj: %s \n", vec_obj.ToString().c_str());
+    std::string buf;
+    v.SerializeToString(buf);
+
+    vectordb::Vec v2;
+    bool b = v2.ParseFromString(buf);
+    assert(b);
+    printf("v2: %s \n\n", v2.ToString().c_str());
 
     return 0;
 }

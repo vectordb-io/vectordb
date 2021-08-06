@@ -4,13 +4,14 @@
 #include <string>
 #include <vector>
 #include "jsonxx/json.hpp"
+#include "vectordb_rpc.pb.h"
 
 namespace vectordb {
 
 class Vec {
   public:
     Vec();
-    Vec(const std::vector<double> &data);
+    Vec(const std::vector<float> &data);
     Vec(const Vec&) = default;
     Vec& operator=(const Vec&) = default;
     ~Vec() = default;
@@ -19,20 +20,22 @@ class Vec {
         return data_.size();
     }
 
-    const std::vector<double>&
+    const std::vector<float>&
     data() const {
         return data_;
     }
 
-    std::vector<double>&
+    std::vector<float>&
     mutable_data() {
         return data_;
     }
 
     std::string ToString() const;
+    void SerializeToString(std::string &buf) const;
+    bool ParseFromString(const std::string &buf);
 
   private:
-    std::vector<double> data_;
+    std::vector<float> data_;
 };
 
 class VecObj {
@@ -83,6 +86,8 @@ class VecObj {
     }
 
     std::string ToString() const;
+    void SerializeToString(std::string &buf) const;
+    bool ParseFromString(const std::string &buf);
 
   private:
     std::string key_;
