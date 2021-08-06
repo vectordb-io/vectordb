@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <glog/logging.h>
 #include "jsonxx/json.hpp"
 #include "vectordb_rpc.pb.h"
 

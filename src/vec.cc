@@ -65,6 +65,9 @@ VecObj::SerializeToString(std::string &buf) const {
     pb_vecobj.set_attach_value1(attach_value1_);
     pb_vecobj.set_attach_value2(attach_value2_);
     pb_vecobj.set_attach_value3(attach_value3_);
+
+    bool ret = pb_vecobj.SerializeToString(&buf);
+    assert(ret);
 }
 
 bool
