@@ -241,9 +241,9 @@ Meta::ForEachReplica(std::function<Status(std::shared_ptr<Replica>)> func) {
     return Status::OK();
 }
 
-jsonxx::json
+jsonxx::json64
 Replica::ToJson() const {
-    jsonxx::json j;
+    jsonxx::json64 j;
     j["id"] = id_;
     j["name"] = name_;
     j["table_name"] = table_name_;
@@ -253,9 +253,9 @@ Replica::ToJson() const {
     return j;
 }
 
-jsonxx::json
+jsonxx::json64
 Partition::ToJson() const {
-    jsonxx::json j;
+    jsonxx::json64 j;
     j["id"] = id_;
     j["name"] = name_;
     j["table_name"] = table_name_;
@@ -268,9 +268,9 @@ Partition::ToJson() const {
     return j;
 }
 
-jsonxx::json
+jsonxx::json64
 Table::ToJson() const {
-    jsonxx::json j;
+    jsonxx::json64 j;
     j["name"] = name_;
     j["dim"] = dim_;
     j["partition_num"] = partition_num_;
@@ -283,7 +283,7 @@ Table::ToJson() const {
 
     k = 0;
     for (auto &kv : indices_) {
-        jsonxx::json ji;
+        jsonxx::json64 ji;
         ji["index_name"] = kv.first;
         ji["index_type"] = kv.second;
         j["indices"][k++] = ji;

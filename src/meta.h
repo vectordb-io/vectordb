@@ -96,7 +96,7 @@ class Replica {
     }
 
   private:
-    jsonxx::json ToJson() const;
+    jsonxx::json64 ToJson() const;
 
     int id_;
     std::string name_;
@@ -193,7 +193,7 @@ class Partition {
 
   private:
     void AddAllReplicas();
-    jsonxx::json ToJson() const;
+    jsonxx::json64 ToJson() const;
 
     int id_;
     std::string name_;
@@ -300,7 +300,7 @@ class Table {
 
   private:
     void AddAllPartitions();
-    jsonxx::json ToJson() const;
+    jsonxx::json64 ToJson() const;
 
     std::string name_;
     int dim_;

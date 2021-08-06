@@ -7,7 +7,7 @@ namespace vectordb {
 
 std::string
 Config::ToString() const {
-    jsonxx::json j;
+    jsonxx::json64 j;
     j["address"] = address_.ToString();
     j["data_path"] = data_path();
     j["meta_path"] = meta_path();

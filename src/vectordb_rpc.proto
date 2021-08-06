@@ -216,3 +216,12 @@ message InfoRequest {
 message InfoReply {
   string msg = 1;
 }
+
+message VEngineMeta {
+  int32 dim = 1;
+  string replica_name = 2;
+  repeated string index_names = 3; 
+}
+
+
+

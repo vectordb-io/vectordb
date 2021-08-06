@@ -46,7 +46,7 @@ ToString(const vectordb_rpc::PingReply &reply) {
 
 std::string
 ToString(const vectordb_rpc::CreateTableReply &reply) {
-    jsonxx::json j;
+    jsonxx::json64 j;
     j["code"] = reply.code();
     j["msg"] = reply.msg();
     return j.dump(4, ' ');
@@ -59,7 +59,7 @@ ToString(const vectordb_rpc::InfoReply &reply) {
 
 std::string
 ToString(const vectordb_rpc::ShowTablesReply &reply) {
-    jsonxx::json j, jt;
+    jsonxx::json64 j, jt;
     int k = 0;
     for (int i = 0; i < reply.tables_size(); ++i) {
         j[k++] = reply.tables(i);
@@ -70,7 +70,7 @@ ToString(const vectordb_rpc::ShowTablesReply &reply) {
 
 std::string
 ToString(const vectordb_rpc::DescribeReply &reply) {
-    jsonxx::json j;
+    jsonxx::json64 j;
     j["code"] = reply.code();
     j["msg"] = reply.msg();
 
@@ -86,9 +86,9 @@ ToString(const vectordb_rpc::DescribeReply &reply) {
     return j.dump(4, ' ');
 }
 
-jsonxx::json
+jsonxx::json64
 ToJson(const vectordb_rpc::Table &table) {
-    jsonxx::json j;
+    jsonxx::json64 j;
     j["name"] = table.name();
     j["dim"] = table.dim();
     j["partition_num"] = table.partition_num();
@@ -102,7 +102,7 @@ ToJson(const vectordb_rpc::Table &table) {
 
     k = 0;
     for (int i = 0; i < table.indices_size(); ++i) {
-        jsonxx::json ji;
+        jsonxx::json64 ji;
         ji["index_name"] = table.indices(i).index_name();
         ji["index_type"] = table.indices(i).index_type();
         j["indices"][k++] = ji;
@@ -110,9 +110,9 @@ ToJson(const vectordb_rpc::Table &table) {
     return j;
 }
 
-jsonxx::json
+jsonxx::json64
 ToJson(const vectordb_rpc::Partition &partition) {
-    jsonxx::json j;
+    jsonxx::json64 j;
     j["id"] = partition.id();
     j["name"] = partition.name();
     j["table_name"] = partition.table_name();
@@ -125,9 +125,9 @@ ToJson(const vectordb_rpc::Partition &partition) {
     return j;
 }
 
-jsonxx::json
+jsonxx::json64
 ToJson(const vectordb_rpc::Replica &replica) {
-    jsonxx::json j;
+    jsonxx::json64 j;
     j["id"] = replica.id();
     j["name"] = replica.name();
     j["table_name"] = replica.table_name();
@@ -139,15 +139,15 @@ ToJson(const vectordb_rpc::Replica &replica) {
 
 std::string
 ToString(const vectordb_rpc::PutVecReply &reply) {
-    jsonxx::json j;
+    jsonxx::json64 j;
     j["code"] = reply.code();
     j["msg"] = reply.msg();
     return j.dump(4, ' ');
 }
 
-jsonxx::json
+jsonxx::json64
 ToJson(const vectordb_rpc::VecObj &vec_obj) {
-    jsonxx::json j;
+    jsonxx::json64 j;
     j["key"] = vec_obj.key();
     j["attach_value1"] = vec_obj.attach_value1();
     j["attach_value2"] = vec_obj.attach_value2();
@@ -160,7 +160,7 @@ ToJson(const vectordb_rpc::VecObj &vec_obj) {
 
 std::string
 ToString(const vectordb_rpc::GetVecReply &reply) {
-    jsonxx::json j;
+    jsonxx::json64 j;
     j["code"] = reply.code();
     j["msg"] = reply.msg();
     j["vec_obj"] = ToJson(reply.vec_obj());
@@ -169,7 +169,7 @@ ToString(const vectordb_rpc::GetVecReply &reply) {
 
 std::string
 ToString(const vectordb_rpc::DistKeyReply &reply) {
-    jsonxx::json j;
+    jsonxx::json64 j;
     j["code"] = reply.code();
     j["msg"] = reply.msg();
     j["distance"] = reply.distance();
@@ -178,7 +178,7 @@ ToString(const vectordb_rpc::DistKeyReply &reply) {
 
 std::string
 ToString(const vectordb_rpc::KeysReply &reply) {
-    jsonxx::json j;
+    jsonxx::json64 j;
     j["code"] = reply.code();
     j["msg"] = reply.msg();
     for (int i = 0; i < reply.keys_size(); ++i) {
@@ -189,7 +189,7 @@ ToString(const vectordb_rpc::KeysReply &reply) {
 
 std::string
 ToString(const vectordb_rpc::BuildIndexReply &reply) {
-    jsonxx::json j;
+    jsonxx::json64 j;
     j["code"] = reply.code();
     j["msg"] = reply.msg();
     return j.dump(4, ' ');
@@ -197,11 +197,11 @@ ToString(const vectordb_rpc::BuildIndexReply &reply) {
 
 std::string
 ToString(const vectordb_rpc::GetKNNReply &reply) {
-    jsonxx::json j;
+    jsonxx::json64 j;
     j["code"] = reply.code();
     j["msg"] = reply.msg();
     for (int i = 0; i < reply.vecdts_size(); ++i) {
-        jsonxx::json jvdt;
+        jsonxx::json64 jvdt;
         jvdt["key"] = reply.vecdts(i).key();
         jvdt["distance"] = reply.vecdts(i).distance();
         jvdt["attach_value1"] = reply.vecdts(i).attach_value1();

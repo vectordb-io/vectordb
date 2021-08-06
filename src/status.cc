@@ -45,19 +45,19 @@ std::string Status::ToString() const {
             type = "Corruption: ";
             break;
         case kNotSupported:
-            type = "Not implemented: ";
+            type = "NotImplemented: ";
             break;
         case kInvalidArgument:
-            type = "Invalid argument: ";
+            type = "InvalidArgument: ";
             break;
         case kIOError:
-            type = "IO error: ";
+            type = "IOError: ";
             break;
         case kHelp:
             type = "Help: ";
             break;
         case kOtherError:
-            type = "Other error: ";
+            type = "OtherError: ";
             break;
         default:
             snprintf(tmp, sizeof(tmp),
