@@ -64,7 +64,9 @@ class VEngine {
         return replica_name_;
     }
 
+    jsonxx::json64 ToJson() const;
     std::string ToString() const;
+    std::string ToStringPretty() const;
 
   private:
     Status PersistMeta();

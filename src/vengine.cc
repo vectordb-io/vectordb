@@ -243,9 +243,9 @@ VEngine::Delete(const std::string &key) {
     return Status::OK();
 }
 
-std::string
-VEngine::ToString() const {
-    jsonxx::json64 j;
+jsonxx::json64
+VEngine::ToJson() const {
+    jsonxx::json64 j, jret;
     j["dim"] = dim_;
     j["replica_name"] = replica_name_;
     j["path"] = path_;
@@ -254,7 +254,18 @@ VEngine::ToString() const {
     j["index_path"] = index_path_;
     // index
 
-    return j.dump();
+    jret["VEngine"] = j;
+    return jret;
+}
+
+std::string
+VEngine::ToString() const {
+    return ToJson().dump();
+}
+
+std::string
+VEngine::ToStringPretty() const {
+    return ToJson().dump(4, ' ');
 }
 
 

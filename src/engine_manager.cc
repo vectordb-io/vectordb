@@ -60,4 +60,24 @@ EngineManager::LoadEngineByPath(const std::string &path) {
     return Status::OK();
 }
 
+jsonxx::json64
+EngineManager::ToJson() const {
+    jsonxx::json64 j, jret;
+    for (auto &kv : vengines_) {
+        j[kv.first] = kv.second->ToJson();
+    }
+    jret["EngineManager"] = j;
+    return jret;
+}
+
+std::string
+EngineManager::ToString() const {
+    return ToJson().dump();
+}
+
+std::string
+EngineManager::ToStringPretty() const {
+    return ToJson().dump(4, ' ');
+}
+
 } // namespace vectordb

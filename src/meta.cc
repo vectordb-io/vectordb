@@ -263,19 +263,21 @@ Meta::ForEachReplica2(std::function<Status(std::shared_ptr<Table>, std::shared_p
 
 jsonxx::json64
 Replica::ToJson() const {
-    jsonxx::json64 j;
+    jsonxx::json64 j, jret;
     j["id"] = id_;
     j["name"] = name_;
     j["table_name"] = table_name_;
     j["partition_name"] = partition_name_;
     j["address"] = address_;
     j["path"] = path_;
-    return j;
+
+    jret["Replica"] = j;
+    return jret;
 }
 
 jsonxx::json64
 Partition::ToJson() const {
-    jsonxx::json64 j;
+    jsonxx::json64 j, jret;
     j["id"] = id_;
     j["name"] = name_;
     j["table_name"] = table_name_;
@@ -285,12 +287,14 @@ Partition::ToJson() const {
     for (auto &r : replicas_) {
         j["replicas"][k++] = r.second->name();
     }
-    return j;
+
+    jret["Partition"] = j;
+    return jret;
 }
 
 jsonxx::json64
 Table::ToJson() const {
-    jsonxx::json64 j;
+    jsonxx::json64 j, jret;
     j["name"] = name_;
     j["dim"] = dim_;
     j["partition_num"] = partition_num_;
@@ -308,29 +312,19 @@ Table::ToJson() const {
         ji["index_type"] = kv.second;
         j["indices"][k++] = ji;
     }
-    return j;
+
+    jret["Table"] = j;
+    return jret;
 }
 
-std::string
-Meta::ToString() const {
-    std::string s;
-    s.append("meta:\n");
-    for (auto &t : tables_) {
-        s.append((t.second)->ToString());
-        s.append("\n");
+jsonxx::json64
+Meta::ToJson() const {
+    jsonxx::json64 j, jret;
+    for (auto &kv : tables_) {
+        j[kv.first] = kv.second->ToJson();
     }
-    return s;
-}
-
-std::string
-Meta::ToStringPretty() const {
-    std::string s;
-    s.append("meta:\n");
-    for (auto &t : tables_) {
-        s.append((t.second)->ToStringPretty());
-        s.append("\n");
-    }
-    return s;
+    jret["Meta"] = j;
+    return jret;
 }
 
 void

@@ -21,12 +21,36 @@ vectordb::EngineManager *g_em;
 void PrintHelp() {
     std::cout << std::endl;
     std::cout << "Usage: " << std::endl << std::endl;
-    std::cout << exe_name << " --addr=127.0.0.1:38000 --data_path=/tmp/test_add_engine_by_meta" << std::endl;
+    std::cout << exe_name << " --addr=127.0.0.1:38000 --data_path=/tmp/test_engine_manager" << std::endl;
     std::cout << exe_name << " -h" << std::endl;
     std::cout << exe_name << " --help" << std::endl;
     std::cout << exe_name << " -v" << std::endl;
     std::cout << exe_name << " --version" << std::endl;
     std::cout << std::endl;
+}
+
+void AddTable(const std::string table_name, int partition_num, int replica_num, int dim) {
+    printf("tid:%ld AddTable: %s \n", gettid(), table_name.c_str());
+    fflush(nullptr);
+
+    vectordb::TableParam table_param;
+    table_param.name = table_name;
+    table_param.partition_num = partition_num;
+    table_param.replica_num = replica_num;
+    table_param.path = "/xx/test_meta_path";
+    table_param.dim = dim;
+
+    auto s = g_meta->AddTable(table_param);
+    if (!s.ok()) {
+        printf("%s %s \n", table_name.c_str(), s.ToString().c_str());
+        assert(0);
+    }
+
+    s = g_meta->Persist();
+    assert(s.ok());
+
+    printf("create %s finish \n", table_name.c_str());
+    fflush(nullptr);
 }
 
 vectordb::Status AddEngine(std::shared_ptr<vectordb::Table> t, std::shared_ptr<vectordb::Partition> p, std::shared_ptr<vectordb::Replica> r) {
@@ -48,8 +72,6 @@ vectordb::Status AddEngine(std::shared_ptr<vectordb::Table> t, std::shared_ptr<v
 
     return vectordb::Status::OK();
 }
-
-// test EngineManager::Init, load engine from meta
 
 int main(int argc, char** argv) {
     exe_name = std::string(argv[0]);
@@ -73,22 +95,56 @@ int main(int argc, char** argv) {
         exit(-1);
     }
 
+    vectordb::util::RecurMakeDir(vectordb::Config::GetInstance().data_path());
+    if (!vectordb::util::DirOK(vectordb::Config::GetInstance().data_path())) {
+        std::string msg = "data_dir error: ";
+        msg.append(vectordb::Config::GetInstance().data_path());
+        printf("%s \n", msg.c_str());
+        return -1;
+    }
+
+    vectordb::util::RecurMakeDir(vectordb::Config::GetInstance().engine_path());
+    if (!vectordb::util::DirOK(vectordb::Config::GetInstance().engine_path())) {
+        std::string msg = "engine_dir error: ";
+        msg.append(vectordb::Config::GetInstance().engine_path());
+        printf("%s \n", msg.c_str());
+        return -1;
+    }
+
     vectordb::Meta meta(vectordb::Config::GetInstance().meta_path());
     g_meta = &meta;
 
     s = meta.Init();
     assert(s.ok());
+    LOG(INFO) << meta.ToStringPretty();
+
+    int thread_num = 3;
+    std::vector<std::thread*> threads;
+    for (int i = 0; i < thread_num; ++i) {
+        char buf[32];
+        snprintf(buf, sizeof(buf), "test_table_%d", i);
+        std::string table_name(buf);
+        printf("begin create table: %s \n", table_name.c_str());
+        fflush(nullptr);
+        std::thread *t = new std::thread(AddTable, table_name, 5, 3, 512);
+        threads.push_back(t);
+    }
+
+    for (auto &t : threads) {
+        t->join();
+    }
+
+    s = meta.Persist();
+    assert(s.ok());
+    LOG(INFO) << "meta persist ok!";
 
     vectordb::EngineManager engine_manager;
     g_em = &engine_manager;
+    s = engine_manager.Init();
+    assert(s.ok());
 
     s = meta.ForEachReplica(std::bind(&vectordb::EngineManager::LoadEngine, &engine_manager, std::placeholders::_1));
-    if (!s.ok()) {
-        std::string msg = "engien manager init error: ";
-        msg.append(s.ToString());
-        return -1;
-    }
-    printf("%s \n", engine_manager.ToStringPretty().c_str());
+    assert(s.ok());
 
     google::ShutdownGoogleLogging();
     return 0;

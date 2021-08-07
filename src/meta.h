@@ -95,8 +95,9 @@ class Replica {
         return ToJson().dump(4, ' ');
     }
 
-  private:
     jsonxx::json64 ToJson() const;
+
+  private:
 
     int id_;
     std::string name_;
@@ -191,9 +192,10 @@ class Partition {
         return ToJson().dump(4, ' ');
     }
 
+    jsonxx::json64 ToJson() const;
+
   private:
     void AddAllReplicas();
-    jsonxx::json64 ToJson() const;
 
     int id_;
     std::string name_;
@@ -298,9 +300,10 @@ class Table {
         return ToJson().dump(4, ' ');
     }
 
+    jsonxx::json64 ToJson() const;
+
   private:
     void AddAllPartitions();
-    jsonxx::json64 ToJson() const;
 
     std::string name_;
     int dim_;
@@ -345,8 +348,16 @@ class Meta {
     Status ReplicaNameByKey(const std::string &table_name,
                             const std::string &key,
                             std::string &replica_name) const;
-    std::string ToString() const;
-    std::string ToStringPretty() const;
+
+    jsonxx::json64 ToJson() const;
+
+    std::string ToString() const {
+        return ToJson().dump();
+    }
+
+    std::string ToStringPretty() const {
+        return ToJson().dump(4, ' ');
+    }
 
     Status ForEachTable(std::function<Status(std::shared_ptr<Table>)> func);
     Status ForEachPartition(std::function<Status(std::shared_ptr<Partition>)> func);
