@@ -44,6 +44,16 @@ int main(int argc, char** argv) {
         exit(-1);
     }
 
+    s = vectordb::Node::GetInstance().Init();
+    assert(s.ok());
+
+    s = vectordb::Node::GetInstance().Start();
+    assert(s.ok());
+
+    while (true) {
+        std::this_thread::sleep_for(std::chrono::seconds(3));
+    }
+
     google::ShutdownGoogleLogging();
     return 0;
 }
