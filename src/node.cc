@@ -75,6 +75,53 @@ Node::OnInfo(const vectordb_rpc::InfoRequest* request, vectordb_rpc::InfoReply* 
 
 Status
 Node::OnCreateTable(const vectordb_rpc::CreateTableRequest* request, vectordb_rpc::CreateTableReply* reply) {
+    std::string table_path = Config::GetInstance().engine_path();
+    table_path.append("/").append(request->table_name());
+    std::string msg = "create table error: ";
+
+    TableParam tp;
+    tp.name = request->table_name();
+    tp.partition_num = request->partition_num();
+    tp.replica_num = request->replica_num();
+    tp.path = table_path;
+    tp.dim = request->dim();
+
+    auto s = meta_.AddTable(tp);
+    if (!s.ok()) {
+        reply->set_code(1);
+        msg.append(s.Msg());
+        reply->set_msg(msg);
+        LOG(INFO) << msg;
+        return Status::OtherError(s.Msg());
+    }
+
+    auto table_sp = meta_.GetTable(request->table_name());
+    assert(table_sp);
+
+    s = meta_.ForEachReplica2(std::bind(&vectordb::EngineManager::AddVEngine3, &Node::GetInstance().mutable_engine_manager(), std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+    if (!s.ok()) {
+        reply->set_code(2);
+        msg.append(s.Msg());
+        reply->set_msg(msg);
+        LOG(INFO) << msg;
+        return Status::OtherError(s.Msg());
+    }
+
+    s = meta_.Persist();
+    if (!s.ok()) {
+        reply->set_code(3);
+        msg.append(s.Msg());
+        reply->set_msg(msg);
+        LOG(INFO) << msg;
+        return Status::OtherError(s.Msg());
+    }
+
+    reply->set_code(0);
+    msg = "create table ";
+    msg.append(request->table_name());
+    msg.append(" ok");
+    LOG(INFO) << msg;
+    reply->set_msg(msg);
     return Status::OK();
 }
 

@@ -10,8 +10,12 @@ grpc::Status
 VectorDBServiceImpl::Ping(grpc::ServerContext* context,
                           const vectordb_rpc::PingRequest* request,
                           vectordb_rpc::PingReply* reply) {
-    //auto s = Node::GetInstance().OnPing(request, reply);
-    //assert(s.ok());
+    auto s = Node::GetInstance().OnPing(request, reply);
+    if (!s.ok()) {
+        std::string msg = "Ping error: ";
+        msg.append(s.ToString());
+        LOG(INFO) << msg;
+    }
     return grpc::Status::OK;
 }
 

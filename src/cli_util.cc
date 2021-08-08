@@ -75,7 +75,7 @@ ToString(const vectordb_rpc::DescribeReply &reply) {
     j["msg"] = reply.msg();
 
     if (reply.describe_table()) {
-        j["table"] = ToJson(reply.table());
+        j["table"] = ToJson(reply.table_name());
     }
     if (reply.describe_partition()) {
         j["partition"] = ToJson(reply.partition());

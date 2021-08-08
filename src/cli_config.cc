@@ -32,19 +32,23 @@ CliConfig::Load(int argc, char **argv) {
             break;
         }
 
-        case 'v':
+        case 'v': {
             printf("%s\n", __VECTORDB__VERSION__);
             fflush(nullptr);
             exit(0);
             break;
+        }
 
-        case 'h':
-            return Status::InvalidArgument("-h", "help");
-            exit(0);
+        case 'h': {
+            return Status::Help("help");
+            break;
+        }
 
-        default:
-            return Status::InvalidArgument("-h", "help");
-            exit(0);
+        default: {
+            return Status::Help("help");
+            break;
+        }
+
         }
     }
     return Status::OK();

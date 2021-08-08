@@ -26,13 +26,50 @@ EngineManager::GetVEngine(const std::string &replica_name) const {
     return ve;
 }
 
-void
+bool
 EngineManager::AddVEngine(const std::string &replica_name, std::shared_ptr<VEngine> ve) {
     std::unique_lock<std::mutex> guard(mutex_);
 
     auto it = vengines_.find(replica_name);
-    assert(it == vengines_.end());
+    if (it != vengines_.end()) {
+        return false;
+    }
     vengines_.insert(std::pair<std::string, std::shared_ptr<VEngine>>(replica_name, ve));
+    return true;
+}
+
+bool
+EngineManager::AddVEngine2(const std::string &path, const VEngineParam &param) {
+    std::unique_lock<std::mutex> guard(mutex_);
+
+    auto vengien_sp = std::make_shared<VEngine>(path, param);
+    assert(vengien_sp);
+
+    auto s = vengien_sp->Init();
+    if (!s.ok()) {
+        std::string msg = "vengine init error: ";
+        msg.append(param.replica_name).append(" ").append(path);
+        LOG(INFO) << msg;
+        return false;
+    }
+
+    bool b = AddVEngine(param.replica_name, vengien_sp);
+    return b;
+}
+
+Status
+EngineManager::AddVEngine3(std::shared_ptr<Table> t, std::shared_ptr<Partition> p, std::shared_ptr<Replica> r) {
+    std::string path = r->path();
+    VEngineParam param;
+    param.dim = 10;
+    param.replica_name = r->name();
+    auto b = AddVEngine2(path, param);
+    if (!b) {
+        std::string msg = "add engine error: ";
+        msg.append(param.replica_name);
+        return Status::OtherError(msg);
+    }
+    return Status::OK();
 }
 
 Status

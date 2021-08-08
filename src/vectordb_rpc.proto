@@ -31,7 +31,7 @@ message Int32 {
 }
 
 message GetKNNRequest {
-  string table = 1;
+  string table_name = 1;
   string key = 2;
   int32 limit = 3;
   string index_name = 4;
@@ -64,7 +64,7 @@ message Vec {
 }
 
 message KeysRequest {
-  string table = 1;
+  string table_name = 1;
 }
 
 message KeysReply {
@@ -83,7 +83,7 @@ message KNNGraphParam {
 }
 
 message BuildIndexRequest {
-  string table = 1;
+  string table_name = 1;
   string index_type = 2;
   AnnoyParam annoy_param = 3;
   KNNGraphParam knn_graph_param = 4;
@@ -95,7 +95,7 @@ message BuildIndexReply {
 }
 
 message DistKeyRequest {
-  string table = 1;
+  string table_name = 1;
   string key1 = 2;
   string key2 = 3;
 }
@@ -107,7 +107,7 @@ message DistKeyReply {
 }
 
 message PutVecRequest {
-  string table = 1;
+  string table_name = 1;
   VecObj vec_obj = 2;
 }
 
@@ -117,7 +117,7 @@ message PutVecReply {
 }
 
 message GetVecRequest {
-  string table = 1;
+  string table_name = 1;
   string key = 2;
 }
 
@@ -201,7 +201,7 @@ message DescribeReply {
   string msg = 2;
 
   bool describe_table = 3;
-  Table table = 4;
+  Table table_name = 4;
 
   bool describe_partition = 5;
   Partition partition = 6;

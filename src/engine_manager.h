@@ -20,7 +20,9 @@ class EngineManager {
     ~EngineManager() = default;
 
     Status Init();
-    void AddVEngine(const std::string &replica_name, std::shared_ptr<VEngine> ve);
+    bool AddVEngine(const std::string &replica_name, std::shared_ptr<VEngine> ve);
+    bool AddVEngine2(const std::string &path, const VEngineParam &param);
+    Status AddVEngine3(std::shared_ptr<Table> t, std::shared_ptr<Partition> p, std::shared_ptr<Replica> r);
     Status LoadEngine(std::shared_ptr<Replica> r);
     Status LoadEngineByPath(const std::string &path);
 

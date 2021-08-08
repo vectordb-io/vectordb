@@ -33,8 +33,6 @@ std::string ToString(const vectordb_rpc::KeysReply &reply);
 std::string ToString(const vectordb_rpc::BuildIndexReply &reply);
 std::string ToString(const vectordb_rpc::GetKNNReply &reply);
 
-
-
 } // namespace cli_util
 
 } // namespace vectordb
