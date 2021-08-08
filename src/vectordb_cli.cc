@@ -49,7 +49,7 @@ VectordbCli::Do(const std::vector<std::string> &cmd_sv, const std::string &param
 
     } else if (cmd_sv.size() == 2 && cmd_sv[0] == "create" && cmd_sv[1] == "table") {
         vectordb_rpc::CreateTableRequest request;
-        auto s = PreProcessCreateTable(params_json, request, reply);
+        auto s = PreProcess(params_json, request, reply);
         if (s.ok()) {
             CreateTable(request, reply);
         }
@@ -65,7 +65,7 @@ VectordbCli::Do(const std::vector<std::string> &cmd_sv, const std::string &param
 
     } else if (cmd_sv.size() == 1 && cmd_sv[0] == "ping") {
         vectordb_rpc::PingRequest request;
-        auto s = PreProcessPing(params_json, request, reply);
+        auto s = PreProcess(params_json, request, reply);
         if (s.ok()) {
             Ping(request, reply);
         }
@@ -93,7 +93,7 @@ VectordbCli::Do(const std::vector<std::string> &cmd_sv, const std::string &param
 
     } else if (cmd_sv.size() == 1 && cmd_sv[0] == "info") {
         vectordb_rpc::InfoRequest request;
-        auto s = PreProcessInfo(params_json, request, reply);
+        auto s = PreProcess(params_json, request, reply);
         if (s.ok()) {
             Info(request, reply);
         }
@@ -344,24 +344,26 @@ VectordbCli::Prompt() const {
     fflush(nullptr);
 }
 
+Status
+VectordbCli::PreProcess(const std::string &params_json, vectordb_rpc::ShowTablesRequest &request, std::string &reply_msg) {
+    reply_msg.clear();
+    return Status::OK();
+}
+
 void
 VectordbCli::ShowTables(const vectordb_rpc::ShowTablesRequest &request, std::string &reply_msg) {
-
-    /*
     vectordb_rpc::ShowTablesReply reply;
-    grpc::ClientContext context;
-    grpc::Status status = stub_->ShowTables(&context, request, &reply);
-    if (status.ok()) {
-    reply_msg = cli_util::ToString(reply);
+    auto s = vdb_client_.ShowTables(request, &reply);
+    if (s.ok()) {
+        reply_msg = cli_util::ToString(reply);
     } else {
-    reply_msg = status.error_message();
+        reply_msg = s.Msg();
     }
-    */
 }
 
 
 Status
-VectordbCli::PreProcessCreateTable(const std::string &params_json, vectordb_rpc::CreateTableRequest &request, std::string &reply_msg) {
+VectordbCli::PreProcess(const std::string &params_json, vectordb_rpc::CreateTableRequest &request, std::string &reply_msg) {
     reply_msg.clear();
     do {
         std::string table_name;
@@ -432,7 +434,7 @@ VectordbCli::CreateTable(const vectordb_rpc::CreateTableRequest &request, std::s
 }
 
 Status
-VectordbCli::PreProcessPing(const std::string &params_json, vectordb_rpc::PingRequest &request, std::string &reply_msg) {
+VectordbCli::PreProcess(const std::string &params_json, vectordb_rpc::PingRequest &request, std::string &reply_msg) {
     reply_msg.clear();
     request.set_msg("ping");
     return Status::OK();
@@ -451,21 +453,17 @@ VectordbCli::Ping(const vectordb_rpc::PingRequest &request, std::string &reply_m
 
 void
 VectordbCli::Describe(const vectordb_rpc::DescribeRequest &request, std::string &reply_msg) {
-
-    /*
     vectordb_rpc::DescribeReply reply;
-    grpc::ClientContext context;
-    grpc::Status status = stub_->Describe(&context, request, &reply);
-    if (status.ok()) {
-    reply_msg = cli_util::ToString(reply);
+    auto s = vdb_client_.Describe(request, &reply);
+    if (s.ok()) {
+        reply_msg = cli_util::ToString(reply);
     } else {
-    reply_msg = status.error_message();
+        reply_msg = s.Msg();
     }
-    */
 }
 
 Status
-VectordbCli::PreProcessInfo(const std::string &params_json, vectordb_rpc::InfoRequest &request, std::string &reply_msg) {
+VectordbCli::PreProcess(const std::string &params_json, vectordb_rpc::InfoRequest &request, std::string &reply_msg) {
     reply_msg.clear();
     return Status::OK();
 }

@@ -104,6 +104,10 @@ Meta::AddTable(const TableParam &param) {
     }
     auto table = std::make_shared<Table>(param);
     tables_.insert(std::pair<std::string, std::shared_ptr<Table>>(param.name, table));
+
+    std::string msg = "add table: ";
+    msg.append(table->ToStringPretty());
+    LOG(INFO) << msg;
     return Status::OK();
 }
 
@@ -148,6 +152,16 @@ Meta::GetTable(const std::string &name) const {
     return p;
 }
 
+std::shared_ptr<Table>
+Meta::GetTableNonlocking(const std::string &name) const {
+    std::shared_ptr<Table> p;
+    auto it = tables_.find(name);
+    if (it != tables_.end()) {
+        p = it->second;
+    }
+    return p;
+}
+
 std::shared_ptr<Partition>
 Meta::GetPartition(const std::string &name) const {
     std::unique_lock<std::mutex> guard(mutex_);
@@ -159,7 +173,24 @@ Meta::GetPartition(const std::string &name) const {
 
     bool b = util::ParsePartitionName(name, table_name, partition_id);
     if (b) {
-        pt = GetTable(table_name);
+        pt = GetTableNonlocking(table_name);
+        if (pt) {
+            pp = pt->GetPartition(name);
+        }
+    }
+    return pp;
+}
+
+std::shared_ptr<Partition>
+Meta::GetPartitionNonlocking(const std::string &name) const {
+    std::shared_ptr<Table> pt;
+    std::shared_ptr<Partition> pp;
+    std::string table_name;
+    int partition_id;
+
+    bool b = util::ParsePartitionName(name, table_name, partition_id);
+    if (b) {
+        pt = GetTableNonlocking(table_name);
         if (pt) {
             pp = pt->GetPartition(name);
         }
@@ -180,7 +211,7 @@ Meta::GetReplica(const std::string &name) const {
     bool b = util::ParseReplicaName(name, table_name, partition_id, replica_id);
     if (b) {
         std::string partition_name = util::PartitionName(table_name, partition_id);
-        pp = GetPartition(partition_name);
+        pp = GetPartitionNonlocking(partition_name);
         if (pp) {
             pr = pp->GetReplica(name);
         }
@@ -375,6 +406,10 @@ Partition::AddAllReplicas() {
         param.path = replica_path;
         auto replica = std::make_shared<Replica>(param);
         replicas_.insert(std::pair<std::string, std::shared_ptr<Replica>>(replica_name, replica));
+
+        std::string msg = "add replica: ";
+        msg.append(replica->ToStringPretty());
+        LOG(INFO) << msg;
     }
 }
 
@@ -395,6 +430,10 @@ Table::AddAllPartitions() {
         param.path = partition_path;
         auto partition = std::make_shared<Partition>(param);
         partitions_.insert(std::pair<std::string, std::shared_ptr<Partition>>(partition_name, partition));
+
+        std::string msg = "add partition: ";
+        msg.append(partition->ToStringPretty());
+        LOG(INFO) << msg;
     }
 }
 

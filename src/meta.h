@@ -368,14 +368,21 @@ class Meta {
     std::shared_ptr<Table>
     GetTable(const std::string &name) const;
 
+    std::shared_ptr<Table>
+    GetTableNonlocking(const std::string &name) const;
+
     std::shared_ptr<Partition>
     GetPartition(const std::string &name) const;
+
+    std::shared_ptr<Partition>
+    GetPartitionNonlocking(const std::string &name) const;
 
     std::shared_ptr<Replica>
     GetReplica(const std::string &name) const;
 
     std::map<std::string, std::shared_ptr<Table>>
     tables_copy() {
+        std::unique_lock<std::mutex> guard(mutex_);
         return tables_;
     }
 

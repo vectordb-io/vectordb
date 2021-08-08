@@ -12,6 +12,7 @@ Pb2Replica(const vectordb_rpc::Replica &pb, Replica &replica) {
     replica.set_table_name(pb.table_name());
     replica.set_partition_name(pb.partition_name());
     replica.set_path(pb.path());
+    replica.set_address(pb.address());
 }
 
 void

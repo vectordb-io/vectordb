@@ -25,7 +25,7 @@ VectorDBServiceImpl::Info(grpc::ServerContext* context,
                           vectordb_rpc::InfoReply* reply) {
     auto s = Node::GetInstance().OnInfo(request, reply);
     if (!s.ok()) {
-        std::string msg = "info error: ";
+        std::string msg = "Info error: ";
         msg.append(s.ToString());
         LOG(INFO) << msg;
     }
@@ -38,7 +38,7 @@ VectorDBServiceImpl::CreateTable(grpc::ServerContext* context,
                                  vectordb_rpc::CreateTableReply* reply) {
     auto s = Node::GetInstance().OnCreateTable(request, reply);
     if (!s.ok()) {
-        std::string msg = "create table error, ";
+        std::string msg = "CreateTable error, ";
         msg.append(request->table_name()).append(", ").append(s.ToString());
         LOG(INFO) << msg;
     }
@@ -50,8 +50,12 @@ grpc::Status
 VectorDBServiceImpl::ShowTables(grpc::ServerContext* context,
                                 const vectordb_rpc::ShowTablesRequest* request,
                                 vectordb_rpc::ShowTablesReply* reply) {
-    //auto s = Node::GetInstance().OnShowTables(request, reply);
-    //assert(s.ok());
+    auto s = Node::GetInstance().OnShowTables(request, reply);
+    if (!s.ok()) {
+        std::string msg = "ShowTables error: ";
+        msg.append(s.ToString());
+        LOG(INFO) << msg;
+    }
     return grpc::Status::OK;
 }
 
@@ -59,8 +63,12 @@ grpc::Status
 VectorDBServiceImpl::Describe(grpc::ServerContext* context,
                               const vectordb_rpc::DescribeRequest* request,
                               vectordb_rpc::DescribeReply* reply) {
-    //auto s = Node::GetInstance().OnDescribe(request, reply);
-    //assert(s.ok());
+    auto s = Node::GetInstance().OnDescribe(request, reply);
+    if (!s.ok()) {
+        std::string msg = "Describe error: ";
+        msg.append(request->name()).append(", ").append(s.ToString());
+        LOG(INFO) << msg;
+    }
     return grpc::Status::OK;
 }
 
