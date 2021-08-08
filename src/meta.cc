@@ -211,7 +211,7 @@ Meta::ForEachPartition(std::function<Status(std::shared_ptr<Partition>)> func) {
             auto partition_sp = partition_kv.second;
             auto s = func(partition_sp);
             if (!s.ok()) {
-                std::string msg = "ForEachPartition do ";
+                std::string msg = "ForEachPartition ";
                 msg.append(partition_kv.first).append(" error");
                 LOG(INFO) << msg;
                 return s;
@@ -230,7 +230,7 @@ Meta::ForEachReplica(std::function<Status(std::shared_ptr<Replica>)> func) {
                 auto replica_sp = replica_kv.second;
                 auto s = func(replica_sp);
                 if (!s.ok()) {
-                    std::string msg = "ForEachReplica do ";
+                    std::string msg = "ForEachReplica ";
                     msg.append(replica_kv.first).append(" error");
                     LOG(INFO) << msg;
                     return s;
@@ -250,7 +250,7 @@ Meta::ForEachReplica2(std::function<Status(std::shared_ptr<Table>, std::shared_p
                 auto replica_sp = replica_kv.second;
                 auto s = func(table_kv.second, partition_kv.second, replica_sp);
                 if (!s.ok()) {
-                    std::string msg = "ForEachReplica do ";
+                    std::string msg = "ForEachReplica ";
                     msg.append(replica_kv.first).append(" error");
                     LOG(INFO) << msg;
                     return s;
@@ -258,6 +258,37 @@ Meta::ForEachReplica2(std::function<Status(std::shared_ptr<Table>, std::shared_p
             }
         }
     }
+    return Status::OK();
+}
+
+Status
+Meta::ForEachReplicaOfTable(const std::string &table_name, std::function<Status(std::shared_ptr<Table>, std::shared_ptr<Partition>, std::shared_ptr<Replica>)> func) {
+    std::unique_lock<std::mutex> guard(mutex_);
+
+    std::shared_ptr<Table> table_sp;
+    auto it = tables_.find(table_name);
+    if (it != tables_.end()) {
+        table_sp = it->second;
+    } else {
+        std::string msg = "table not found: ";
+        msg.append(table_name);
+        return Status::NotFound(table_name);
+    }
+
+    for (auto &partition_kv : table_sp->partitions()) {
+        auto partition_sp = partition_kv.second;
+        for (auto &replica_kv : partition_sp->replicas()) {
+            auto replica_sp = replica_kv.second;
+            auto s = func(table_sp, partition_sp, replica_sp);
+            if (!s.ok()) {
+                std::string msg = "ForEachReplicaOfTable ";
+                msg.append(replica_kv.first).append(" error");
+                LOG(INFO) << msg;
+                return s;
+            }
+        }
+    }
+
     return Status::OK();
 }
 

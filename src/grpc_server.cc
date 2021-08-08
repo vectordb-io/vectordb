@@ -23,8 +23,12 @@ grpc::Status
 VectorDBServiceImpl::Info(grpc::ServerContext* context,
                           const vectordb_rpc::InfoRequest* request,
                           vectordb_rpc::InfoReply* reply) {
-    //auto s = Node::GetInstance().OnInfo(request, reply);
-    //assert(s.ok());
+    auto s = Node::GetInstance().OnInfo(request, reply);
+    if (!s.ok()) {
+        std::string msg = "info error: ";
+        msg.append(s.ToString());
+        LOG(INFO) << msg;
+    }
     return grpc::Status::OK;
 }
 
@@ -32,11 +36,12 @@ grpc::Status
 VectorDBServiceImpl::CreateTable(grpc::ServerContext* context,
                                  const vectordb_rpc::CreateTableRequest* request,
                                  vectordb_rpc::CreateTableReply* reply) {
-    //auto s = Node::GetInstance().OnCreateTable(request, reply);
-
-
-    // maybe not ok
-    //assert(s.ok());
+    auto s = Node::GetInstance().OnCreateTable(request, reply);
+    if (!s.ok()) {
+        std::string msg = "create table error, ";
+        msg.append(request->table_name()).append(", ").append(s.ToString());
+        LOG(INFO) << msg;
+    }
     return grpc::Status::OK;
 }
 

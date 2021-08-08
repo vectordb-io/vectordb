@@ -70,6 +70,8 @@ Node::OnPing(const vectordb_rpc::PingRequest* request, vectordb_rpc::PingReply* 
 
 Status
 Node::OnInfo(const vectordb_rpc::InfoRequest* request, vectordb_rpc::InfoReply* reply) {
+    //LOG(INFO) << meta_.ToStringPretty();
+    reply->set_msg(meta_.ToStringPretty());
     return Status::OK();
 }
 
@@ -98,7 +100,7 @@ Node::OnCreateTable(const vectordb_rpc::CreateTableRequest* request, vectordb_rp
     auto table_sp = meta_.GetTable(request->table_name());
     assert(table_sp);
 
-    s = meta_.ForEachReplica2(std::bind(&vectordb::EngineManager::AddVEngine3, &Node::GetInstance().mutable_engine_manager(), std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+    s = meta_.ForEachReplicaOfTable(request->table_name(), std::bind(&vectordb::EngineManager::AddVEngine3, &Node::GetInstance().mutable_engine_manager(), std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
     if (!s.ok()) {
         reply->set_code(2);
         msg.append(s.Msg());

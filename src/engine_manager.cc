@@ -35,13 +35,14 @@ EngineManager::AddVEngine(const std::string &replica_name, std::shared_ptr<VEngi
         return false;
     }
     vengines_.insert(std::pair<std::string, std::shared_ptr<VEngine>>(replica_name, ve));
+    std::string msg = "add vengine ok: ";
+    msg.append(ve->ToString());
+    LOG(INFO) << msg;
     return true;
 }
 
 bool
 EngineManager::AddVEngine2(const std::string &path, const VEngineParam &param) {
-    std::unique_lock<std::mutex> guard(mutex_);
-
     auto vengien_sp = std::make_shared<VEngine>(path, param);
     assert(vengien_sp);
 
