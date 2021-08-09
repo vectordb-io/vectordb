@@ -234,6 +234,52 @@ Node::OnPutVec(const vectordb_rpc::PutVecRequest* request, vectordb_rpc::PutVecR
 
 Status
 Node::OnGetVec(const vectordb_rpc::GetVecRequest* request, vectordb_rpc::GetVecReply* reply) {
+    VecObj vo;
+    auto s = GetVec(request->table_name(), request->key(), vo);
+    if (!s.ok()) {
+        reply->set_code(1);
+        reply->set_msg(s.Msg());
+    } else {
+        reply->set_code(0);
+        reply->set_msg("get vector ok");
+        coding::VecObj2Pb(vo, *(reply->mutable_vec_obj()));
+    }
+    return Status::OK();
+}
+
+Status
+Node::GetVec(const std::string &table_name, const std::string &key, VecObj &vo) const {
+    std::string replica_name;
+    std::string msg;
+
+    std::shared_ptr<Table> pt = meta_.GetTable(table_name);
+    if (!pt) {
+        msg = "table not exist: ";
+        msg.append(table_name);
+        return Status::OtherError(msg);
+    }
+
+    auto s = meta_.ReplicaNameByKey(table_name, key, replica_name);
+    if (!s.ok()) {
+        msg = "get replica_name by key error: ";
+        msg.append(replica_name).append(", ").append(s.Msg());
+        return Status::OtherError(msg);
+    }
+
+    auto vengine_sp = engine_manager_.GetVEngine(replica_name);
+    if (!vengine_sp) {
+        msg = "get vengine error: ";
+        msg.append(replica_name).append(", ").append(s.Msg());;
+        return Status::OtherError(msg);
+    }
+
+    s = vengine_sp->Get(key, vo);
+    if (!s.ok()) {
+        msg = "db get error, key: ";
+        msg.append(key);
+        return Status::OtherError(msg);
+    }
+
     return Status::OK();
 }
 
@@ -242,15 +288,61 @@ Node::OnDistKey(const vectordb_rpc::DistKeyRequest* request, vectordb_rpc::DistK
     return Status::OK();
 }
 
-/*
-Status
-Node::GetVec(const std::string &table, const std::string &key, VecObj &vo) const {
-    return Status::OK();
-}
-*/
-
 Status
 Node::OnKeys(const vectordb_rpc::KeysRequest* request, vectordb_rpc::KeysReply* reply) {
+    std::vector<std::string> replica_names;
+    auto s = meta_.ReplicaNamesByTable(request->table_name(), replica_names);
+    if (!s.ok()) {
+        std::string msg = "get replica_names error: ";
+        msg.append(s.Msg());
+        LOG(INFO) << msg;
+        return Status::OtherError(msg);
+    }
+
+    int count = 0;
+    int begin = 0;
+    for (auto &replica_name : replica_names) {
+        auto engine_sp = engine_manager_.GetVEngine(replica_name);
+        if (!engine_sp) {
+            std::string msg = "get engine error, ";
+            msg.append(replica_name);
+            LOG(INFO) << msg;
+            return Status::OtherError(msg);
+        }
+        LOG(INFO) << "OnKeys, get engine: " << engine_sp->ToString();
+
+        leveldb::DB* db = engine_sp->mutable_db_data();
+        if (!db) {
+            std::string msg = "db error, ";
+            msg.append(replica_name);
+            LOG(INFO) << msg;
+            return Status::OtherError(msg);
+        }
+
+        leveldb::Iterator* it = db->NewIterator(leveldb::ReadOptions());
+        for (it->SeekToFirst(); it->Valid(); it->Next()) {
+            //char log_buf[128];
+            //snprintf(log_buf, sizeof(log_buf), "begin:%d count:%d request->begin():%d request->limit():%d", begin, count, request->begin(), request->limit());
+            //LOG(INFO) << log_buf;
+
+            if (begin >= request->begin()) {
+                //LOG(INFO) << "add key: " << it->key().ToString();
+                reply->add_keys(it->key().ToString());
+                count++;
+                if (count >= request->limit()) {
+                    delete it;
+                    reply->set_code(0);
+                    reply->set_msg("ok");
+                    return Status::OK();
+                }
+            }
+            begin++;
+        }
+        delete it;
+    }
+
+    reply->set_code(0);
+    reply->set_msg("ok");
     return Status::OK();
 }
 

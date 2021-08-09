@@ -349,6 +349,9 @@ class Meta {
                             const std::string &key,
                             std::string &replica_name) const;
 
+    Status ReplicaNamesByTable(const std::string &table_name,
+                               std::vector<std::string> &replica_names) const;
+
     jsonxx::json64 ToJson() const;
 
     std::string ToString() const {

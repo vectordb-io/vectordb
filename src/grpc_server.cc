@@ -91,8 +91,13 @@ grpc::Status
 VectorDBServiceImpl::GetVec(grpc::ServerContext* context,
                             const vectordb_rpc::GetVecRequest* request,
                             vectordb_rpc::GetVecReply* reply) {
-    //auto s = Node::GetInstance().OnGetVec(request, reply);
-    //assert(s.ok());
+    auto s = Node::GetInstance().OnGetVec(request, reply);
+    if (!s.ok()) {
+        std::string msg = "GetVec error: ";
+        msg.append(request->table_name()).append(", ");
+        msg.append(request->key()).append(", ").append(s.ToString());
+        LOG(INFO) << msg;
+    }
     return grpc::Status::OK;
 }
 
@@ -109,8 +114,13 @@ grpc::Status
 VectorDBServiceImpl::Keys(grpc::ServerContext* context,
                           const vectordb_rpc::KeysRequest* request,
                           vectordb_rpc::KeysReply* reply) {
-    //auto s = Node::GetInstance().OnKeys(request, reply);
-    //assert(s.ok());
+    auto s = Node::GetInstance().OnKeys(request, reply);
+    if (!s.ok()) {
+        std::string msg = "Keys error: ";
+        msg.append(request->table_name()).append(", ");
+        msg.append(s.ToString());
+        LOG(INFO) << msg;
+    }
     return grpc::Status::OK;
 }
 

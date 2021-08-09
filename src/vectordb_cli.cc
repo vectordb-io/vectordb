@@ -172,15 +172,10 @@ VectordbCli::Do(const std::vector<std::string> &cmd_sv, const std::string &param
         } while (0);
 
     } else if (cmd_sv.size() == 1 && cmd_sv[0] == "keys") {
-        try {
-            auto j = jsonxx::json::parse(params_json);
-            std::string table_name = j["table_name"].as_string();
-            vectordb_rpc::KeysRequest request;
-            request.set_table_name(table_name);
+        vectordb_rpc::KeysRequest request;
+        auto s = PreProcess(params_json, request, reply);
+        if (s.ok()) {
             Keys(request, reply);
-
-        } catch (std::exception &e) {
-            std::cout << e.what() << std::endl;
         }
 
     } else if (cmd_sv.size() == 1 && cmd_sv[0] == "put") {
@@ -207,18 +202,10 @@ VectordbCli::Do(const std::vector<std::string> &cmd_sv, const std::string &param
         }
 
     } else if (cmd_sv.size() == 1 && cmd_sv[0] == "get") {
-        try {
-            auto j = jsonxx::json::parse(params_json);
-            std::string table_name = j["table_name"].as_string();
-            std::string key = j["key"].as_string();
-
-            vectordb_rpc::GetVecRequest request;
-            request.set_table_name(table_name);
-            request.set_key(key);
+        vectordb_rpc::GetVecRequest request;
+        auto s = PreProcess(params_json, request, reply);
+        if (s.ok()) {
             GetVec(request, reply);
-
-        } catch (std::exception &e) {
-            std::cout << e.what() << std::endl;
         }
 
     } else if (cmd_sv.size() == 1 && cmd_sv[0] == "getknn") {
@@ -501,19 +488,44 @@ VectordbCli::PutVec(const vectordb_rpc::PutVecRequest &request, std::string &rep
     }
 }
 
+Status
+VectordbCli::PreProcess(const std::string &params_json, vectordb_rpc::GetVecRequest &request, std::string &reply_msg) {
+    reply_msg.clear();
+    do {
+        jsonxx::json j;
+        std::string table_name;
+        std::string key;
+
+        // required value
+        try {
+            j = jsonxx::json::parse(params_json);
+            table_name = j["table_name"].as_string();
+            key = j["key"].as_string();
+
+        } catch (std::exception &e) {
+            reply_msg = "get error, ";
+            reply_msg.append(e.what());
+            break;
+        }
+
+        request.set_table_name(table_name);
+        request.set_key(key);
+        return Status::OK();
+
+    } while (0);
+
+    return Status::OtherError(reply_msg);
+}
+
 void
 VectordbCli::GetVec(const vectordb_rpc::GetVecRequest &request, std::string &reply_msg) {
-
-    /*
     vectordb_rpc::GetVecReply reply;
-    grpc::ClientContext context;
-    grpc::Status status = stub_->GetVec(&context, request, &reply);
-    if (status.ok()) {
-    reply_msg = cli_util::ToString(reply);
+    auto s = vdb_client_.GetVec(request, &reply);
+    if (s.ok()) {
+        reply_msg = cli_util::ToString(reply);
     } else {
-    reply_msg = status.error_message();
+        reply_msg = s.Msg();
     }
-    */
 }
 
 void
@@ -531,19 +543,58 @@ VectordbCli::DistKey(const vectordb_rpc::DistKeyRequest &request, std::string &r
     */
 }
 
+Status
+VectordbCli::PreProcess(const std::string &params_json, vectordb_rpc::KeysRequest &request, std::string &reply_msg) {
+    reply_msg.clear();
+    do {
+        jsonxx::json j;
+        std::string table_name;
+        int begin, limit;
+
+        // required value
+        try {
+            j = jsonxx::json::parse(params_json);
+            table_name = j["table_name"].as_string();
+
+        } catch (std::exception &e) {
+            reply_msg = "keys error, ";
+            reply_msg.append(e.what());
+            break;
+        }
+
+        // optional value
+        try {
+            begin = j["begin"].as_integer();
+        } catch (std::exception &e) {
+            begin = 0;
+        }
+
+        // optional value
+        try {
+            limit = j["limit"].as_integer();
+        } catch (std::exception &e) {
+            limit = 200;
+        }
+
+        request.set_table_name(table_name);
+        request.set_begin(begin);
+        request.set_limit(limit);
+        return Status::OK();
+
+    } while (0);
+
+    return Status::OtherError(reply_msg);
+}
+
 void
 VectordbCli::Keys(const vectordb_rpc::KeysRequest &request, std::string &reply_msg) {
-
-    /*
     vectordb_rpc::KeysReply reply;
-    grpc::ClientContext context;
-    grpc::Status status = stub_->Keys(&context, request, &reply);
-    if (status.ok()) {
-    reply_msg = cli_util::ToString(reply);
+    auto s = vdb_client_.Keys(request, &reply);
+    if (s.ok()) {
+        reply_msg = cli_util::ToString(reply);
     } else {
-    reply_msg = status.error_message();
+        reply_msg = s.Msg();
     }
-    */
 }
 
 void

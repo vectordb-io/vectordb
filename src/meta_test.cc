@@ -83,7 +83,8 @@ int main(int argc, char** argv) {
     AddTable("test_table", 100, 3, 512);
     LOG(INFO) << meta.ToStringPretty();
 
-    int thread_num = 100;
+    int thread_num = 5;
+    //int thread_num = 100;
     std::vector<std::thread*> threads;
     for (int i = 0; i < thread_num; ++i) {
         char buf[32];
@@ -91,7 +92,8 @@ int main(int argc, char** argv) {
         std::string table_name(buf);
         printf("begin create table: %s \n", table_name.c_str());
         fflush(nullptr);
-        std::thread *t = new std::thread(AddTable, table_name, 1024, 3, 512);
+        std::thread *t = new std::thread(AddTable, table_name, 5, 3, 512);
+        //std::thread *t = new std::thread(AddTable, table_name, 1024, 3, 512);
         threads.push_back(t);
     }
 
@@ -102,6 +104,24 @@ int main(int argc, char** argv) {
     s = meta.Persist();
     assert(s.ok());
     LOG(INFO) << "meta persist ok!";
+
+    printf("\nReplicaNamesByTable test: \n\n");
+    std::vector<std::string> replica_names;
+
+    s = meta.ReplicaNamesByTable("test_table_0", replica_names);
+    std::cout << "table: test_table_0, size:" << replica_names.size() << " status:" << s.ToString() << std::endl;
+    for (auto &rn : replica_names) {
+        std::cout << rn << std::endl;
+        std::cout.flush();
+    }
+
+    s = meta.ReplicaNamesByTable("test_table_1", replica_names);
+    std::cout << "table: test_table_0, size:" << replica_names.size() << " status:" << s.ToString() << std::endl;
+    for (auto &rn : replica_names) {
+        std::cout << rn << std::endl;
+        std::cout.flush();
+    }
+
 
     google::ShutdownGoogleLogging();
     return 0;

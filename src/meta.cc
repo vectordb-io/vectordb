@@ -128,15 +128,40 @@ Meta::DropIndex(const std::string &name) {
 Status
 Meta::ReplicaNameByKey(const std::string &table_name,
                        const std::string &key, std::string &replica_name) const {
+    std::unique_lock<std::mutex> guard(mutex_);
+
     auto it_table = tables_.find(table_name);
     if (it_table == tables_.end()) {
-        std::string msg;
-        msg.append("table not found:");
+        std::string msg = "table not found: ";
         msg.append(table_name);
         return Status::NotFound(msg);
     }
     int partition_id = util::RSHash(key.c_str()) % it_table->second->partition_num();
     replica_name = util::ReplicaName(table_name, partition_id, 0);
+    return Status::OK();
+}
+
+Status
+Meta::ReplicaNamesByTable(const std::string &table_name,
+                          std::vector<std::string> &replica_names) const {
+    std::unique_lock<std::mutex> guard(mutex_);
+
+    auto table_sp = GetTableNonlocking(table_name);
+    if (!table_sp) {
+        std::string msg = "table not found: ";
+        msg.append(table_name);
+        return Status::NotFound(msg);
+    }
+
+    replica_names.clear();
+    for (auto &partition_kv : table_sp->partitions()) {
+        auto partition_sp = partition_kv.second;
+        for (auto &replica_kv : partition_sp->replicas()) {
+            replica_names.push_back(replica_kv.first);
+            //LOG(INFO) << "ReplicaNamesByTable get replica: " << replica_kv.first;
+        }
+    }
+
     return Status::OK();
 }
 

@@ -23,7 +23,7 @@ class Node {
     Status Init();
     Status Start();
     Status Stop();
-    //Status GetVec(const std::string &table, const std::string &key, VecObj &vo) const;
+    Status GetVec(const std::string &table_name, const std::string &key, VecObj &vo) const;
 
     Status OnPing(const vectordb_rpc::PingRequest* request, vectordb_rpc::PingReply* reply);
     Status OnInfo(const vectordb_rpc::InfoRequest* request, vectordb_rpc::InfoReply* reply);

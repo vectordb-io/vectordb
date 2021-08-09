@@ -65,6 +65,8 @@ message Vec {
 
 message KeysRequest {
   string table_name = 1;
+  int32 begin = 2;
+  int32 limit = 3;
 }
 
 message KeysReply {
