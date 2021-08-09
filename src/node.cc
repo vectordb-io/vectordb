@@ -173,6 +173,62 @@ Node::OnDescribe(const vectordb_rpc::DescribeRequest* request, vectordb_rpc::Des
 
 Status
 Node::OnPutVec(const vectordb_rpc::PutVecRequest* request, vectordb_rpc::PutVecReply* reply) {
+    std::string replica_name;
+    std::string msg;
+
+    std::shared_ptr<Table> pt = meta_.GetTable(request->table_name());
+    if (!pt) {
+        msg = "table not exist: ";
+        msg.append(request->table_name());
+        reply->set_code(1);
+        reply->set_msg(msg);
+        return Status::OtherError(msg);
+    }
+
+    auto s = meta_.ReplicaNameByKey(request->table_name(), request->vec_obj().key(), replica_name);
+    if (!s.ok()) {
+        msg = "get replica_name by key error: ";
+        msg.append(replica_name).append(", ").append(s.Msg());
+        LOG(INFO) << msg;
+        reply->set_code(2);
+        reply->set_msg(msg);
+        return Status::OtherError(msg);
+    }
+
+    auto vengine_sp = engine_manager_.GetVEngine(replica_name);
+    if (!vengine_sp) {
+        msg = "get vengine error: ";
+        msg.append(replica_name).append(", ").append(s.Msg());;
+        LOG(INFO) << msg;
+        reply->set_code(3);
+        reply->set_msg(msg);
+        return Status::OtherError(msg);
+    }
+
+    VecObj vo;
+    coding::Pb2VecObj(request->vec_obj(), vo);
+    if (pt->dim() != vo.vec().dim()) {
+        msg = "dim not equal";
+        LOG(INFO) << msg;
+        reply->set_code(4);
+        reply->set_msg(msg);
+        return Status::OK();
+    }
+
+    s = vengine_sp->Put(request->vec_obj().key(), vo);
+    if (!s.ok()) {
+        msg = "db put error, ";
+        msg.append(replica_name).append(", ");
+        msg.append(request->vec_obj().key()).append(", ").append(s.Msg());;
+        LOG(INFO) << msg;
+        reply->set_code(5);
+        reply->set_msg(msg);
+        return Status::OtherError(msg);
+    }
+
+    msg = "put vector ok";
+    reply->set_code(0);
+    reply->set_msg(msg);
     return Status::OK();
 }
 

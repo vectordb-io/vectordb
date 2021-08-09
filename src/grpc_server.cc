@@ -76,8 +76,13 @@ grpc::Status
 VectorDBServiceImpl::PutVec(grpc::ServerContext* context,
                             const vectordb_rpc::PutVecRequest* request,
                             vectordb_rpc::PutVecReply* reply) {
-    //auto s = Node::GetInstance().OnPutVec(request, reply);
-    //assert(s.ok());
+    auto s = Node::GetInstance().OnPutVec(request, reply);
+    if (!s.ok()) {
+        std::string msg = "PutVec error: ";
+        msg.append(request->table_name()).append(", ");
+        msg.append(request->vec_obj().key()).append(", ").append(s.ToString());
+        LOG(INFO) << msg;
+    }
     return grpc::Status::OK;
 
 }

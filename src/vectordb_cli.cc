@@ -184,87 +184,11 @@ VectordbCli::Do(const std::vector<std::string> &cmd_sv, const std::string &param
         }
 
     } else if (cmd_sv.size() == 1 && cmd_sv[0] == "put") {
-        do {
-            std::string table_name;
-            std::string key;
-            std::string attach_value1;
-            std::string attach_value2;
-            std::string attach_value3;
-            jsonxx::json j;
-
-            try {
-                j = jsonxx::json::parse(params_json);
-            } catch (std::exception &e) {
-                reply = "parameters error";
-                break;
-            }
-
-            // optional value
-            try {
-                attach_value1 = j["attach_value1"].as_string();
-            } catch (std::exception &e) {
-                attach_value1 = "";
-            }
-
-            // optional value
-            try {
-                attach_value2 = j["attach_value2"].as_string();
-            } catch (std::exception &e) {
-                attach_value2 = "";
-            }
-
-            // optional value
-            try {
-                attach_value3 = j["attach_value3"].as_string();
-            } catch (std::exception &e) {
-                attach_value3 = "";
-            }
-
-            // required value
-            try {
-                table_name = j["table_name"].as_string();
-            } catch (std::exception &e) {
-                reply = "table_name error, ";
-                reply.append(e.what());
-                break;
-            }
-
-            // required value
-            try {
-                key = j["key"].as_string();
-            } catch (std::exception &e) {
-                reply = "key error, ";
-                reply.append(e.what());
-                break;
-            }
-
-            // required value
-            try {
-                bool b = j["vector"].is_array();
-                if (!b) {
-                    reply = "vector error";
-                    break;
-                }
-            } catch (std::exception &e) {
-                reply = "vector error, ";
-                reply.append(e.what());
-                break;
-            }
-            const auto& vector_arr = j["vector"].as_array();
-
-            vectordb_rpc::PutVecRequest request;
-            request.set_table_name(table_name);
-            request.mutable_vec_obj()->set_key(key);
-            request.mutable_vec_obj()->set_attach_value1(attach_value1);
-            request.mutable_vec_obj()->set_attach_value2(attach_value2);
-            request.mutable_vec_obj()->set_attach_value3(attach_value3);
-            for (auto &jobj : vector_arr) {
-                double dd = jobj.as_float();
-                request.mutable_vec_obj()->mutable_vec()->add_data(dd);
-            }
+        vectordb_rpc::PutVecRequest request;
+        auto s = PreProcess(params_json, request, reply);
+        if (s.ok()) {
             PutVec(request, reply);
-
-        } while (0);
+        }
 
     } else if (cmd_sv.size() == 2 && cmd_sv[0] == "distance" && cmd_sv[1] == "key") {
         try {
@@ -479,19 +403,102 @@ VectordbCli::Info(const vectordb_rpc::InfoRequest &request, std::string &reply_m
     }
 }
 
+Status
+VectordbCli::PreProcess(const std::string &params_json, vectordb_rpc::PutVecRequest &request, std::string &reply_msg) {
+    reply_msg.clear();
+    do {
+        std::string table_name;
+        std::string key;
+        std::string attach_value1;
+        std::string attach_value2;
+        std::string attach_value3;
+        jsonxx::json j;
+
+        try {
+            j = jsonxx::json::parse(params_json);
+        } catch (std::exception &e) {
+            reply_msg = "parameters error";
+            break;
+        }
+
+        // optional value
+        try {
+            attach_value1 = j["attach_value1"].as_string();
+        } catch (std::exception &e) {
+            attach_value1 = "";
+        }
+
+        // optional value
+        try {
+            attach_value2 = j["attach_value2"].as_string();
+        } catch (std::exception &e) {
+            attach_value2 = "";
+        }
+
+        // optional value
+        try {
+            attach_value3 = j["attach_value3"].as_string();
+        } catch (std::exception &e) {
+            attach_value3 = "";
+        }
+
+        // required value
+        try {
+            table_name = j["table_name"].as_string();
+        } catch (std::exception &e) {
+            reply_msg = "table_name error, ";
+            reply_msg.append(e.what());
+            break;
+        }
+
+        // required value
+        try {
+            key = j["key"].as_string();
+        } catch (std::exception &e) {
+            reply_msg = "key error, ";
+            reply_msg.append(e.what());
+            break;
+        }
+
+        // required value
+        try {
+            bool b = j["vector"].is_array();
+            if (!b) {
+                reply_msg = "vector error";
+                break;
+            }
+        } catch (std::exception &e) {
+            reply_msg = "vector error, ";
+            reply_msg.append(e.what());
+            break;
+        }
+        const auto& vector_arr = j["vector"].as_array();
+
+        request.set_table_name(table_name);
+        request.mutable_vec_obj()->set_key(key);
+        request.mutable_vec_obj()->set_attach_value1(attach_value1);
+        request.mutable_vec_obj()->set_attach_value2(attach_value2);
+        request.mutable_vec_obj()->set_attach_value3(attach_value3);
+        for (auto &jobj : vector_arr) {
+            double dd = jobj.as_float();
+            request.mutable_vec_obj()->mutable_vec()->add_data(dd);
+        }
+        return Status::OK();
+
+    } while(0);
+
+    return Status::OtherError(reply_msg);
+}
+
 void
 VectordbCli::PutVec(const vectordb_rpc::PutVecRequest &request, std::string &reply_msg) {
-
-    /*
     vectordb_rpc::PutVecReply reply;
-    grpc::ClientContext context;
-    grpc::Status status = stub_->PutVec(&context, request, &reply);
-    if (status.ok()) {
-    reply_msg = cli_util::ToString(reply);
+    auto s = vdb_client_.PutVec(request, &reply);
+    if (s.ok()) {
+        reply_msg = cli_util::ToString(reply);
     } else {
-    reply_msg = status.error_message();
+        reply_msg = s.Msg();
     }
-    */
 }
 
 void
