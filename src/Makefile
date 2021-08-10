@@ -20,6 +20,10 @@ OBJS_VENGINE_GET_TEST=vengine_get_test.o vengine.o vec.o status.o util.o vectord
 LIBS_VENGINE_TEST=-lglog -lprotobuf -lgrpc++ -lgrpc -lleveldb -lpthread
 LFLAGS_VENGINE_TEST=-L/usr/local/lib
 
+OBJS_VINDEX_ANNOY_TEST=vindex_annoy_test.o vengine.o vec.o status.o util.o vectordb_rpc.pb.o vindex_annoy.o coding.o
+LIBS_VINDEX_ANNOY_TEST=-lglog -lprotobuf -lgrpc++ -lgrpc -lleveldb -lpthread
+LFLAGS_VINDEX_ANNOY_TEST=-L/usr/local/lib
+
 OBJS_META_FOREACH_TEST=meta_foreach_test.o meta.o config.o status.o util.o vectordb_rpc.pb.o coding.o
 OBJS_META_LOAD_TEST=meta_load_test.o meta.o config.o status.o util.o vectordb_rpc.pb.o coding.o
 OBJS_META_TEST=meta_test.o meta.o config.o status.o util.o vectordb_rpc.pb.o coding.o
@@ -115,12 +119,15 @@ engine_manager_test : $(OBJS_ENGINE_MANAGER_TEST)
 engine_manager_test2 : $(OBJS_ENGINE_MANAGER_TEST2)
 	$(CC) $^ -o $@ $(LIBS_ENGINE_MANAGER_TEST) $(LFLAGS_ENGINE_MANAGER_TEST)
 
+vindex_annoy_test: $(OBJS_VINDEX_ANNOY_TEST)
+	$(CC) $^ -o $@ $(LIBS_VINDEX_ANNOY_TEST) $(LFLAGS_VINDEX_ANNOY_TEST)
+
 %.o: %.cc %.h
 	$(CC) $< $(INCLUDES) $(CFLAGS) -o $@
 
 .PHONY:
 
-test: config_test log_test meta_test meta_load_test meta_foreach_test vengine_test vengine_load_test vec_test vecobj_test vengine_put_test vengine_get_test engine_manager_test engine_manager_test2 vengine_add_by_meta_test
+test: config_test log_test meta_test meta_load_test meta_foreach_test vengine_test vengine_load_test vec_test vecobj_test vengine_put_test vengine_get_test engine_manager_test engine_manager_test2 vengine_add_by_meta_test vindex_annoy_test
 	@echo "make test finish!"
 
 api: $(OBJS_API)
@@ -182,6 +189,7 @@ clean:
 	rm -rf engine_manager_test
 	rm -rf engine_manager_test2
 	rm -rf vengine_add_by_meta_test
+	rm -rf vindex_annoy_test 
 
 cleanall: clean uninstall
 	rm -f vectordb_rpc.pb.*

@@ -1,5 +1,4 @@
 #include "vengine.h"
-#include "util.h"
 #include "coding.h"
 #include "vindex_annoy.h"
 
@@ -75,7 +74,7 @@ VIndexAnnoy::GetKNN(const std::vector<float> &vec, int limit, std::vector<VecDt>
         std::vector<int> result;
         std::vector<float> distances;
 
-        annoy_index_->get_nns_by_vector(vec.data(), vec.size(), search_k, &result, &distances);
+        annoy_index_->get_nns_by_vector(vec.data(), limit, search_k, &result, &distances);
         assert(result.size() == distances.size());
 
         auto s = ProcResults(result, distances, results);

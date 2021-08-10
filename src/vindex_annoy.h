@@ -8,6 +8,7 @@
 #include "kissrandom.h"
 #include "annoylib.h"
 #include "vec.h"
+#include "util.h"
 #include "status.h"
 #include "vindex.h"
 
