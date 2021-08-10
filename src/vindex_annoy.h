@@ -58,7 +58,7 @@ class VIndexAnnoy : public VIndex {
     ~VIndexAnnoy();
 
     Status GetKNN(const std::string &key, int limit, std::vector<VecDt> &results) override;
-    Status GetKNN(const Vec &vec, int limit, std::vector<VecDt> &results) override;
+    Status GetKNN(const std::vector<float> &vec, int limit, std::vector<VecDt> &results) override;
     Status Distance(const std::string &key1, const std::string &key2, float &distance) override;
     Status Load() override;
     Status Build() override;

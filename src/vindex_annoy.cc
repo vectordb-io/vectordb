@@ -36,7 +36,7 @@ VIndexAnnoy::~VIndexAnnoy() {
 
 Status
 VIndexAnnoy::GetKNN(const std::string &key, int limit, std::vector<VecDt> &results) {
-    int search_k = 2 * limit;
+    int search_k = (2 * limit > 20) ? (2 * limit) : 20;
     int id;
 
     if (limit > 0) {
@@ -64,14 +64,18 @@ VIndexAnnoy::GetKNN(const std::string &key, int limit, std::vector<VecDt> &resul
 }
 
 Status
-VIndexAnnoy::GetKNN(const Vec &vec, int limit, std::vector<VecDt> &results) {
-    int search_k = 2 * limit;
+VIndexAnnoy::GetKNN(const std::vector<float> &vec, int limit, std::vector<VecDt> &results) {
+    int search_k = (2 * limit > 20) ? (2 * limit) : 20;
+
+    if (static_cast<int>(vec.size()) != dim_) {
+        return Status::OtherError("dim not equal");
+    }
 
     if (limit > 0) {
         std::vector<int> result;
         std::vector<float> distances;
 
-        annoy_index_->get_nns_by_vector(vec.data().data(), vec.data().size(), search_k, &result, &distances);
+        annoy_index_->get_nns_by_vector(vec.data(), vec.size(), search_k, &result, &distances);
         assert(result.size() == distances.size());
 
         auto s = ProcResults(result, distances, results);
