@@ -105,7 +105,7 @@ VectordbCli::Do(const std::vector<std::string> &cmd_sv, const std::string &param
         vectordb_rpc::BuildIndexRequest request;
         request.set_table_name(cmd_sv[2]);
         request.set_index_type("annoy");
-        request.mutable_annoy_param()->set_distance_type("cosine");
+        //request.mutable_annoy_param()->set_distance_type("cosine");
         BuildIndex(request, reply);
 
     } else if (cmd_sv.size() == 2 && cmd_sv[0] == "build" && cmd_sv[1] == "index") {
@@ -159,10 +159,10 @@ VectordbCli::Do(const std::vector<std::string> &cmd_sv, const std::string &param
             request.set_table_name(table_name);
             request.set_index_type(index_type);
             if (index_type == "annoy") {
-                request.mutable_annoy_param()->set_distance_type(distance_type);
+                //request.mutable_annoy_param()->set_distance_type(distance_type);
             } else if (index_type == "knn_graph") {
-                request.mutable_knn_graph_param()->set_distance_type(distance_type);
-                request.mutable_knn_graph_param()->set_k(k);
+                //request.mutable_knn_graph_param()->set_distance_type(distance_type);
+                //request.mutable_knn_graph_param()->set_k(k);
             } else {
                 reply = "parameters error: unknown index_type";
                 break;
@@ -467,8 +467,8 @@ VectordbCli::PreProcess(const std::string &params_json, vectordb_rpc::PutVecRequ
         request.mutable_vec_obj()->set_attach_value2(attach_value2);
         request.mutable_vec_obj()->set_attach_value3(attach_value3);
         for (auto &jobj : vector_arr) {
-            double dd = jobj.as_float();
-            request.mutable_vec_obj()->mutable_vec()->add_data(dd);
+            float df = jobj.as_float();
+            request.mutable_vec_obj()->mutable_vec()->add_data(df);
         }
         return Status::OK();
 

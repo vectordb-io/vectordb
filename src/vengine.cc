@@ -61,7 +61,7 @@ VEngine::Init() {
 
     auto s = PersistMeta();
     if (!s.ok()) {
-        std::string msg = "persist meta error: ";
+        std::string msg = "vengine persist meta error: ";
         msg.append(s.Msg());
         return Status::OtherError(msg);
     }
@@ -81,7 +81,7 @@ VEngine::Load() {
     auto s = LoadMeta();
     if (!s.ok()) {
         std::string msg = replica_name_;
-        msg.append(" load data error");
+        msg.append(" vengine load meta error");
         LOG(INFO) << msg;
         return s;
     }
@@ -89,7 +89,7 @@ VEngine::Load() {
     s = LoadData();
     if (!s.ok()) {
         std::string msg = replica_name_;
-        msg.append(" load data error");
+        msg.append(" vengine load data error");
         LOG(INFO) << msg;
         return Status::OtherError(msg);
     }
@@ -97,7 +97,7 @@ VEngine::Load() {
     s = LoadIndex();
     if (!s.ok()) {
         std::string msg = replica_name_;
-        msg.append(" load index error: ").append(s.ToString());
+        msg.append(" vengine load index error: ").append(s.ToString());
         LOG(INFO) << msg;
         return Status::OtherError(msg);
     }

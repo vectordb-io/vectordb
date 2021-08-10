@@ -38,7 +38,7 @@ VdbClient::CreateTable(const std::string &table_name, int dim, vectordb_rpc::Cre
 Status
 VdbClient::PutVec(const std::string &table_name,
                   const std::string &key,
-                  const std::vector<double> &vec,
+                  const std::vector<float> &vec,
                   const std::vector<std::string> &attach_values,
                   vectordb_rpc::PutVecReply* reply) {
     vectordb_rpc::PutVecRequest request;

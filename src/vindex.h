@@ -2,9 +2,14 @@
 #define __VECTORDB_VINDEX_H__
 
 #include <string>
+#include "jsonxx/json.hpp"
 #include "status.h"
 
 namespace vectordb {
+
+#define VINDEX_DISTANCE_TYPE_COSINE "cosine"
+#define VINDEX_DISTANCE_TYPE_INNER_PRODUCT "inner_product"
+#define VINDEX_DISTANCE_TYPE_EUCLIDEAN "euclidean"
 
 struct VecDtParam {
     std::string key;
@@ -46,6 +51,25 @@ class VecDt {
 
     const std::string& attach_value3() const {
         return attach_value3_;
+    }
+
+    jsonxx::json64 ToJson() const {
+        jsonxx::json64 j, jret;
+        j["key"] = key_;
+        j["distance"] = distance_;
+        j["attach_value1"] = attach_value1_;
+        j["attach_value2"] = attach_value2_;
+        j["attach_value3"] = attach_value3_;
+        jret["VecDt"] = j;
+        return jret;
+    }
+
+    std::string ToString() const {
+        return ToJson().dump();
+    }
+
+    std::string ToStringPretty() const {
+        return ToJson().dump(4, ' ');
     }
 
   private:

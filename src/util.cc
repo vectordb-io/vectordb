@@ -15,6 +15,14 @@ namespace vectordb {
 
 namespace util {
 
+std::string LocalTimeString(time_t t) {
+    tm* local = localtime(&t); // to loal time
+    char buf[128];
+    memset(buf, 0, sizeof(buf));
+    strftime(buf, 64, "%Y-%m-%d %H:%M:%S", local);
+    return std::string(buf);
+}
+
 unsigned int RSHash(const char *str) {
     unsigned int b = 378551;
     unsigned int a = 63689;

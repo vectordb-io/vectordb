@@ -22,7 +22,7 @@ class VdbClient {
     Status CreateTable(const std::string &table_name, int dim, vectordb_rpc::CreateTableReply* reply);
     Status PutVec(const std::string &table_name,
                   const std::string &key,
-                  const std::vector<double> &vec,
+                  const std::vector<float> &vec,
                   const std::vector<std::string> &attach_values,
                   vectordb_rpc::PutVecReply* reply);
     Status BuildIndex(const std::string &table_name, vectordb_rpc::BuildIndexReply* reply);

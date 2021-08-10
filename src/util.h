@@ -1,6 +1,7 @@
 #ifndef __VECTORDB_UTIL_H__
 #define __VECTORDB_UTIL_H__
 
+#include <ctime>
 #include <vector>
 #include <string>
 
@@ -8,6 +9,7 @@ namespace vectordb {
 
 namespace util {
 
+std::string LocalTimeString(time_t t);
 unsigned int RSHash(const char *str);
 void Split(const std::string &s, char separator, std::vector<std::string> &sv, const std::string ignore = "");
 

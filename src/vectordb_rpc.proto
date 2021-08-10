@@ -75,10 +75,6 @@ message KeysReply {
   repeated string keys = 3;
 }
 
-message AnnoyParam {
-  string distance_type = 1;
-}
-
 message KNNGraphParam {
   string distance_type = 1;
   int32 k = 2;
@@ -87,8 +83,8 @@ message KNNGraphParam {
 message BuildIndexRequest {
   string table_name = 1;
   string index_type = 2;
-  AnnoyParam annoy_param = 3;
-  KNNGraphParam knn_graph_param = 4;
+  //AnnoyParam annoy_param = 3;
+  //KNNGraphParam knn_graph_param = 4;
 }
 
 message BuildIndexReply {
@@ -225,5 +221,12 @@ message VEngineMeta {
   repeated string index_names = 3; 
 }
 
-
+message AnnoyMeta {
+  int32 dim = 1;
+  string index_type = 2;
+  string distance_type = 3;
+  string replica_name = 4;
+  uint64 timestamp = 5;
+  int32 tree_num = 6;
+}
 
