@@ -55,6 +55,62 @@ void GetVec(int i) {
     printf("get vec_obj: %s \n\n", vec_obj.ToString().c_str());
 }
 
+void test_index(std::string distance_type, int dim) {
+    do {
+        vectordb::AnnoyParam annoy_param;
+        annoy_param.dim = dim;
+        annoy_param.index_type = "annoy";
+        annoy_param.distance_type = distance_type;
+        annoy_param.replica_name = "test_replica";
+        annoy_param.timestamp = time(nullptr);
+        annoy_param.tree_num = 10;
+
+        char index_path[512];
+        snprintf(index_path, sizeof(index_path), "/tmp/test_vindex_annoy/%s.%lu", annoy_param.index_type.c_str(), annoy_param.timestamp);
+
+        vectordb::VIndexAnnoy annoy_index(index_path, g_vengine, annoy_param);
+        auto s = annoy_index.Build();
+        if (!s.ok()) {
+            std::cout << "index: " << annoy_index.ToString() << " build error: " << s.ToString();
+            return;
+        }
+
+        printf("%s \n", annoy_index.ToString().c_str());
+
+        {
+            std::cout << std::endl << std::endl;
+            int limit = 5;
+            std::vector<vectordb::VecDt> results;
+            printf("getknn by key: %s \n\n", test_key.c_str());
+            s = annoy_index.GetKNN(test_key, limit, results);
+            assert(s.ok());
+            for (size_t i = 0; i < results.size(); ++i) {
+                std::cout << "result-" << i << " : " << results[i].ToString() << std::endl;
+            }
+            std::cout << std::endl << std::endl;
+        }
+
+        {
+            std::cout << std::endl << std::endl;
+            int limit = 5;
+            std::vector<vectordb::VecDt> results;
+            printf("getknn by vec: \n\n");
+            std::vector<float> vec;
+            for (int i = 0; i < dim; ++i) {
+                vec.push_back(random_float(-10, 10));
+            }
+
+            s = annoy_index.GetKNN(vec, limit, results);
+            assert(s.ok());
+            for (size_t i = 0; i < results.size(); ++i) {
+                std::cout << "result-" << i << " : " << results[i].ToString() << std::endl;
+            }
+            std::cout << std::endl << std::endl;
+        }
+
+    } while (0);
+}
+
 int main(int argc, char** argv) {
     vectordb::Status s;
     exe_name = std::string(argv[0]);
@@ -85,103 +141,13 @@ int main(int argc, char** argv) {
         PutVec(i, dim);
     }
 
-    do {
-        vectordb::AnnoyParam annoy_param;
-        annoy_param.dim = dim;
-        annoy_param.index_type = "annoy";
-        annoy_param.distance_type = "cosine";
-        annoy_param.replica_name = "test_replica";
-        annoy_param.timestamp = time(nullptr);
-        annoy_param.tree_num = 10;
-
-        char index_path[512];
-        snprintf(index_path, sizeof(index_path), "/tmp/test_vindex_annoy/%s.%lu", annoy_param.index_type.c_str(), annoy_param.timestamp);
-        vectordb::VIndexAnnoy annoy_index(index_path, &vengine, annoy_param);
-        s = annoy_index.Build();
-        assert(s.ok());
-        printf("%s \n", annoy_index.ToString().c_str());
-
-        {
-            std::cout << std::endl << std::endl;
-            int limit = 5;
-            std::vector<vectordb::VecDt> results;
-            printf("getknn by key: %s \n\n", test_key.c_str());
-            s = annoy_index.GetKNN(test_key, limit, results);
-            assert(s.ok());
-            for (size_t i = 0; i < results.size(); ++i) {
-                std::cout << "result-" << i << " : " << results[i].ToString() << std::endl;
-            }
-            std::cout << std::endl << std::endl;
-        }
-
-        {
-            std::cout << std::endl << std::endl;
-            int limit = 5;
-            std::vector<vectordb::VecDt> results;
-            printf("getknn by vec: \n\n");
-            std::vector<float> vec;
-            for (int i = 0; i < dim; ++i) {
-                vec.push_back(random_float(-10, 10));
-            }
-
-            s = annoy_index.GetKNN(vec, limit, results);
-            assert(s.ok());
-            for (size_t i = 0; i < results.size(); ++i) {
-                std::cout << "result-" << i << " : " << results[i].ToString() << std::endl;
-            }
-            std::cout << std::endl << std::endl;
-        }
-
-    } while (0);
-
-    do {
-        vectordb::AnnoyParam annoy_param;
-        annoy_param.dim = dim;
-        annoy_param.index_type = "annoy";
-        annoy_param.distance_type = "inner_product";
-        annoy_param.replica_name = "test_replica";
-        annoy_param.timestamp = time(nullptr);
-        annoy_param.tree_num = 10;
-
-        char index_path[512];
-        snprintf(index_path, sizeof(index_path), "/tmp/test_vindex_annoy/%s.%lu", annoy_param.index_type.c_str(), annoy_param.timestamp);
-        vectordb::VIndexAnnoy annoy_index(index_path, &vengine, annoy_param);
-        s = annoy_index.Build();
-        assert(s.ok());
-        printf("%s \n", annoy_index.ToString().c_str());
-
-        {
-            std::cout << std::endl << std::endl;
-            int limit = 5;
-            std::vector<vectordb::VecDt> results;
-            printf("getknn by key: %s \n\n", test_key.c_str());
-            s = annoy_index.GetKNN(test_key, limit, results);
-            assert(s.ok());
-            for (size_t i = 0; i < results.size(); ++i) {
-                std::cout << "result-" << i << " : " << results[i].ToString() << std::endl;
-            }
-            std::cout << std::endl << std::endl;
-        }
-
-        {
-            std::cout << std::endl << std::endl;
-            int limit = 5;
-            std::vector<vectordb::VecDt> results;
-            printf("getknn by vec: \n\n");
-            std::vector<float> vec;
-            for (int i = 0; i < dim; ++i) {
-                vec.push_back(random_float(-10, 10));
-            }
-
-            s = annoy_index.GetKNN(vec, limit, results);
-            assert(s.ok());
-            for (size_t i = 0; i < results.size(); ++i) {
-                std::cout << "result-" << i << " : " << results[i].ToString() << std::endl;
-            }
-            std::cout << std::endl << std::endl;
-        }
-
-    } while (0);
+    test_index(VINDEX_DISTANCE_TYPE_COSINE, dim);
+    test_index(VINDEX_DISTANCE_TYPE_COSINE, dim);
+    test_index(VINDEX_DISTANCE_TYPE_INNER_PRODUCT, dim);
+    test_index(VINDEX_DISTANCE_TYPE_INNER_PRODUCT, dim);
+    test_index(VINDEX_DISTANCE_TYPE_EUCLIDEAN, dim);
+    test_index(VINDEX_DISTANCE_TYPE_EUCLIDEAN, dim);
+    test_index("bad_type", dim);
 
 
 
