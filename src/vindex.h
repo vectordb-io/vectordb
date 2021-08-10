@@ -41,6 +41,10 @@ class VecDt {
         return distance_ < rhs.distance_;
     }
 
+    bool operator > (const VecDt &rhs) const {
+        return distance_ > rhs.distance_;
+    }
+
     const std::string& attach_value1() const {
         return attach_value1_;
     }

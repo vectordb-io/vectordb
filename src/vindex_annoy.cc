@@ -53,37 +53,12 @@ VIndexAnnoy::GetKNN(const std::string &key, int limit, std::vector<VecDt> &resul
         annoy_index_->get_nns_by_item(id, limit, search_k, &result, &distances);
         assert(result.size() == distances.size());
 
-        for (size_t i = 0; i < result.size(); ++i) {
-            std::string find_key;
-            auto s = Id2Key(result[i], find_key);
-            if (!s.ok()) {
-                std::string msg = "getknn_by_key Id2Key error ";
-                msg.append(find_key).append(" ").append(s.ToString());
-                return s;
-            }
-
-            VecObj vo;
-            s = vengine_->Get(find_key, vo);
-            if (!s.ok()) {
-                std::string msg = "getknn_by_key get vector object error ";
-                msg.append(find_key).append(" ").append(s.ToString());
-                return s;
-            }
-            assert(find_key == vo.key());
-
-            VecDtParam param;
-            param.key = vo.key();
-            param.distance = distances[i];
-            param.attach_value1 = vo.attach_value1();
-            param.attach_value2 = vo.attach_value2();
-            param.attach_value3 = vo.attach_value3();
-
-            VecDt vdt(param);
-            results.push_back(vdt);
-            std::string log_str = "getknn_by_key one: " + vdt.ToString();
-            LOG(INFO) << log_str;
+        s = ProcResults(result, distances, results);
+        if (!s.ok()) {
+            std::string msg = ToString() + " getknn by key error: " + s.ToString();
+            LOG(INFO) << msg;
+            return s;
         }
-        std::sort(results.begin(), results.end());
     }
     return Status::OK();
 }
@@ -99,38 +74,64 @@ VIndexAnnoy::GetKNN(const Vec &vec, int limit, std::vector<VecDt> &results) {
         annoy_index_->get_nns_by_vector(vec.data().data(), vec.data().size(), search_k, &result, &distances);
         assert(result.size() == distances.size());
 
-        for (size_t i = 0; i < result.size(); ++i) {
-            std::string find_key;
-            auto s = Id2Key(result[i], find_key);
-            if (!s.ok()) {
-                std::string msg = "getknn_by_vec Id2Key error ";
-                msg.append(find_key).append(" ").append(s.ToString());
-                return s;
-            }
-
-            VecObj vo;
-            s = vengine_->Get(find_key, vo);
-            if (!s.ok()) {
-                std::string msg = "getknn_by_vec get vector object error ";
-                msg.append(find_key).append(" ").append(s.ToString());
-                return s;
-            }
-            assert(find_key == vo.key());
-
-            VecDtParam param;
-            param.key = vo.key();
-            param.distance = distances[i];
-            param.attach_value1 = vo.attach_value1();
-            param.attach_value2 = vo.attach_value2();
-            param.attach_value3 = vo.attach_value3();
-
-            VecDt vdt(param);
-            results.push_back(vdt);
-            std::string log_str = "getknn_by_vec one: " + vdt.ToString();
-            LOG(INFO) << log_str;
+        auto s = ProcResults(result, distances, results);
+        if (!s.ok()) {
+            std::string msg = ToString() + " getknn by vec error: " + s.ToString();
+            LOG(INFO) << msg;
+            return s;
         }
-        std::sort(results.begin(), results.end());
     }
+    return Status::OK();
+}
+
+Status
+VIndexAnnoy::ProcResults(const std::vector<int> results, const std::vector<float> distances, std::vector<VecDt> &results_out) {
+    assert(results.size() == distances.size());
+    results_out.clear();
+
+    for (size_t i = 0; i < results.size(); ++i) {
+        std::string find_key;
+        auto s = Id2Key(results[i], find_key);
+        if (!s.ok()) {
+            std::string msg = "ProcResults Id2Key error ";
+            msg.append(find_key).append(" ").append(s.ToString());
+            return s;
+        }
+
+        VecObj vo;
+        s = vengine_->Get(find_key, vo);
+        if (!s.ok()) {
+            std::string msg = "ProcResults get vector object error ";
+            msg.append(find_key).append(" ").append(s.ToString());
+            return s;
+        }
+        assert(find_key == vo.key());
+
+        VecDtParam param;
+        param.key = vo.key();
+        if (distance_type_ == VINDEX_DISTANCE_TYPE_COSINE) {
+            param.distance = Dt2Cos(distances[i]);
+
+        } else {
+            param.distance = distances[i];
+        }
+
+        param.attach_value1 = vo.attach_value1();
+        param.attach_value2 = vo.attach_value2();
+        param.attach_value3 = vo.attach_value3();
+
+        VecDt vdt(param);
+        results_out.push_back(vdt);
+        std::string log_str = "ProcResults one: " + vdt.ToString();
+        LOG(INFO) << log_str;
+    }
+
+    if (distance_type_ == VINDEX_DISTANCE_TYPE_COSINE) {
+        std::sort(results_out.begin(), results_out.end(), std::greater<VecDt>());
+    } else {
+        std::sort(results_out.begin(), results_out.end(), std::less<VecDt>());
+    }
+
     return Status::OK();
 }
 
@@ -147,6 +148,10 @@ VIndexAnnoy::Distance(const std::string &key1, const std::string &key2, float &d
     }
 
     distance = annoy_index_->get_distance(id1, id2);
+    if (distance_type_ == VINDEX_DISTANCE_TYPE_COSINE) {
+        distance = Dt2Cos(distance);
+    }
+
     return Status::OK();
 }
 
@@ -425,6 +430,11 @@ VIndexAnnoy::LoadAnnoy() {
     }
 
     return Status::OK();
+}
+
+float
+VIndexAnnoy::Dt2Cos(float dt) {
+    return 1 - dt / 2;
 }
 
 } // namespace vectordb

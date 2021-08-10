@@ -119,6 +119,8 @@ class VIndexAnnoy : public VIndex {
     Status PersistMeta();
     Status LoadMeta();
     Status LoadAnnoy();
+    Status ProcResults(const std::vector<int> results, const std::vector<float> distances, std::vector<VecDt> &results_out);
+    static float Dt2Cos(float dt);
 
   private:
     int dim_;
