@@ -13,7 +13,10 @@ VIndexAnnoy::VIndexAnnoy(const std::string &path, VEngine* vengine, const AnnoyP
      timestamp_(param.timestamp),
      tree_num_(param.tree_num),
      path_(path),
-     vengine_(vengine) {
+     vengine_(vengine),
+     db_key2id_(nullptr),
+     db_id2key_(nullptr),
+     db_meta_(nullptr) {
     char buf[128];
     snprintf(buf, sizeof(buf), "%s.%lu", index_type_.c_str(), timestamp_);
     name_ = buf;
@@ -23,7 +26,10 @@ VIndexAnnoy::VIndexAnnoy(const std::string &path, VEngine* vengine, const AnnoyP
 // call Load
 VIndexAnnoy::VIndexAnnoy(const std::string &path, VEngine* vengine)
     :path_(path),
-     vengine_(vengine) {
+     vengine_(vengine),
+     db_key2id_(nullptr),
+     db_id2key_(nullptr),
+     db_meta_(nullptr) {
     InitPath();
 }
 
@@ -159,7 +165,26 @@ VIndexAnnoy::Distance(const std::string &key1, const std::string &key2, float &d
 }
 
 Status
+VIndexAnnoy::CheckParams() const {
+    if (index_type_ != "annoy") {
+        return Status::OtherError("param index_type error");
+
+    } else if (distance_type_ != VINDEX_DISTANCE_TYPE_COSINE &&
+               distance_type_ != VINDEX_DISTANCE_TYPE_INNER_PRODUCT &&
+               distance_type_ != VINDEX_DISTANCE_TYPE_EUCLIDEAN) {
+        return Status::OtherError("param distance_type error");
+    }
+
+    return Status::OK();
+}
+
+Status
 VIndexAnnoy::Init() {
+    auto s = CheckParams();
+    if (!s.ok()) {
+        return s;
+    }
+
     if (util::DirOK(path_)) {
         std::string msg = "vindex_annoy init error, dir already exist: ";
         msg.append(path_);
@@ -186,7 +211,7 @@ VIndexAnnoy::Init() {
     ls = leveldb::DB::Open(options, db_meta_path_, &db_meta_);
     assert(ls.ok());
 
-    auto s = PersistMeta();
+    s = PersistMeta();
     if (!s.ok()) {
         std::string msg = "vindex_annoy persist meta error: ";
         msg.append(s.Msg());
@@ -212,6 +237,15 @@ VIndexAnnoy::Load() {
         LOG(INFO) << msg;
         return s;
     }
+
+    leveldb::Options options;
+    //options.create_if_missing = true;
+    leveldb::Status ls;
+
+    ls = leveldb::DB::Open(options, db_key2id_path_, &db_key2id_);
+    assert(ls.ok());
+    ls = leveldb::DB::Open(options, db_id2key_path_, &db_id2key_);
+    assert(ls.ok());
 
     s = LoadAnnoy();
     if (!s.ok()) {

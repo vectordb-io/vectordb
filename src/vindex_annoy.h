@@ -116,6 +116,7 @@ class VIndexAnnoy : public VIndex {
     Status Key2Id(const std::string &key, int &id) const;
     Status Id2Key(int id, std::string &key) const;
 
+    Status CheckParams() const;
     Status Init();
     Status PersistMeta();
     Status LoadMeta();

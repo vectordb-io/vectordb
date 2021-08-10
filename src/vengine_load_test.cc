@@ -18,9 +18,6 @@ int main(int argc, char** argv) {
     FLAGS_max_log_size = 10;
     google::InitGoogleLogging(argv[0]);
 
-    vectordb::VEngineParam param;
-    param.dim = 10;
-    param.replica_name = "test_replica";
     std::string path = "/tmp/test_vengine";
 
     vectordb::VEngine vengine(path);

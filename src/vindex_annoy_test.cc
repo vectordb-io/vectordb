@@ -1,3 +1,6 @@
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <dirent.h>
 #include <getopt.h>
 #include <cstdio>
 #include <cstdlib>
@@ -66,12 +69,12 @@ void test_index(std::string distance_type, int dim) {
         annoy_param.tree_num = 10;
 
         char index_path[512];
-        snprintf(index_path, sizeof(index_path), "/tmp/test_vindex_annoy/%s.%lu", annoy_param.index_type.c_str(), annoy_param.timestamp);
+        snprintf(index_path, sizeof(index_path), "/tmp/test_vindex_annoy/index/%s.%lu", annoy_param.index_type.c_str(), annoy_param.timestamp);
 
         vectordb::VIndexAnnoy annoy_index(index_path, g_vengine, annoy_param);
         auto s = annoy_index.Build();
         if (!s.ok()) {
-            std::cout << "index: " << annoy_index.ToString() << " build error: " << s.ToString();
+            std::cout << "index: " << annoy_index.ToString() << " build error: " << s.ToString() << std::endl;
             return;
         }
 
