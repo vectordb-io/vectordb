@@ -40,9 +40,8 @@ class VEngine {
     Status Get(const std::string &key, VecObj &vo) const;
     Status Delete(const std::string &key);
 
-    //bool HasIndex() const;
+    bool HasIndex() const;
     //Status AddIndex(std::string index_name, std::string index_type, void *param);
-    //Status LoadIndex(std::string index_name, std::string index_type);
     //Status GetKNN(const std::string &key, int limit, std::vector<VecDt> &results, const std::string &index_name);
     //Status GetKNN(const Vec &vec, int limit, std::vector<VecDt> &results, const std::string &index_name);
 

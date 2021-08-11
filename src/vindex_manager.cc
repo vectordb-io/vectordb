@@ -46,6 +46,49 @@ VIndexManager::Del(const std::string &name) {
     return Status::OK();
 }
 
+bool
+VIndexManager::HasIndex() const {
+    std::unique_lock<std::mutex> guard(mutex_);
+    return indices_by_name_.size() > 0;
+}
+
+std::shared_ptr<VIndex>
+VIndexManager::GetIndexByName(const std::string &index_name) {
+    std::unique_lock<std::mutex> guard(mutex_);
+
+    std::shared_ptr<VIndex> index_sp;
+    auto it = indices_by_name_.find(index_name);
+    if (it != indices_by_name_.end()) {
+        index_sp = it->second;
+    }
+    return index_sp;
+}
+
+std::shared_ptr<VIndex>
+VIndexManager::GetNewestIndexByType(const std::string &index_type) {
+    std::unique_lock<std::mutex> guard(mutex_);
+
+    std::shared_ptr<VIndex> index_sp;
+    for (auto rit = indices_by_name_.rbegin(); rit != indices_by_name_.rend(); ++rit) {
+        if (rit->second->index_type() == index_type) {
+            index_sp = rit->second;
+            break;
+        }
+    }
+    return index_sp;
+}
+
+std::shared_ptr<VIndex>
+VIndexManager::GetNewestIndex() {
+    std::unique_lock<std::mutex> guard(mutex_);
+
+    std::shared_ptr<VIndex> index_sp;
+    if (indices_by_time_.size() > 0) {
+        index_sp = indices_by_time_.rbegin()->second;
+    }
+    return index_sp;
+}
+
 Status
 VIndexManager::ForEachIndex(std::function<Status(std::shared_ptr<VIndex>)> func) {
     std::unique_lock<std::mutex> guard(mutex_);

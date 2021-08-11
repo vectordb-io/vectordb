@@ -60,6 +60,11 @@ class VIndexManager {
     Status Del(const std::string &name);
     Status ForEachIndex(std::function<Status(std::shared_ptr<VIndex>)> func);
 
+    bool HasIndex() const;
+    std::shared_ptr<VIndex> GetIndexByName(const std::string &index_name);
+    std::shared_ptr<VIndex> GetNewestIndexByType(const std::string &index_type);
+    std::shared_ptr<VIndex> GetNewestIndex();
+
     std::string path() const {
         return path_;
     }

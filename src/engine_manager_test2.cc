@@ -19,7 +19,7 @@ vectordb::EngineManager *g_em;
 void PrintHelp() {
     std::cout << std::endl;
     std::cout << "Usage: " << std::endl << std::endl;
-    std::cout << exe_name << " --addr=127.0.0.1:38000 --data_path=/tmp/test_engine_manager" << std::endl;
+    std::cout << exe_name << " --addr=127.0.0.1:38000 --data_path=/tmp/test_engine_manager2" << std::endl;
     std::cout << exe_name << " -h" << std::endl;
     std::cout << exe_name << " --help" << std::endl;
     std::cout << exe_name << " -v" << std::endl;

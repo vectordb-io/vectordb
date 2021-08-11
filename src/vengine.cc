@@ -52,6 +52,14 @@ VEngine::Init() {
         return Status::OtherError(msg);
     }
 
+    auto s = vindex_manager_.Init();
+    if (!s.ok()) {
+        std::string msg = "vengine init error, :vindex_manager init error: ";
+        msg.append(s.Msg());
+        LOG(INFO) << msg;
+        return Status::OtherError(msg);
+    }
+
     leveldb::Options options;
     options.create_if_missing = true;
     leveldb::Status ls;
@@ -61,7 +69,7 @@ VEngine::Init() {
     ls = leveldb::DB::Open(options, data_path_, &db_data_);
     assert(ls.ok());
 
-    auto s = PersistMeta();
+    s = PersistMeta();
     if (!s.ok()) {
         std::string msg = "vengine persist meta error: ";
         msg.append(s.Msg());
@@ -299,6 +307,11 @@ VEngine::Get(const std::string &key, VecObj &vo) const {
 Status
 VEngine::Delete(const std::string &key) {
     return Status::OK();
+}
+
+bool
+VEngine::HasIndex() const {
+    return vindex_manager_.HasIndex();
 }
 
 jsonxx::json64
