@@ -14,6 +14,7 @@
 #include "options.h"
 #include "status.h"
 #include "vindex.h"
+#include "vindex_manager.h"
 
 namespace vectordb {
 
@@ -56,6 +57,10 @@ class VEngine {
         return db_meta_;
     }
 
+    VIndexManager& mutable_vindex_manager() {
+        return vindex_manager_;
+    }
+
     int dim() const {
         return dim_;
     }
@@ -81,12 +86,10 @@ class VEngine {
 
     int dim_;
     std::string replica_name_;
-    std::map<std::string, std::shared_ptr<VIndex>> indices_by_name_;
-    std::map<time_t, std::shared_ptr<VIndex>> indices_by_timestamp_;
-    mutable std::mutex mutex_;
-
     leveldb::DB* db_data_;
     leveldb::DB* db_meta_;
+
+    VIndexManager vindex_manager_;
 };
 
 } // namespace vectordb

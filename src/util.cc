@@ -15,7 +15,34 @@ namespace vectordb {
 
 namespace util {
 
-std::string LocalTimeString(time_t t) {
+bool
+ChildrenOfDir(const std::string &path, std::vector<std::string> &children_paths, std::vector<std::string> &children_names) {
+    DIR* dir = opendir(path.c_str());
+    if (!dir) {
+        return false;
+    }
+
+    children_paths.clear();
+    children_names.clear();
+    dirent *direntp;
+    while ((direntp = readdir(dir)) != nullptr) {
+        if (std::string(direntp->d_name) == "." || std::string(direntp->d_name) == "..") {
+            continue;
+        }
+
+        std::string temp_path = path;
+        temp_path.append("/").append(direntp->d_name);
+        children_paths.push_back(temp_path);
+        children_names.push_back(std::string(direntp->d_name));
+        //std::cout << temp_path << std::endl;
+    }
+
+    closedir(dir);
+    return true;
+}
+
+std::string
+LocalTimeString(time_t t) {
     tm* local = localtime(&t); // to loal time
     char buf[128];
     memset(buf, 0, sizeof(buf));
@@ -23,7 +50,8 @@ std::string LocalTimeString(time_t t) {
     return std::string(buf);
 }
 
-unsigned int RSHash(const char *str) {
+unsigned int
+RSHash(const char *str) {
     unsigned int b = 378551;
     unsigned int a = 63689;
     unsigned int hash = 0;
@@ -118,6 +146,13 @@ ReplicaName(const std::string &table_name, int partition_id, int replica_id) {
     return std::string(buf);
 }
 
+std::string
+IndexName(const std::string &table_name, const std::string &index_type, time_t timestamp) {
+    char buf[256];
+    snprintf(buf, sizeof(buf), "%s#%s#%lu", table_name.c_str(), index_type.c_str(), timestamp);
+    return std::string(buf);
+}
+
 bool
 ParsePartitionName(const std::string &partition_name, std::string &table_name, int &partition_id) {
     std::vector<std::string> sv, sv_id;
@@ -158,7 +193,20 @@ ParseReplicaName(const std::string &replica_name, std::string &table_name, int &
     return true;
 }
 
-bool Distance(const std::vector<float> &v1, const std::vector<float> &v2, float &d) {
+bool ParseIndexName(const std::string &index_name, std::string &table_name, std::string &index_type, time_t &timestamp) {
+    std::vector<std::string> sv;
+    Split(index_name, '#', sv);
+    if (sv.size() != 3) {
+        return false;
+    }
+    table_name = sv[0];
+    index_type = sv[1];
+    sscanf(sv[2].c_str(), "%lu", &timestamp);
+    return true;
+}
+
+bool
+Distance(const std::vector<float> &v1, const std::vector<float> &v2, float &d) {
     if (v1.size() != v2.size()) {
         return false;
     }

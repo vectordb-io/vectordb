@@ -282,12 +282,12 @@ class Table {
         return partitions_;
     }
 
-    std::map<std::string, std::string>&
+    std::vector<std::string>&
     mutable_indices() {
         return indices_;
     }
 
-    const std::map<std::string, std::string>&
+    const std::vector<std::string>&
     indices() const {
         return indices_;
     }
@@ -311,26 +311,18 @@ class Table {
     int replica_num_;
     std::string path_;
     std::map<std::string, std::shared_ptr<Partition>> partitions_;
-    std::map<std::string, std::string> indices_;  // map value has all attributes of a index
+    std::vector<std::string> indices_;  // index names, eg: test_table#annoy.xxx
 };
 
 
 struct IndexParam {
     std::string table_name;
     std::string index_name;
-    std::string index_type;
 };
 
 class Meta {
   public:
 #define META_PERSIST_KEY_TABLES "META_PERSIST_KEY_TABLES"
-
-#define INDEX_TYPE_ANNOY "annoy"
-#define INDEX_TYPE_KNNGRAPH "knn_graph"
-
-#define DISTANCE_TYPE_COSINE "cosine"
-#define DISTANCE_TYPE_INNER_PRODUCT "inner_product"
-#define DISTANCE_TYPE_EUCLIDEAN "euclidean"
 
   public:
     Meta(const std::string &path);

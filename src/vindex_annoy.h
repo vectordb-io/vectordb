@@ -14,6 +14,8 @@
 
 namespace vectordb {
 
+class VEngine;
+
 class AnnoyFactory {
   public:
     static AnnoyIndexInterface<int, float>*
@@ -37,8 +39,7 @@ class AnnoyFactory {
     }
 };
 
-class AnnoyParam {
-  public:
+struct AnnoyParam {
     int dim;
     std::string index_type;
     std::string distance_type;
@@ -52,8 +53,8 @@ class VIndexAnnoy : public VIndex {
 #define KEY_META_ANNOY_INDEX "KEY_META_ANNOY_INDEX"
 
   public:
-    VIndexAnnoy(const std::string &path, VEngine* vengine, const AnnoyParam &param);  // call Build
-    VIndexAnnoy(const std::string &path, VEngine* vengine);                           // call Load
+    VIndexAnnoy(const std::string &path, VEngine* vengine, AnnoyParam *param);    // call Build, path: /tmp/table/partition/replica/index/  will create dir table#annoy#xxx
+    VIndexAnnoy(const std::string &path, VEngine* vengine);                       // call Load,  path: /tmp/table/partition/replica/index/table#annoy#xxx
     VIndexAnnoy(const VIndexAnnoy&) = delete;
     VIndexAnnoy& operator=(const VIndexAnnoy&) = delete;
     ~VIndexAnnoy();
@@ -64,48 +65,34 @@ class VIndexAnnoy : public VIndex {
     Status Load() override;
     Status Build() override;
 
-    int dim() const {
-        return dim_;
-    }
-
-    std::string index_type() const {
-        return index_type_;
-    }
-
-    std::string distance_type() const {
-        return distance_type_;
-    }
-
-    std::string name() const {
-        return name_;
-    }
-
-    std::string replica_name() const {
-        return replica_name_;
-    }
-
-    time_t timestamp() const {
-        return timestamp_;
-    }
-
-    std::string timestamp_str() const {
-        std::string s = util::LocalTimeString(timestamp_);
-        return s;
-    }
-
     int tree_num() const {
         return tree_num_;
     }
 
-    std::string path() const {
-        return path_;
-    }
-
-    jsonxx::json64 ToJson() const;
-    std::string ToString() const;
-    std::string ToStringPretty() const;
+    jsonxx::json64 ToJson() const override;
+    std::string ToString() const override;
+    std::string ToStringPretty() const override;
 
   private:
+    VIndexParam PrepareVIndexParam(const std::string &path, AnnoyParam *param) {
+        VIndexParam vindex_param;
+        vindex_param.dim = param->dim;
+        vindex_param.index_type = param->index_type;
+        vindex_param.distance_type = param->distance_type;
+        vindex_param.replica_name = param->replica_name;
+        vindex_param.timestamp = param->timestamp;
+
+        std::string table_name;
+        int partition_id, replica_id;
+        auto b = util::ParseReplicaName(vindex_param.replica_name, table_name, partition_id, replica_id);
+        assert(b);
+        vindex_param.name = util::IndexName(table_name, vindex_param.index_type, vindex_param.timestamp);
+
+        vindex_param.path = path + "/" + vindex_param.name;
+
+        return vindex_param;
+    }
+
     void InitPath() {
         db_key2id_path_ = path_ + "/key2id";
         db_id2key_path_ = path_ + "/id2key";
@@ -125,14 +112,8 @@ class VIndexAnnoy : public VIndex {
     static float Dt2Cos(float dt);
 
   private:
-    int dim_;
-    std::string index_type_;
-    std::string distance_type_;
-    std::string name_;
-    std::string replica_name_;
-    time_t timestamp_;
+
     int tree_num_;
-    std::string path_;
     VEngine* vengine_;
 
     std::string db_key2id_path_;

@@ -73,6 +73,12 @@ int main(int argc, char** argv) {
         exit(-1);
     }
 
+    vectordb::util::RecurMakeDir(vectordb::Config::GetInstance().data_path());
+    if (!vectordb::util::DirOK(vectordb::Config::GetInstance().data_path())) {
+        std::cout << "dir error: " << vectordb::Config::GetInstance().data_path() << std::endl;
+        return -1;
+    }
+
     vectordb::Meta meta(vectordb::Config::GetInstance().meta_path());
     g_meta = &meta;
 

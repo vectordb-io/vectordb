@@ -10,22 +10,24 @@ namespace vectordb {
 
 VEngine::VEngine(std::string path, const VEngineParam& param)
     :path_(path),
+     data_path_(path_ + "/data"),
+     meta_path_(path_ + "/meta"),
+     index_path_(path_ + "/index"),
      dim_(param.dim),
      replica_name_(param.replica_name),
      db_data_(nullptr),
-     db_meta_(nullptr) {
-    data_path_ = path_ + "/data";
-    meta_path_ = path_ + "/meta";
-    index_path_ = path_ + "/index";
+     db_meta_(nullptr),
+     vindex_manager_(index_path_, this) {
 }
 
 VEngine::VEngine(std::string path)
     :path_(path),
+     data_path_(path_ + "/data"),
+     meta_path_(path_ + "/meta"),
+     index_path_(path_ + "/index"),
      db_data_(nullptr),
-     db_meta_(nullptr) {
-    data_path_ = path_ + "/data";
-    meta_path_ = path_ + "/meta";
-    index_path_ = path_ + "/index";
+     db_meta_(nullptr),
+     vindex_manager_(index_path_, this) {
 }
 
 VEngine::~VEngine() {
@@ -110,10 +112,13 @@ VEngine::PersistMeta() {
     vectordb_rpc::VEngineMeta pb;
     pb.set_dim(dim_);
     pb.set_replica_name(replica_name_);
-    for (auto &kv : indices_by_name_) {
-        std::string index_name = kv.first;
+
+    /*
+    for (auto &index_name : indices_) {
         pb.add_index_names(index_name);
     }
+    */
+
     std::string buf;
     bool ret = pb.SerializeToString(&buf);
     assert(ret);
@@ -152,10 +157,12 @@ VEngine::LoadMeta() {
 
         dim_ = pb.dim();
         replica_name_ = pb.replica_name();
+
+        /*
         for (int i = 0; i < pb.index_names_size(); ++i) {
-            std::string index_path = data_path_ + "/" + pb.index_names(i);
-            std::shared_ptr<VIndex> index_sp; // factory
+            indices_.push_back(pb.index_names(i));
         }
+        */
 
     } else {
         std::string msg = "load meta error: ";;
@@ -184,6 +191,57 @@ VEngine::LoadData() {
 
 Status
 VEngine::LoadIndex() {
+
+    std::vector<std::string> children_paths;
+    std::vector<std::string> children_names;
+    auto b = util::ChildrenOfDir(index_path_, children_paths, children_names);;
+    if (!b) {
+        std::string msg = "load index ChildrenOfDir error: " + index_path_;
+        LOG(INFO) << msg;
+        return Status::OtherError(msg);
+    }
+
+    for (auto &index_name : children_names) {
+        std::string table_name;
+        std::string index_type;
+        time_t timestamp;
+        b = util::ParseIndexName(index_name, table_name, index_type, timestamp);
+        if (!b) {
+            std::string msg = "load index ParseIndexName error: ";
+            msg.append(index_name);
+            LOG(INFO) << msg;
+            return Status::OtherError(msg);
+        }
+
+        std::string index_path = index_path_ + "/" + index_name;
+        auto index_sp = VIndexFactory::Create(index_type, index_path, this);
+        if (!index_sp) {
+            std::string msg = "load index VIndexFactory::Create error: ";
+            msg.append(index_name);
+            LOG(INFO) << msg;
+            return Status::OtherError(msg);
+        }
+
+        auto s = index_sp->Load();
+        if (!s.ok()) {
+            std::string msg = "load index VIndexFactory::Create error: ";
+            msg.append(index_name).append(", ").append(s.Msg());
+            LOG(INFO) << msg;
+            return Status::OtherError(msg);
+
+        }
+
+        s = vindex_manager_.Add(index_name, index_sp);
+        if (!s.ok()) {
+            std::string msg = "load index vindex_manager_.Add error: ";
+            msg.append(index_name).append(", ").append(s.Msg());
+            LOG(INFO) << msg;
+            return Status::OtherError(msg);
+        }
+
+        std::string msg = "load index ok: " + index_sp->ToString();
+        LOG(INFO) << msg;
+    }
     return Status::OK();
 }
 
@@ -252,8 +310,7 @@ VEngine::ToJson() const {
     j["data_path"] = data_path_;
     j["meta_path"] = meta_path_;
     j["index_path"] = index_path_;
-    // index
-
+    j["index"] = vindex_manager_.ToJson();
     jret["VEngine"] = j;
     return jret;
 }

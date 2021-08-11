@@ -143,11 +143,6 @@ message Partition {
   repeated Replica replicas = 6;
 }
 
-message Index {
-  string index_name = 1;
-  string index_type = 2;
-};
-
 message Table {
   string name = 1;
   int32 partition_num = 2;
@@ -155,7 +150,7 @@ message Table {
   string engine_type = 4;
   string path = 5;
   repeated Partition partitions = 6;
-  repeated Index indices = 7;
+  repeated string indices = 7;
   int32 dim = 8;
 }
 
@@ -218,15 +213,16 @@ message InfoReply {
 message VEngineMeta {
   int32 dim = 1;
   string replica_name = 2;
-  repeated string index_names = 3; 
 }
 
 message AnnoyMeta {
   int32 dim = 1;
   string index_type = 2;
   string distance_type = 3;
-  string replica_name = 4;
-  uint64 timestamp = 5;
-  int32 tree_num = 6;
+  string name = 4;
+  string replica_name = 5;
+  uint64 timestamp = 6;
+
+  int32 tree_num = 7;
 }
 

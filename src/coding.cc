@@ -55,8 +55,7 @@ Pb2Table(const vectordb_rpc::Table &pb, Table &table) {
     }
 
     for (int i = 0; i < pb.indices_size(); i++) {
-        const vectordb_rpc::Index &index = pb.indices(i);
-        table.mutable_indices().insert(std::pair<std::string, std::string>(index.index_name(), index.index_type()));
+        table.mutable_indices().push_back(pb.indices(i));
     }
 }
 
@@ -95,10 +94,8 @@ Table2Pb(const Table &table, vectordb_rpc::Table &pb) {
         Partition2Pb(*(p.second), *partition);
     }
 
-    for (auto &indices_ : table.indices()) {
-        vectordb_rpc::Index* index = pb.add_indices();
-        index->set_index_name(indices_.first);
-        index->set_index_type(indices_.second);
+    for (auto &index_name: table.indices()) {
+        pb.add_indices(index_name);
     }
 }
 

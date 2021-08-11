@@ -4,32 +4,28 @@
 
 namespace vectordb {
 
-// call Build
-VIndexAnnoy::VIndexAnnoy(const std::string &path, VEngine* vengine, const AnnoyParam &param)
-    :dim_(param.dim),
-     index_type_(param.index_type),
-     distance_type_(param.distance_type),
-     replica_name_(param.replica_name),
-     timestamp_(param.timestamp),
-     tree_num_(param.tree_num),
-     path_(path),
+// call Build, path: /tmp/table/partition/replica/index/  will create dir table#annoy#xxx
+VIndexAnnoy::VIndexAnnoy(const std::string &path, VEngine* vengine, AnnoyParam *param)
+    :VIndex(PrepareVIndexParam(path, param)),
+     tree_num_(param->tree_num),
      vengine_(vengine),
      db_key2id_(nullptr),
      db_id2key_(nullptr),
-     db_meta_(nullptr) {
-    char buf[128];
-    snprintf(buf, sizeof(buf), "%s.%lu", index_type_.c_str(), timestamp_);
-    name_ = buf;
+     db_meta_(nullptr),
+     annoy_index_(nullptr) {
+
     InitPath();
 }
 
-// call Load
+// call Load, path: /tmp/table/partition/replica/index/table#annoy#xxx
 VIndexAnnoy::VIndexAnnoy(const std::string &path, VEngine* vengine)
-    :path_(path),
-     vengine_(vengine),
+    :vengine_(vengine),
      db_key2id_(nullptr),
      db_id2key_(nullptr),
-     db_meta_(nullptr) {
+     db_meta_(nullptr),
+     annoy_index_(nullptr) {
+
+    path_ = path;
     InitPath();
 }
 
@@ -37,6 +33,7 @@ VIndexAnnoy::~VIndexAnnoy() {
     delete db_key2id_;
     delete db_id2key_;
     delete db_meta_;
+    delete annoy_index_;
 }
 
 Status
@@ -166,7 +163,7 @@ VIndexAnnoy::Distance(const std::string &key1, const std::string &key2, float &d
 
 Status
 VIndexAnnoy::CheckParams() const {
-    if (index_type_ != "annoy") {
+    if (index_type_ != VINDEX_TYPE_ANNOY) {
         return Status::OtherError("param index_type error");
 
     } else if (distance_type_ != VINDEX_DISTANCE_TYPE_COSINE &&
@@ -396,6 +393,7 @@ VIndexAnnoy::PersistMeta() {
     pb.set_dim(dim_);
     pb.set_index_type(index_type_);
     pb.set_distance_type(distance_type_);
+    pb.set_name(name_);
     pb.set_replica_name(replica_name_);
     pb.set_timestamp(timestamp_);
     pb.set_tree_num(tree_num_);
@@ -439,12 +437,10 @@ VIndexAnnoy::LoadMeta() {
         dim_ = pb.dim();
         index_type_ = pb.index_type();
         distance_type_ = pb.distance_type();
+        name_ = pb.name();
         replica_name_ = pb.replica_name();
         timestamp_ = pb.timestamp();
         tree_num_ = pb.tree_num();
-        char buf[128];
-        snprintf(buf, sizeof(buf), "%s.%lu", index_type_.c_str(), timestamp_);
-        name_ = buf;
 
     } else {
         std::string msg = "vindex_annoy load meta error: ";;

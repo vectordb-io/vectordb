@@ -7,6 +7,7 @@
 #include <glog/logging.h>
 #include "status.h"
 #include "config.h"
+#include "util.h"
 #include "meta.h"
 
 #define gettid() (syscall(SYS_gettid))
@@ -73,6 +74,12 @@ int main(int argc, char** argv) {
         exit(-1);
     }
 
+    vectordb::util::RecurMakeDir(vectordb::Config::GetInstance().data_path());
+    if (!vectordb::util::DirOK(vectordb::Config::GetInstance().data_path())) {
+        std::cout << "dir error: " << vectordb::Config::GetInstance().data_path() << std::endl;
+        return -1;
+    }
+
     vectordb::Meta meta(vectordb::Config::GetInstance().meta_path());
     g_meta = &meta;
 
@@ -116,7 +123,7 @@ int main(int argc, char** argv) {
     }
 
     s = meta.ReplicaNamesByTable("test_table_1", replica_names);
-    std::cout << "table: test_table_0, size:" << replica_names.size() << " status:" << s.ToString() << std::endl;
+    std::cout << "table: test_table_1, size:" << replica_names.size() << " status:" << s.ToString() << std::endl;
     for (auto &rn : replica_names) {
         std::cout << rn << std::endl;
         std::cout.flush();

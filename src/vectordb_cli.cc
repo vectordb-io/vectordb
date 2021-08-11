@@ -104,7 +104,7 @@ VectordbCli::Do(const std::vector<std::string> &cmd_sv, const std::string &param
     } else if (cmd_sv.size() == 3 && cmd_sv[0] == "build" && cmd_sv[1] == "index") {
         vectordb_rpc::BuildIndexRequest request;
         request.set_table_name(cmd_sv[2]);
-        request.set_index_type("annoy");
+        request.set_index_type(VINDEX_TYPE_ANNOY);
         //request.mutable_annoy_param()->set_distance_type("cosine");
         BuildIndex(request, reply);
 
@@ -136,7 +136,7 @@ VectordbCli::Do(const std::vector<std::string> &cmd_sv, const std::string &param
             try {
                 index_type = j["index_type"].as_string();
             } catch (std::exception &e) {
-                index_type = "annoy";
+                index_type = VINDEX_TYPE_ANNOY;
             }
 
             // optional value
@@ -158,7 +158,7 @@ VectordbCli::Do(const std::vector<std::string> &cmd_sv, const std::string &param
             vectordb_rpc::BuildIndexRequest request;
             request.set_table_name(table_name);
             request.set_index_type(index_type);
-            if (index_type == "annoy") {
+            if (index_type == VINDEX_TYPE_ANNOY) {
                 //request.mutable_annoy_param()->set_distance_type(distance_type);
             } else if (index_type == "knn_graph") {
                 //request.mutable_knn_graph_param()->set_distance_type(distance_type);

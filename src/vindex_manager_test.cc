@@ -58,17 +58,24 @@ void GetVec(int i) {
     printf("get vec_obj: %s \n\n", vec_obj.ToString().c_str());
 }
 
-void test_index(std::string path, std::string distance_type, int dim) {
+void test_index(std::string distance_type, int dim) {
     do {
         vectordb::AnnoyParam annoy_param;
+
+
+        /*
         annoy_param.dim = dim;
-        annoy_param.index_type = VINDEX_TYPE_ANNOY;
+        annoy_param.index_type = "annoy";
         annoy_param.distance_type = distance_type;
-        annoy_param.replica_name = vectordb::util::ReplicaName("test_table", 1, 1);
+        annoy_param.replica_name = "test_replica";
         annoy_param.timestamp = time(nullptr);
         annoy_param.tree_num = 10;
-        vectordb::VIndexAnnoy annoy_index(path, g_vengine, &annoy_param);
 
+        char index_path[512];
+        snprintf(index_path, sizeof(index_path), "/tmp/test_vindex_annoy/index/%s.%lu", annoy_param.index_type.c_str(), annoy_param.timestamp);
+        */
+
+        vectordb::VIndexAnnoy annoy_index(&annoy_param, g_vengine);
         auto s = annoy_index.Build();
         if (!s.ok()) {
             std::cout << "index: " << annoy_index.ToString() << " build error: " << s.ToString() << std::endl;
@@ -125,7 +132,7 @@ int main(int argc, char** argv) {
     vectordb::VEngineParam param;
     param.dim = dim;
     param.replica_name = "test_replica";
-    std::string path = "/tmp/test_vindex_annoy";
+    std::string path = "/tmp/test_vindex_annoy/data";
 
     vectordb::VEngine vengine(path, param);
     g_vengine = &vengine;
@@ -141,14 +148,13 @@ int main(int argc, char** argv) {
         PutVec(i, dim);
     }
 
-    std::string index_path = "/tmp/test_vindex_annoy/index";
-    test_index(index_path, VINDEX_DISTANCE_TYPE_COSINE, dim);
-    test_index(index_path, VINDEX_DISTANCE_TYPE_COSINE, dim);
-    test_index(index_path, VINDEX_DISTANCE_TYPE_INNER_PRODUCT, dim);
-    test_index(index_path, VINDEX_DISTANCE_TYPE_INNER_PRODUCT, dim);
-    test_index(index_path, VINDEX_DISTANCE_TYPE_EUCLIDEAN, dim);
-    test_index(index_path, VINDEX_DISTANCE_TYPE_EUCLIDEAN, dim);
-    test_index(index_path, "bad_type", dim);
+    test_index(VINDEX_DISTANCE_TYPE_COSINE, dim);
+    test_index(VINDEX_DISTANCE_TYPE_COSINE, dim);
+    test_index(VINDEX_DISTANCE_TYPE_INNER_PRODUCT, dim);
+    test_index(VINDEX_DISTANCE_TYPE_INNER_PRODUCT, dim);
+    test_index(VINDEX_DISTANCE_TYPE_EUCLIDEAN, dim);
+    test_index(VINDEX_DISTANCE_TYPE_EUCLIDEAN, dim);
+    test_index("bad_type", dim);
 
 
 

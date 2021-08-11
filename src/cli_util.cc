@@ -102,10 +102,7 @@ ToJson(const vectordb_rpc::Table &table) {
 
     k = 0;
     for (int i = 0; i < table.indices_size(); ++i) {
-        jsonxx::json64 ji;
-        ji["index_name"] = table.indices(i).index_name();
-        ji["index_type"] = table.indices(i).index_type();
-        j["indices"][k++] = ji;
+        j["indices"][k++] = table.indices(i);
     }
     return j;
 }

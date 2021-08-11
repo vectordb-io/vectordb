@@ -7,6 +7,7 @@
 #include "vectordb_rpc.grpc.pb.h"
 #include "vdb_client.h"
 #include "status.h"
+#include "vindex.h"
 
 namespace vectordb {
 

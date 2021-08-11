@@ -389,17 +389,14 @@ Table::ToJson() const {
     j["path"] = path_;
     int k = 0;
     for (auto &p : partitions_) {
-        j["partitions"][k++] = p.second->name();
+        j["partitions"][k] = p.second->name();
+        k++;
     }
 
-    k = 0;
-    for (auto &kv : indices_) {
+    for (size_t i = 0; i < indices_.size(); ++i) {
         jsonxx::json64 ji;
-        ji["index_name"] = kv.first;
-        ji["index_type"] = kv.second;
-        j["indices"][k++] = ji;
+        ji["indices"][i] = indices_[i];
     }
-
     jret["Table"] = j;
     return jret;
 }

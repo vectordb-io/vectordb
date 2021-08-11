@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
+#include <functional>
 #include <string>
 #include <glog/logging.h>
 #include "status.h"
@@ -42,6 +43,29 @@ bool TravelDir(const std::string &path, std::vector<std::string> &dirs) {
     return true;
 }
 
+vectordb::Status TestGet(std::shared_ptr<vectordb::VIndex> index) {
+    std::cout << std::endl << std::endl;
+    int limit = 5;
+    std::vector<vectordb::VecDt> results;
+    printf("getknn by vec: \n\n");
+    std::vector<float> vec;
+    for (int j = 0; j < index->dim(); ++j) {
+        vec.push_back(random_float(-10, 10));
+    }
+
+    auto s = index->GetKNN(vec, limit, results);
+    if (!s.ok()) {
+        std::cout << "getknn error, " << s.ToString() << std::endl;
+        return s;
+    }
+    for (size_t j = 0; j < results.size(); ++j) {
+        std::cout << "result-" << j << " : " << results[j].ToString() << std::endl;
+    }
+    std::cout << std::endl << std::endl;
+
+    return vectordb::Status::OK();
+}
+
 int main(int argc, char** argv) {
     vectordb::Status s;
     exe_name = std::string(argv[0]);
@@ -51,7 +75,7 @@ int main(int argc, char** argv) {
     FLAGS_max_log_size = 10;
     google::InitGoogleLogging(argv[0]);
 
-    std::string path = "/tmp/test_vindex_annoy/data";
+    std::string path = "/tmp/test_vindex_annoy";
     vectordb::VEngine vengine(path);
     g_vengine = &vengine;
     s = vengine.Load();
@@ -59,22 +83,11 @@ int main(int argc, char** argv) {
         printf("%s \n", s.ToString().c_str());
         return -1;
     }
-    printf("vengine: %s \n", vengine.ToString().c_str());
+    printf("vengine: %s \n", vengine.ToStringPretty().c_str());
 
-    std::string index_path = "/tmp/test_vindex_annoy/index";
-    std::vector<vectordb::VIndexAnnoy*> indices;
-    std::vector<std::string> dirs;
-    std::cout << "TravelDir " << index_path << std::endl;
-    auto b = TravelDir(index_path, dirs);
-    assert(b);
-    for (auto &p: dirs) {
-        vectordb::VIndexAnnoy *annoy_index = new vectordb::VIndexAnnoy(p, g_vengine);
-        auto s = annoy_index->Load();
-        assert(s.ok());
-        indices.push_back(annoy_index);
-    }
+    vengine.mutable_vindex_manager().ForEachIndex(std::bind(TestGet, std::placeholders::_1));
 
-    std::cout << "load index ok: " << std::endl << std::endl;
+    /*
     for (auto &index : indices) {
         std::cout << index->ToString() << std::endl;
 
@@ -99,6 +112,7 @@ int main(int argc, char** argv) {
             std::cout << std::endl << std::endl;
         }
     }
+    */
 
     google::ShutdownGoogleLogging();
     return 0;
