@@ -26,6 +26,14 @@ EngineManager::GetVEngine(const std::string &replica_name) const {
     return ve;
 }
 
+Status
+EngineManager::DelEngine(const std::string &replica_name) {
+    std::unique_lock<std::mutex> guard(mutex_);
+    vengines_.erase(replica_name);
+
+    return Status::OK();
+}
+
 bool
 EngineManager::AddVEngine(const std::string &replica_name, std::shared_ptr<VEngine> ve) {
     std::unique_lock<std::mutex> guard(mutex_);
@@ -100,6 +108,8 @@ EngineManager::LoadEngineByPath(const std::string &path) {
 
 jsonxx::json64
 EngineManager::ToJson() const {
+    std::unique_lock<std::mutex> guard(mutex_);
+
     jsonxx::json64 j, jret;
     for (auto &kv : vengines_) {
         j[kv.first] = kv.second->ToJson();

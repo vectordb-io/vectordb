@@ -12,7 +12,7 @@ void Usage() {
     std::cout << std::endl;
     std::cout << "Usage: " << std::endl;
     std::cout << exe_name << " address table_name index_name limit key" << std::endl;
-    std::cout << exe_name << " 127.0.0.1:38000 test_table_dim10 default 20 key_xxx" << std::endl;
+    std::cout << exe_name << " 127.0.0.1:38000 test_table_dim10 default 20 key0_test" << std::endl;
     std::cout << std::endl;
 }
 

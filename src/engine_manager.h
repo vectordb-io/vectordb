@@ -29,6 +29,8 @@ class EngineManager {
     std::shared_ptr<VEngine>
     GetVEngine(const std::string &replica_name) const;
 
+    Status DelEngine(const std::string &replica_name);
+
     jsonxx::json64 ToJson() const;
     std::string ToString() const;
     std::string ToStringPretty() const;

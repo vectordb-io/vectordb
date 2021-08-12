@@ -6,6 +6,7 @@ service VectorDB {
   rpc Ping (PingRequest) returns (PingReply) {}
   rpc Info (InfoRequest) returns (InfoReply) {}
   rpc CreateTable (CreateTableRequest) returns (CreateTableReply) {}
+  rpc DropTable (DropTableRequest) returns (DropTableReply) {}
   rpc ShowTables (ShowTablesRequest) returns (ShowTablesReply) {}
   rpc Describe (DescribeRequest) returns (DescribeReply) {}
   rpc PutVec (PutVecRequest) returns (PutVecReply) {}
@@ -178,6 +179,15 @@ message CreateTableRequest {
 }
 
 message CreateTableReply {
+  int32 code = 1;
+  string msg = 2;
+}
+
+message DropTableRequest {
+  string table_name = 1;
+}
+
+message DropTableReply {
   int32 code = 1;
   string msg = 2;
 }

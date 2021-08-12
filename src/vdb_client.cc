@@ -36,6 +36,14 @@ VdbClient::CreateTable(const std::string &table_name, int dim, vectordb_rpc::Cre
 }
 
 Status
+VdbClient::DropTable(const std::string &table_name, vectordb_rpc::DropTableReply* reply) {
+    vectordb_rpc::DropTableRequest request;
+    request.set_table_name(table_name);
+    auto s = DropTable(request, reply);
+    return s;
+}
+
+Status
 VdbClient::PutVec(const std::string &table_name,
                   const std::string &key,
                   const std::vector<float> &vec,
@@ -110,6 +118,17 @@ Status
 VdbClient::CreateTable(const vectordb_rpc::CreateTableRequest &request, vectordb_rpc::CreateTableReply* reply) {
     grpc::ClientContext context;
     grpc::Status status = stub_->CreateTable(&context, request, reply);
+    if (!status.ok()) {
+        std::string reply_msg = status.error_message();
+        return Status::OtherError(reply_msg);
+    }
+    return Status::OK();
+}
+
+Status
+VdbClient::DropTable(const vectordb_rpc::DropTableRequest &request, vectordb_rpc::DropTableReply* reply) {
+    grpc::ClientContext context;
+    grpc::Status status = stub_->DropTable(&context, request, reply);
     if (!status.ok()) {
         std::string reply_msg = status.error_message();
         return Status::OtherError(reply_msg);

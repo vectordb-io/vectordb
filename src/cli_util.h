@@ -24,6 +24,7 @@ jsonxx::json64 ToJson(const vectordb_rpc::Replica &replica);
 std::string ToString(const vectordb_rpc::PingReply &reply);
 std::string ToString(const vectordb_rpc::InfoReply &reply);
 std::string ToString(const vectordb_rpc::CreateTableReply &reply);
+std::string ToString(const vectordb_rpc::DropTableReply &reply);
 std::string ToString(const vectordb_rpc::ShowTablesReply &reply);
 std::string ToString(const vectordb_rpc::DescribeReply &reply);
 std::string ToString(const vectordb_rpc::PutVecReply &reply);

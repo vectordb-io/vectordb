@@ -400,7 +400,7 @@ Table::ToJson() const {
 
 jsonxx::json64
 Meta::ToJson() const {
-    std::unique_lock<std::mutex> guard(mutex_);
+    //std::unique_lock<std::mutex> guard(mutex_);
 
     jsonxx::json64 j, jret;
     for (auto &kv : tables_) {

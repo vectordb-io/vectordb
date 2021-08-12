@@ -61,6 +61,14 @@ ToString(const vectordb_rpc::CreateTableReply &reply) {
 }
 
 std::string
+ToString(const vectordb_rpc::DropTableReply &reply) {
+    jsonxx::json64 j;
+    j["code"] = reply.code();
+    j["msg"] = reply.msg();
+    return j.dump(4, ' ');
+}
+
+std::string
 ToString(const vectordb_rpc::InfoReply &reply) {
     return reply.msg();
 }

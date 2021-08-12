@@ -21,6 +21,10 @@ class VectorDBServiceImpl final : public vectordb_rpc::VectorDB::Service {
                              const vectordb_rpc::CreateTableRequest* request,
                              vectordb_rpc::CreateTableReply* reply) override;
 
+    grpc::Status DropTable(grpc::ServerContext* context,
+                           const vectordb_rpc::DropTableRequest* request,
+                           vectordb_rpc::DropTableReply* reply) override;
+
     grpc::Status ShowTables(grpc::ServerContext* context,
                             const vectordb_rpc::ShowTablesRequest* request,
                             vectordb_rpc::ShowTablesReply* reply) override;

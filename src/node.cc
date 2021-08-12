@@ -128,6 +128,60 @@ Node::OnCreateTable(const vectordb_rpc::CreateTableRequest* request, vectordb_rp
 }
 
 Status
+Node::OnDropTable(const vectordb_rpc::DropTableRequest* request, vectordb_rpc::DropTableReply* reply) {
+    std::string msg;
+    std::shared_ptr<Table> table_sp = meta_.GetTable(request->table_name());
+    if (!table_sp) {
+        msg = "table not exist: ";
+        msg.append(request->table_name());
+        reply->set_code(1);
+        reply->set_msg(msg);
+        return Status::OtherError(msg);
+    }
+
+    std::vector<std::string> replica_names;
+    auto s = meta_.ReplicaNamesByTable(request->table_name(), replica_names);
+    if (!s.ok()) {
+        msg = "drop table meta_.ReplicaNamesByTable error " + request->table_name() + " " + s.Msg();
+        reply->set_code(2);
+        reply->set_msg(msg);
+        return Status::OtherError(msg);
+    }
+
+    s = meta_.DropTable(request->table_name());
+    if (!s.ok()) {
+        msg = "meta drop table " + request->table_name() + " error: " + s.Msg();
+        reply->set_code(3);
+        reply->set_msg(msg);
+        return Status::OtherError(msg);
+    }
+
+    for (auto &replica_name : replica_names) {
+        s = engine_manager_.DelEngine(replica_name);
+        if (!s.ok()) {
+            msg = "drop table DelEngine error, " + replica_name + ", " + s.Msg();
+            reply->set_code(4);
+            reply->set_msg(msg);
+            return Status::OtherError(msg);
+        }
+    }
+
+    auto b = util::RemoveDir(table_sp->path());
+    if (!b) {
+        msg = "drop table rm dir error, " + table_sp->path();
+        reply->set_code(5);
+        reply->set_msg(msg);
+        return Status::OtherError(msg);
+    }
+
+    reply->set_code(0);
+    msg = "drop table " + request->table_name() + " ok";
+    reply->set_msg(msg);
+
+    return Status::OK();
+}
+
+Status
 Node::OnShowTables(const vectordb_rpc::ShowTablesRequest* request, vectordb_rpc::ShowTablesReply* reply) {
     std::map<std::string, std::shared_ptr<Table>> tables = meta_.tables_copy();
     for (auto &kv : tables) {

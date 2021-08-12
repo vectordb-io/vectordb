@@ -47,6 +47,7 @@ class VectordbCli {
     void Ping(const vectordb_rpc::PingRequest &request, std::string &reply_msg);
     void Info(const vectordb_rpc::InfoRequest &request, std::string &reply_msg);
     void CreateTable(const vectordb_rpc::CreateTableRequest &request, std::string &reply_msg);
+    void DropTable(const vectordb_rpc::DropTableRequest &request, std::string &reply_msg);
     void ShowTables(const vectordb_rpc::ShowTablesRequest &request, std::string &reply_msg);
     void Describe(const vectordb_rpc::DescribeRequest &request, std::string &reply_msg);
     void PutVec(const vectordb_rpc::PutVecRequest &request, std::string &reply_msg);

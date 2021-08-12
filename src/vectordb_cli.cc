@@ -110,6 +110,11 @@ VectordbCli::Do(const std::vector<std::string> &cmd_sv, const std::string &param
         request.mutable_knn_graph_param()->set_k(20);
         BuildIndex(request, reply);
 
+    } else if (cmd_sv.size() == 3 && cmd_sv[0] == "drop" && cmd_sv[1] == "table") {
+        vectordb_rpc::DropTableRequest request;
+        request.set_table_name(cmd_sv[2]);
+        DropTable(request, reply);
+
     } else if (cmd_sv.size() == 2 && cmd_sv[0] == "build" && cmd_sv[1] == "index") {
         vectordb_rpc::BuildIndexRequest request;
         auto s = PreProcess(params_json, request, reply);
@@ -271,6 +276,17 @@ void
 VectordbCli::CreateTable(const vectordb_rpc::CreateTableRequest &request, std::string &reply_msg) {
     vectordb_rpc::CreateTableReply reply;
     auto s = vdb_client_.CreateTable(request, &reply);
+    if (s.ok()) {
+        reply_msg = cli_util::ToString(reply);
+    } else {
+        reply_msg = s.Msg();
+    }
+}
+
+void
+VectordbCli::DropTable(const vectordb_rpc::DropTableRequest &request, std::string &reply_msg) {
+    vectordb_rpc::DropTableReply reply;
+    auto s = vdb_client_.DropTable(request, &reply);
     if (s.ok()) {
         reply_msg = cli_util::ToString(reply);
     } else {

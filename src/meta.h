@@ -339,7 +339,11 @@ class Meta {
 
   public:
     Meta(const std::string &path);
-    ~Meta() = default;
+
+    ~Meta() {
+        delete db_;
+    }
+
     Meta(const Meta&) = delete;
     Meta& operator=(const Meta&) = delete;
 

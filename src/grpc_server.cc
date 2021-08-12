@@ -45,6 +45,18 @@ VectorDBServiceImpl::CreateTable(grpc::ServerContext* context,
     return grpc::Status::OK;
 }
 
+grpc::Status
+VectorDBServiceImpl::DropTable(grpc::ServerContext* context,
+                               const vectordb_rpc::DropTableRequest* request,
+                               vectordb_rpc::DropTableReply* reply) {
+    auto s = Node::GetInstance().OnDropTable(request, reply);
+    if (!s.ok()) {
+        std::string msg = "DropTable error, ";
+        msg.append(request->table_name()).append(", ").append(s.ToString());
+        LOG(INFO) << msg;
+    }
+    return grpc::Status::OK;
+}
 
 grpc::Status
 VectorDBServiceImpl::ShowTables(grpc::ServerContext* context,
