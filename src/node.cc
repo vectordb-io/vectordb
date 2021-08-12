@@ -365,6 +365,8 @@ Node::OnBuildIndex(const vectordb_rpc::BuildIndexRequest* request, vectordb_rpc:
 
     int partition_num = table_sp->partition_num();
     int replica_num = table_sp->replica_num();
+    time_t timestamp = time(nullptr);
+
     for (int partition_id = 0; partition_id < partition_num; ++partition_id) {
         for (int replica_id = 0; replica_id < replica_num; ++replica_id) {
             std::string replica_name = util::ReplicaName(request->table_name(), partition_id, replica_id);
@@ -382,7 +384,7 @@ Node::OnBuildIndex(const vectordb_rpc::BuildIndexRequest* request, vectordb_rpc:
                 param.index_type = request->index_type();
                 param.distance_type = request->distance_type();
                 param.replica_name = replica_name;
-                param.timestamp = time(nullptr);
+                param.timestamp = timestamp;
                 param.tree_num = request->annoy_param().tree_num();
 
                 auto s = vengine_sp->AddIndex(request->index_type(), &param);
@@ -398,7 +400,7 @@ Node::OnBuildIndex(const vectordb_rpc::BuildIndexRequest* request, vectordb_rpc:
                 }
 
             } else {
-                reply->set_code(3);
+                reply->set_code(4);
                 std::string msg = "index type not support: " + request->index_type();
                 reply->set_msg(msg);
                 return Status::OtherError(msg);
@@ -406,6 +408,20 @@ Node::OnBuildIndex(const vectordb_rpc::BuildIndexRequest* request, vectordb_rpc:
         }
     }
 
+    std::string index_name = util::IndexName(request->table_name(), request->index_type(), timestamp);
+    table_sp->mutable_indices().push_back(index_name);
+    auto s = meta_.Persist();
+    if (!s.ok()) {
+        reply->set_code(5);
+        std::string msg = "persist meta error, " + s.Msg();
+        reply->set_msg(msg);
+        return Status::OtherError(msg);
+    }
+    LOG(INFO) << meta_.ToStringPretty();
+
+    reply->set_code(0);
+    std::string msg = "build index ok";
+    reply->set_msg(msg);
     return Status::OK();
 }
 

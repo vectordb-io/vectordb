@@ -87,9 +87,16 @@ int main(int argc, char** argv) {
     assert(s.ok());
     LOG(INFO) << meta.ToStringPretty();
 
-    AddTable("test_table", 100, 3, 512);
+    AddTable("test_table", 10, 2, 512);
     LOG(INFO) << meta.ToStringPretty();
 
+    auto table_sp = meta.GetTable("test_table");
+    assert(table_sp);
+
+    std::string index_name = vectordb::util::IndexName("test_table", "annoy", time(nullptr));
+    table_sp->mutable_indices().push_back(index_name);
+
+    /*
     int thread_num = 5;
     //int thread_num = 100;
     std::vector<std::thread*> threads;
@@ -107,10 +114,12 @@ int main(int argc, char** argv) {
     for (auto &t : threads) {
         t->join();
     }
+    */
 
     s = meta.Persist();
     assert(s.ok());
     LOG(INFO) << "meta persist ok!";
+    LOG(INFO) << meta.ToStringPretty();
 
     printf("\nReplicaNamesByTable test: \n\n");
     std::vector<std::string> replica_names;

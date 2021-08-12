@@ -10,8 +10,8 @@ namespace vectordb {
 
 namespace cli_util {
 
+std::string LocalTimeString(time_t t);
 void DelTail(std::string &s, char c);
-
 std::string HelpStr();
 void ToLower(std::string &str);
 void Split(const std::string &s, char separator, std::vector<std::string> &sv, const std::string ignore = "");

@@ -394,8 +394,7 @@ Table::ToJson() const {
     }
 
     for (size_t i = 0; i < indices_.size(); ++i) {
-        jsonxx::json64 ji;
-        ji["indices"][i] = indices_[i];
+        j["indices"][i] = indices_[i];
     }
     jret["Table"] = j;
     return jret;

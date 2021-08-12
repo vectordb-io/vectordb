@@ -13,6 +13,15 @@ namespace vectordb {
 
 namespace cli_util {
 
+std::string
+LocalTimeString(time_t t) {
+    tm* local = localtime(&t); // to loal time
+    char buf[128];
+    memset(buf, 0, sizeof(buf));
+    strftime(buf, 64, "%Y-%m-%d %H:%M:%S", local);
+    return std::string(buf);
+}
+
 void DelTail(std::string &s, char c) {
     while (true) {
         if (s.empty()) {
@@ -102,7 +111,21 @@ ToJson(const vectordb_rpc::Table &table) {
 
     k = 0;
     for (int i = 0; i < table.indices_size(); ++i) {
-        j["indices"][k++] = table.indices(i);
+        std::string index_name = table.indices(i);
+
+        std::vector<std::string> sv;
+        Split(index_name, '#', sv, " \t");
+        if (sv.size() == 3) {
+            j["indices"][k]["name"] = index_name;
+            j["indices"][k]["type"] = sv[1];
+            time_t t;
+            sscanf(sv[2].c_str(), "%lu", &t);
+            j["indices"][k]["create_time"] = LocalTimeString(t);
+
+        } else {
+            j["indices"][k] = table.indices(i);
+        }
+        k++;
     }
     return j;
 }
