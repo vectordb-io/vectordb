@@ -71,10 +71,10 @@ get {\"table_name\":\"test_table_dim10\", \"key\":\"kkk\"}                      
 2.7 getknn                                                                                                                    \n \
                                                                                                                               \n \
 * whole parameters                                                                                                            \n \
-getknn {\"table_name\":\"test_table_dim10\", \"key\":\"kkk\", \"limit\":20, \"index_name\":\"annoy.xxx\"}                     \n \
+getknn {\"table_name\":\"test_table_dim10\", \"key\":\"key0_test\", \"limit\":20, \"index_name\":\"annoy.xxx\"}                     \n \
                                                                                                                               \n \
 * use default parameters, use the newest index                                                                                \n \
-getknn {\"table_name\":\"test_table_dim10\", \"key\":\"kkk\", \"limit\":20}                                                   \n \
+getknn {\"table_name\":\"test_table_dim10\", \"key\":\"key0_test\", \"limit\":20}                                                   \n \
                                                                                                                               \n \
 2.8 distance key                                                                                                              \n \
                                                                                                                               \n \

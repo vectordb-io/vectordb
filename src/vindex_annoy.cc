@@ -115,6 +115,7 @@ VIndexAnnoy::ProcResults(const std::vector<int> results, const std::vector<float
 
         VecDtParam param;
         param.key = vo.key();
+
         if (distance_type_ == VINDEX_DISTANCE_TYPE_COSINE) {
             param.distance = Dt2Cos(distances[i]);
 

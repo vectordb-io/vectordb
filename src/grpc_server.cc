@@ -142,8 +142,13 @@ grpc::Status
 VectorDBServiceImpl::GetKNN(grpc::ServerContext* context,
                             const vectordb_rpc::GetKNNRequest* request,
                             vectordb_rpc::GetKNNReply* reply) {
-    //auto s = Node::GetInstance().OnGetKNN(request, reply);
-    //assert(s.ok());
+    auto s = Node::GetInstance().OnGetKNN(request, reply);
+    if (!s.ok()) {
+        std::string msg = "GetKNN error: ";
+        msg.append(request->table_name()).append(", ").append(request->key()).append(", ");
+        msg.append(s.ToString());
+        LOG(INFO) << msg;
+    }
     return grpc::Status::OK;
 }
 

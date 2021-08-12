@@ -155,22 +155,10 @@ VectordbCli::Do(const std::vector<std::string> &cmd_sv, const std::string &param
         }
 
     } else if (cmd_sv.size() == 1 && cmd_sv[0] == "getknn") {
-        try {
-            auto j = jsonxx::json::parse(params_json);
-            std::string table_name = j["table_name"].as_string();
-            std::string key = j["key"].as_string();
-            int limit = j["limit"].as_integer();
-            std::string index_name = j["index_name"].as_string();
-
-            vectordb_rpc::GetKNNRequest request;
-            request.set_table_name(table_name);
-            request.set_key(key);
-            request.set_limit(limit);
-            request.set_index_name(index_name);
+        vectordb_rpc::GetKNNRequest request;
+        auto s = PreProcess(params_json, request, reply);
+        if (s.ok()) {
             GetKNN(request, reply);
-
-        } catch (std::exception &e) {
-            std::cout << e.what() << std::endl;
         }
 
     } else {
@@ -442,9 +430,15 @@ VectordbCli::PreProcess(const std::string &params_json, vectordb_rpc::GetVecRequ
         std::string table_name;
         std::string key;
 
-        // required value
         try {
             j = jsonxx::json::parse(params_json);
+        } catch (std::exception &e) {
+            reply_msg = "parameters error";
+            break;
+        }
+
+        // required value
+        try {
             table_name = j["table_name"].as_string();
             key = j["key"].as_string();
 
@@ -497,9 +491,15 @@ VectordbCli::PreProcess(const std::string &params_json, vectordb_rpc::KeysReques
         std::string table_name;
         int begin, limit;
 
-        // required value
         try {
             j = jsonxx::json::parse(params_json);
+        } catch (std::exception &e) {
+            reply_msg = "parameters error";
+            break;
+        }
+
+        // required value
+        try {
             table_name = j["table_name"].as_string();
 
         } catch (std::exception &e) {
@@ -620,21 +620,75 @@ VectordbCli::BuildIndex(const vectordb_rpc::BuildIndexRequest &request, std::str
     }
 }
 
-void
-VectordbCli::GetKNN(const vectordb_rpc::GetKNNRequest &request, std::string &reply_msg) {
+Status
+VectordbCli::PreProcess(const std::string &params_json, vectordb_rpc::GetKNNRequest &request, std::string &reply_msg) {
+    reply_msg.clear();
+    do {
+        jsonxx::json j;
+        std::string table_name;
+        std::string key;
+        int limit;
+        std::string index_name;
 
-    /*
-    vectordb_rpc::GetKNNReply reply;
-    grpc::ClientContext context;
-    grpc::Status status = stub_->GetKNN(&context, request, &reply);
-    if (status.ok()) {
-    reply_msg = cli_util::ToString(reply);
-    } else {
-    reply_msg = status.error_message();
-    }
-    */
+        try {
+            j = jsonxx::json::parse(params_json);
+        } catch (std::exception &e) {
+            reply_msg = "parameters error";
+            break;
+        }
+
+        // required value
+        try {
+            table_name = j["table_name"].as_string();
+        } catch (std::exception &e) {
+            reply_msg = "table_name error, ";
+            reply_msg.append(e.what());
+            break;
+        }
+
+        // required value
+        try {
+            key = j["key"].as_string();
+        } catch (std::exception &e) {
+            reply_msg = "key error, ";
+            reply_msg.append(e.what());
+            break;
+        }
+
+        // optional value
+        try {
+            limit = j["limit"].as_integer();
+        } catch (std::exception &e) {
+            limit = 20;
+        }
+
+        // optional value
+        try {
+            index_name = j["index_name"].as_string();
+        } catch (std::exception &e) {
+            index_name = "default";
+        }
+
+        request.set_table_name(table_name);
+        request.set_key(key);
+        request.set_limit(limit);
+        request.set_index_name(index_name);
+        return Status::OK();
+
+    } while (0);
+
+    return Status::OtherError(reply_msg);
 }
 
-
+void
+VectordbCli::GetKNN(const vectordb_rpc::GetKNNRequest &request, std::string &reply_msg) {
+    vectordb_rpc::GetKNNReply reply;
+    auto s = vdb_client_.GetKNN(request, &reply);
+    if (s.ok()) {
+        reply_msg = cli_util::ToString(reply);
+    } else {
+        reply_msg = s.Msg();
+    }
+}
 
 } // namespace vectordb

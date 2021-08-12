@@ -4,6 +4,7 @@
 #include <set>
 #include <vector>
 #include <string>
+#include "jsonxx/json.hpp"
 #include "vectordb_rpc.grpc.pb.h"
 
 namespace vectordb {

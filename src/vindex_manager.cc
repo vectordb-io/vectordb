@@ -57,9 +57,16 @@ VIndexManager::GetIndexByName(const std::string &index_name) {
     std::unique_lock<std::mutex> guard(mutex_);
 
     std::shared_ptr<VIndex> index_sp;
-    auto it = indices_by_name_.find(index_name);
-    if (it != indices_by_name_.end()) {
-        index_sp = it->second;
+    if (index_name == "default") {
+        if (indices_by_time_.size() > 0) {
+            index_sp = indices_by_time_.rbegin()->second;
+        }
+
+    } else {
+        auto it = indices_by_name_.find(index_name);
+        if (it != indices_by_name_.end()) {
+            index_sp = it->second;
+        }
     }
     return index_sp;
 }

@@ -5,7 +5,6 @@
 #include <string>
 #include <sstream>
 #include <iostream>
-#include "jsonxx/json.hpp"
 #include "cli_util.h"
 #include "usage_string.h"
 

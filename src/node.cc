@@ -364,7 +364,8 @@ Node::OnBuildIndex(const vectordb_rpc::BuildIndexRequest* request, vectordb_rpc:
     }
 
     int partition_num = table_sp->partition_num();
-    int replica_num = table_sp->replica_num();
+    //int replica_num = table_sp->replica_num();
+    int replica_num = 1;
     time_t timestamp = time(nullptr);
 
     for (int partition_id = 0; partition_id < partition_num; ++partition_id) {
@@ -425,14 +426,108 @@ Node::OnBuildIndex(const vectordb_rpc::BuildIndexRequest* request, vectordb_rpc:
     return Status::OK();
 }
 
-/*
-void
-Node::AppendVecDt(std::vector<VecDt> &dst, const std::vector<VecDt> &src) const {
-}
-*/
-
 Status
 Node::OnGetKNN(const vectordb_rpc::GetKNNRequest* request, vectordb_rpc::GetKNNReply* reply) {
+    if (request->limit() < 0 || request->limit() > 1000) {
+        reply->set_code(1);
+        std::string msg = "limit error";
+        reply->set_msg(msg);
+        return Status::OtherError(msg);
+    }
+
+    auto table_sp = meta_.GetTable(request->table_name());
+    if (!table_sp) {
+        reply->set_code(2);
+        std::string msg = "table not exist:[";
+        msg.append(request->table_name());
+        msg.append("]");
+        reply->set_msg(msg);
+        return Status::OtherError(msg);
+    }
+
+    int partition_num = table_sp->partition_num();
+    //int replica_num = table_sp->replica_num();
+    int replica_num = 1;
+
+    std::string distance_type;
+    std::vector<VecDt> results;
+    for (int partition_id = 0; partition_id < partition_num; ++partition_id) {
+        for (int replica_id = 0; replica_id < replica_num; ++replica_id) {
+            std::string replica_name = util::ReplicaName(request->table_name(), partition_id, replica_id);
+            auto vengine_sp = engine_manager_.GetVEngine(replica_name);
+            if (!vengine_sp) {
+                reply->set_code(3);
+                std::string msg = "get vengine error, " + replica_name;
+                reply->set_msg(msg);
+                return Status::OtherError(msg);
+            }
+
+            VecObj vo;
+            auto s = GetVec(request->table_name(), request->key(), vo);
+            if (!s.ok()) {
+                std::string msg = s.Msg();
+                reply->set_code(4);
+                reply->set_msg(msg);
+                return Status::OtherError(msg);
+            }
+
+            std::vector<VecDt> tmp_results;
+            s = vengine_sp->GetKNN(vo.vec().data(), request->limit(), tmp_results, request->index_name());
+            if (!s.ok()) {
+                reply->set_code(5);
+                std::string msg = s.Msg();
+                reply->set_msg(msg);
+                return Status::OtherError(msg);
+            }
+
+            auto index_sp = vengine_sp->mutable_vindex_manager().GetIndexByName(request->index_name());
+            if (!index_sp) {
+                reply->set_code(6);
+                std::string msg = "get index error, " + request->index_name();
+                reply->set_msg(msg);
+                return Status::OtherError(msg);
+            } else {
+                LOG(INFO) << "OnGetKNN get index: " << index_sp->ToString();
+            }
+            distance_type = index_sp->distance_type();
+
+            results.insert(results.begin(), tmp_results.begin(), tmp_results.end());
+            LOG(INFO) << replica_name << " tmp_results: ";
+            for (auto &vdt : tmp_results) {
+                LOG(INFO) << vdt.ToString();
+            }
+        }
+    }
+
+    if (distance_type == VINDEX_DISTANCE_TYPE_COSINE) {
+        std::sort(results.begin(), results.end(), std::greater<VecDt>());
+    } else {
+        std::sort(results.begin(), results.end(), std::less<VecDt>());
+    }
+
+    LOG(INFO) << "results: ";
+    for (auto &vdt : results) {
+        LOG(INFO) << vdt.ToString();
+    }
+
+    int count = 0;
+    for (auto &vdt : results) {
+        if (count < request->limit()) {
+            vectordb_rpc::VecDt* p = reply->add_vecdts();
+            p->set_key(vdt.key());
+            p->set_distance(vdt.distance());
+            p->set_attach_value1(vdt.attach_value1());
+            p->set_attach_value2(vdt.attach_value2());
+            p->set_attach_value3(vdt.attach_value3());
+            count++;
+
+        } else {
+            break;
+        }
+    }
+    reply->set_code(0);
+    reply->set_msg("ok");
+
     return Status::OK();
 }
 
