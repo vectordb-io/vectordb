@@ -128,8 +128,13 @@ grpc::Status
 VectorDBServiceImpl::BuildIndex(grpc::ServerContext* context,
                                 const vectordb_rpc::BuildIndexRequest* request,
                                 vectordb_rpc::BuildIndexReply* reply) {
-    //auto s = Node::GetInstance().OnBuildIndex(request, reply);
-    //assert(s.ok());
+    auto s = Node::GetInstance().OnBuildIndex(request, reply);
+    if (!s.ok()) {
+        std::string msg = "BuildIndex error: ";
+        msg.append(request->table_name()).append(", ");
+        msg.append(s.ToString());
+        LOG(INFO) << msg;
+    }
     return grpc::Status::OK;
 }
 

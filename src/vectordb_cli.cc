@@ -105,71 +105,17 @@ VectordbCli::Do(const std::vector<std::string> &cmd_sv, const std::string &param
         vectordb_rpc::BuildIndexRequest request;
         request.set_table_name(cmd_sv[2]);
         request.set_index_type(VINDEX_TYPE_ANNOY);
-        //request.mutable_annoy_param()->set_distance_type("cosine");
+        request.set_distance_type(VINDEX_DISTANCE_TYPE_COSINE);
+        request.mutable_annoy_param()->set_tree_num(20);
+        request.mutable_knn_graph_param()->set_k(20);
         BuildIndex(request, reply);
 
     } else if (cmd_sv.size() == 2 && cmd_sv[0] == "build" && cmd_sv[1] == "index") {
-        do {
-            std::string table_name;
-            std::string index_type;
-            std::string distance_type;
-            int k;
-            jsonxx::json j;
-
-            try {
-                j = jsonxx::json::parse(params_json);
-            } catch (std::exception &e) {
-                reply = "parameters error";
-                break;
-            }
-
-            // required value
-            try {
-                table_name = j["table_name"].as_string();
-            } catch (std::exception &e) {
-                reply = "table_name error, ";
-                reply.append(e.what());
-                break;
-            }
-
-            // optional value
-            try {
-                index_type = j["index_type"].as_string();
-            } catch (std::exception &e) {
-                index_type = VINDEX_TYPE_ANNOY;
-            }
-
-            // optional value
-            try {
-                distance_type = j["distance_type"].as_string();
-            } catch (std::exception &e) {
-                index_type = "cosine";
-            }
-
-            if (index_type == "knn_graph") {
-                // optional value
-                try {
-                    k = j["k"].as_integer();
-                } catch (std::exception &e) {
-                    k = 20;
-                }
-            }
-
-            vectordb_rpc::BuildIndexRequest request;
-            request.set_table_name(table_name);
-            request.set_index_type(index_type);
-            if (index_type == VINDEX_TYPE_ANNOY) {
-                //request.mutable_annoy_param()->set_distance_type(distance_type);
-            } else if (index_type == "knn_graph") {
-                //request.mutable_knn_graph_param()->set_distance_type(distance_type);
-                //request.mutable_knn_graph_param()->set_k(k);
-            } else {
-                reply = "parameters error: unknown index_type";
-                break;
-            }
+        vectordb_rpc::BuildIndexRequest request;
+        auto s = PreProcess(params_json, request, reply);
+        if (s.ok()) {
             BuildIndex(request, reply);
-
-        } while (0);
+        }
 
     } else if (cmd_sv.size() == 1 && cmd_sv[0] == "keys") {
         vectordb_rpc::KeysRequest request;
@@ -597,19 +543,81 @@ VectordbCli::Keys(const vectordb_rpc::KeysRequest &request, std::string &reply_m
     }
 }
 
+Status
+VectordbCli::PreProcess(const std::string &params_json, vectordb_rpc::BuildIndexRequest &request, std::string &reply_msg) {
+    reply_msg.clear();
+    do {
+        jsonxx::json j;
+        std::string table_name;
+        std::string index_type;
+        std::string distance_type;
+        int tree_num, k;
+
+        try {
+            j = jsonxx::json::parse(params_json);
+        } catch (std::exception &e) {
+            reply_msg = "parameters error";
+            break;
+        }
+
+        // required value
+        try {
+            table_name = j["table_name"].as_string();
+        } catch (std::exception &e) {
+            reply_msg = "table_name error, ";
+            reply_msg.append(e.what());
+            break;
+        }
+
+        // optional value
+        try {
+            index_type = j["index_type"].as_string();
+        } catch (std::exception &e) {
+            index_type = VINDEX_TYPE_ANNOY;
+        }
+
+        // optional value
+        try {
+            distance_type = j["distance_type"].as_string();
+        } catch (std::exception &e) {
+            distance_type = VINDEX_DISTANCE_TYPE_COSINE;
+        }
+
+        // optional value
+        try {
+            k = j["k"].as_integer();
+        } catch (std::exception &e) {
+            k = 20;
+        }
+
+        // optional value
+        try {
+            tree_num = j["tree_num"].as_integer();
+        } catch (std::exception &e) {
+            tree_num = 20;
+        }
+
+        request.set_table_name(table_name);
+        request.set_index_type(index_type);
+        request.set_distance_type(distance_type);
+        request.mutable_annoy_param()->set_tree_num(tree_num);
+        request.mutable_knn_graph_param()->set_k(k);
+        return Status::OK();
+
+    } while (0);
+
+    return Status::OtherError(reply_msg);
+}
+
 void
 VectordbCli::BuildIndex(const vectordb_rpc::BuildIndexRequest &request, std::string &reply_msg) {
-
-    /*
     vectordb_rpc::BuildIndexReply reply;
-    grpc::ClientContext context;
-    grpc::Status status = stub_->BuildIndex(&context, request, &reply);
-    if (status.ok()) {
-    reply_msg = cli_util::ToString(reply);
+    auto s = vdb_client_.BuildIndex(request, &reply);
+    if (s.ok()) {
+        reply_msg = cli_util::ToString(reply);
     } else {
-    reply_msg = status.error_message();
+        reply_msg = s.Msg();
     }
-    */
 }
 
 void

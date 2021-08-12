@@ -41,9 +41,9 @@ class VEngine {
     Status Delete(const std::string &key);
 
     bool HasIndex() const;
-    //Status AddIndex(std::string index_name, std::string index_type, void *param);
-    //Status GetKNN(const std::string &key, int limit, std::vector<VecDt> &results, const std::string &index_name);
-    //Status GetKNN(const Vec &vec, int limit, std::vector<VecDt> &results, const std::string &index_name);
+    Status AddIndex(std::string index_type, void *param);
+    Status GetKNN(const std::string &key, int limit, std::vector<VecDt> &results, const std::string &index_name);
+    Status GetKNN(const std::vector<float> &vec, int limit, std::vector<VecDt> &results, const std::string &index_name);
 
     // append into keys
     //Status Keys(std::vector<std::string> &keys) const;

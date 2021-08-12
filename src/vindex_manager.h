@@ -15,7 +15,7 @@ namespace vectordb {
 class VIndexFactory {
   public:
     static std::shared_ptr<VIndex>
-    Create(const std::string &index_type, const std::string &path, VEngine* vengine, AnnoyParam *param) {
+    Create(const std::string &index_type, const std::string &path, VEngine* vengine, void *param) {
         std::shared_ptr<VIndex> index_sp;
         if (index_type == VINDEX_TYPE_ANNOY) {
             AnnoyParam *annoy_param = static_cast<AnnoyParam*>(param);
@@ -56,7 +56,7 @@ class VIndexManager {
     ~VIndexManager();
 
     Status Init();
-    Status Add(const std::string &name, std::shared_ptr<VIndex> index);
+    Status Add(std::shared_ptr<VIndex> index);
     Status Del(const std::string &name);
     Status ForEachIndex(std::function<Status(std::shared_ptr<VIndex>)> func);
 

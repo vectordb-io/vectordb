@@ -239,7 +239,7 @@ VEngine::LoadIndex() {
 
         }
 
-        s = vindex_manager_.Add(index_name, index_sp);
+        s = vindex_manager_.Add(index_sp);
         if (!s.ok()) {
             std::string msg = "load index vindex_manager_.Add error: ";
             msg.append(index_name).append(", ").append(s.Msg());
@@ -312,6 +312,47 @@ VEngine::Delete(const std::string &key) {
 bool
 VEngine::HasIndex() const {
     return vindex_manager_.HasIndex();
+}
+
+Status
+VEngine::AddIndex(std::string index_type, void *param) {
+    std::shared_ptr<VIndex> index_sp;
+    index_sp = VIndexFactory::Create(index_type, index_path_, this, param);
+    if (!index_sp) {
+        std::string msg = replica_name_ + " VIndexFactory::Create error";
+        LOG(INFO) << msg;
+        return Status::OtherError(msg);
+    }
+
+    auto s = index_sp->Build();
+    if (!s.ok()) {
+        std::string msg = replica_name_ + " build index error: " + s.Msg();
+        LOG(INFO) << msg;
+        return Status::OtherError(msg);
+    }
+
+    s = vindex_manager_.Add(index_sp);
+    if (!s.ok()) {
+        std::string msg = replica_name_ + " vindex_manager_.Add, " + index_sp->name() + " " + s.Msg();
+        LOG(INFO) << msg;
+        return Status::OtherError(msg);
+    }
+
+    std::string msg = replica_name_ + " VEngine::AddIndex " + index_sp->name() + " ok";
+    LOG(INFO) << msg;
+    return Status::OK();
+}
+
+Status
+VEngine::GetKNN(const std::string &key, int limit, std::vector<VecDt> &results, const std::string &index_name) {
+
+    return Status::OK();
+}
+
+Status
+VEngine::GetKNN(const std::vector<float> &vec, int limit, std::vector<VecDt> &results, const std::string &index_name) {
+
+    return Status::OK();
 }
 
 jsonxx::json64

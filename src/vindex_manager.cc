@@ -32,7 +32,7 @@ VIndexManager::Init() {
 }
 
 Status
-VIndexManager::Add(const std::string &name, std::shared_ptr<VIndex> index) {
+VIndexManager::Add(std::shared_ptr<VIndex> index) {
     std::unique_lock<std::mutex> guard(mutex_);
     indices_by_name_.insert(std::pair<std::string, std::shared_ptr<VIndex>>(index->name(), index));
     indices_by_time_.insert(std::pair<time_t, std::shared_ptr<VIndex>>(index->timestamp(), index));

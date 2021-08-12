@@ -353,6 +353,59 @@ Node::Keys(std::vector<std::string> &keys) {
 
 Status
 Node::OnBuildIndex(const vectordb_rpc::BuildIndexRequest* request, vectordb_rpc::BuildIndexReply* reply) {
+    auto table_sp = meta_.GetTable(request->table_name());
+    if (!table_sp) {
+        reply->set_code(1);
+        std::string msg = "table not exist:[";
+        msg.append(request->table_name());
+        msg.append("]");
+        reply->set_msg(msg);
+        return Status::OtherError(msg);
+    }
+
+    int partition_num = table_sp->partition_num();
+    int replica_num = table_sp->replica_num();
+    for (int partition_id = 0; partition_id < partition_num; ++partition_id) {
+        for (int replica_id = 0; replica_id < replica_num; ++replica_id) {
+            std::string replica_name = util::ReplicaName(request->table_name(), partition_id, replica_id);
+            auto vengine_sp = engine_manager_.GetVEngine(replica_name);
+            if (!vengine_sp) {
+                reply->set_code(2);
+                std::string msg = "get vengine error, " + replica_name;
+                reply->set_msg(msg);
+                return Status::OtherError(msg);
+            }
+
+            if (request->index_type() == VINDEX_TYPE_ANNOY) {
+                AnnoyParam param;
+                param.dim = vengine_sp->dim();
+                param.index_type = request->index_type();
+                param.distance_type = request->distance_type();
+                param.replica_name = replica_name;
+                param.timestamp = time(nullptr);
+                param.tree_num = request->annoy_param().tree_num();
+
+                auto s = vengine_sp->AddIndex(request->index_type(), &param);
+                if (!s.ok()) {
+                    reply->set_code(3);
+                    std::string msg = s.Msg();
+                    reply->set_msg(msg);
+                    return Status::OtherError(msg);
+
+                } else {
+                    std::string msg = replica_name + " build index ok";
+                    LOG(INFO) << msg;
+                }
+
+            } else {
+                reply->set_code(3);
+                std::string msg = "index type not support: " + request->index_type();
+                reply->set_msg(msg);
+                return Status::OtherError(msg);
+            }
+        }
+    }
+
     return Status::OK();
 }
 
