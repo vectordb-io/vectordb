@@ -43,6 +43,19 @@ Status
 VIndexManager::Del(const std::string &name) {
     std::unique_lock<std::mutex> guard(mutex_);
 
+    std::shared_ptr<VIndex> index_sp;
+    auto it = indices_by_name_.find(name);
+    if (it != indices_by_name_.end()) {
+        index_sp = it->second;
+        indices_by_name_.erase(index_sp->name());
+        indices_by_time_.erase(index_sp->timestamp());
+        auto b = util::RemoveDir(index_sp->path());
+        if (!b) {
+            std::string msg = "del dir " + index_sp->path() + " error";
+            LOG(INFO) << msg;
+            return Status::OtherError(msg);
+        }
+    }
     return Status::OK();
 }
 
@@ -53,17 +66,17 @@ VIndexManager::HasIndex() const {
 }
 
 std::shared_ptr<VIndex>
-VIndexManager::GetIndexByName(const std::string &index_name) {
+VIndexManager::GetByName(const std::string &name) {
     std::unique_lock<std::mutex> guard(mutex_);
 
     std::shared_ptr<VIndex> index_sp;
-    if (index_name == "default") {
+    if (name == "default") {
         if (indices_by_time_.size() > 0) {
             index_sp = indices_by_time_.rbegin()->second;
         }
 
     } else {
-        auto it = indices_by_name_.find(index_name);
+        auto it = indices_by_name_.find(name);
         if (it != indices_by_name_.end()) {
             index_sp = it->second;
         }
@@ -72,7 +85,7 @@ VIndexManager::GetIndexByName(const std::string &index_name) {
 }
 
 std::shared_ptr<VIndex>
-VIndexManager::GetNewestIndexByType(const std::string &index_type) {
+VIndexManager::GetNewestByType(const std::string &index_type) {
     std::unique_lock<std::mutex> guard(mutex_);
 
     std::shared_ptr<VIndex> index_sp;
@@ -86,13 +99,9 @@ VIndexManager::GetNewestIndexByType(const std::string &index_type) {
 }
 
 std::shared_ptr<VIndex>
-VIndexManager::GetNewestIndex() {
-    std::unique_lock<std::mutex> guard(mutex_);
-
+VIndexManager::GetNewest() {
     std::shared_ptr<VIndex> index_sp;
-    if (indices_by_time_.size() > 0) {
-        index_sp = indices_by_time_.rbegin()->second;
-    }
+    index_sp = GetByName("default");
     return index_sp;
 }
 
@@ -105,7 +114,6 @@ VIndexManager::ForEachIndex(std::function<Status(std::shared_ptr<VIndex>)> func)
             return s;
         }
     }
-
     return Status::OK();
 }
 

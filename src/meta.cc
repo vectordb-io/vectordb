@@ -31,12 +31,10 @@ Meta::Load() {
         s = db_->Get(leveldb::ReadOptions(), table_name, &value);
         assert(s.ok());
 
-        Table table;
-        b = coding::Str2Table(value, table);
+        auto table_sp = std::make_shared<Table>();
+        b = coding::Str2Table(value, *table_sp);
         assert(b);
-
-        tables_.insert(std::pair<std::string, std::shared_ptr<Table>>
-                       (table_name, std::make_shared<Table>(table)));
+        tables_.insert(std::pair<std::string, std::shared_ptr<Table>>(table_name, table_sp));
     }
 
     LOG(INFO) << "meta load: \n" << ToStringPretty();
@@ -115,13 +113,7 @@ Status
 Meta::DropTable(const std::string &name) {
     std::unique_lock<std::mutex> guard(mutex_);
 
-    return Status::OK();
-}
-
-Status
-Meta::DropIndex(const std::string &name) {
-    std::unique_lock<std::mutex> guard(mutex_);
-
+    tables_.erase(name);
     return Status::OK();
 }
 
@@ -189,8 +181,6 @@ Meta::GetTableNonlocking(const std::string &name) const {
 
 std::shared_ptr<Partition>
 Meta::GetPartition(const std::string &name) const {
-    std::unique_lock<std::mutex> guard(mutex_);
-
     std::shared_ptr<Table> pt;
     std::shared_ptr<Partition> pp;
     std::string table_name;
@@ -198,7 +188,7 @@ Meta::GetPartition(const std::string &name) const {
 
     bool b = util::ParsePartitionName(name, table_name, partition_id);
     if (b) {
-        pt = GetTableNonlocking(table_name);
+        pt = GetTable(table_name);  // lock
         if (pt) {
             pp = pt->GetPartition(name);
         }
@@ -225,8 +215,6 @@ Meta::GetPartitionNonlocking(const std::string &name) const {
 
 std::shared_ptr<Replica>
 Meta::GetReplica(const std::string &name) const {
-    std::unique_lock<std::mutex> guard(mutex_);
-
     std::shared_ptr<Partition> pp;
     std::shared_ptr<Replica> pr;
     std::string table_name;
@@ -236,7 +224,7 @@ Meta::GetReplica(const std::string &name) const {
     bool b = util::ParseReplicaName(name, table_name, partition_id, replica_id);
     if (b) {
         std::string partition_name = util::PartitionName(table_name, partition_id);
-        pp = GetPartitionNonlocking(partition_name);
+        pp = GetPartition(partition_name); // lock
         if (pp) {
             pr = pp->GetReplica(name);
         }
@@ -247,6 +235,7 @@ Meta::GetReplica(const std::string &name) const {
 Status
 Meta::ForEachTable(std::function<Status(std::shared_ptr<Table>)> func) {
     std::unique_lock<std::mutex> guard(mutex_);
+
     for (auto &table_kv : tables_) {
         auto s = func(table_kv.second);
         if (!s.ok()) {
@@ -262,6 +251,7 @@ Meta::ForEachTable(std::function<Status(std::shared_ptr<Table>)> func) {
 Status
 Meta::ForEachPartition(std::function<Status(std::shared_ptr<Partition>)> func) {
     std::unique_lock<std::mutex> guard(mutex_);
+
     for (auto &table_kv : tables_) {
         for (auto &partition_kv : table_kv.second->partitions()) {
             auto partition_sp = partition_kv.second;
@@ -280,6 +270,7 @@ Meta::ForEachPartition(std::function<Status(std::shared_ptr<Partition>)> func) {
 Status
 Meta::ForEachReplica(std::function<Status(std::shared_ptr<Replica>)> func) {
     std::unique_lock<std::mutex> guard(mutex_);
+
     for (auto &table_kv : tables_) {
         for (auto &partition_kv : table_kv.second->partitions()) {
             for (auto &replica_kv : partition_kv.second->replicas()) {
@@ -300,6 +291,7 @@ Meta::ForEachReplica(std::function<Status(std::shared_ptr<Replica>)> func) {
 Status
 Meta::ForEachReplica2(std::function<Status(std::shared_ptr<Table>, std::shared_ptr<Partition>, std::shared_ptr<Replica>)> func) {
     std::unique_lock<std::mutex> guard(mutex_);
+
     for (auto &table_kv : tables_) {
         for (auto &partition_kv : table_kv.second->partitions()) {
             for (auto &replica_kv : partition_kv.second->replicas()) {
@@ -393,15 +385,23 @@ Table::ToJson() const {
         k++;
     }
 
-    for (size_t i = 0; i < indices_.size(); ++i) {
-        j["indices"][i] = indices_[i];
+    {
+        std::unique_lock<std::mutex> guard(mutex_);
+        int i = 0;
+        for (auto &index_name : indices_) {
+            j["indices"][i] = index_name;
+            i++;
+        }
     }
+
     jret["Table"] = j;
     return jret;
 }
 
 jsonxx::json64
 Meta::ToJson() const {
+    std::unique_lock<std::mutex> guard(mutex_);
+
     jsonxx::json64 j, jret;
     for (auto &kv : tables_) {
         j[kv.first] = kv.second->ToJson();
@@ -476,11 +476,6 @@ Table::GetPartition(std::string name) const {
         pp = it->second;
     }
     return pp;
-}
-
-Status
-Meta::AddIndex(const IndexParam &param) {
-    return Status::OK();
 }
 
 } // namespace vectordb

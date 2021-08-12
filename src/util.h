@@ -9,6 +9,7 @@ namespace vectordb {
 
 namespace util {
 
+bool RemoveDir(const std::string &path);
 bool ChildrenOfDir(const std::string &path, std::vector<std::string> &children_paths, std::vector<std::string> &children_names);
 std::string LocalTimeString(time_t t);
 unsigned int RSHash(const char *str);

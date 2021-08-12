@@ -45,9 +45,6 @@ class VEngine {
     Status GetKNN(const std::string &key, int limit, std::vector<VecDt> &results, const std::string &index_name);
     Status GetKNN(const std::vector<float> &vec, int limit, std::vector<VecDt> &results, const std::string &index_name);
 
-    // append into keys
-    //Status Keys(std::vector<std::string> &keys) const;
-
     leveldb::DB* mutable_db_data() {
         return db_data_;
     }

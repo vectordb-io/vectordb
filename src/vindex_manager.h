@@ -56,22 +56,21 @@ class VIndexManager {
     ~VIndexManager();
 
     Status Init();
+    bool HasIndex() const;
     Status Add(std::shared_ptr<VIndex> index);
     Status Del(const std::string &name);
+    std::shared_ptr<VIndex> GetByName(const std::string &name);
+    std::shared_ptr<VIndex> GetNewestByType(const std::string &index_type);
+    std::shared_ptr<VIndex> GetNewest();
     Status ForEachIndex(std::function<Status(std::shared_ptr<VIndex>)> func);
-
-    bool HasIndex() const;
-    std::shared_ptr<VIndex> GetIndexByName(const std::string &index_name);
-    std::shared_ptr<VIndex> GetNewestIndexByType(const std::string &index_type);
-    std::shared_ptr<VIndex> GetNewestIndex();
-
-    std::string path() const {
-        return path_;
-    }
 
     jsonxx::json64 ToJson() const;
     std::string ToString() const;
     std::string ToStringPretty() const;
+
+    std::string path() const {
+        return path_;
+    }
 
   private:
     std::string path_;

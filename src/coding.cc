@@ -55,7 +55,7 @@ Pb2Table(const vectordb_rpc::Table &pb, Table &table) {
     }
 
     for (int i = 0; i < pb.indices_size(); i++) {
-        table.mutable_indices().push_back(pb.indices(i));
+        table.mutable_indices().insert(pb.indices(i));
     }
 }
 

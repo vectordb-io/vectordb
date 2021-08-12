@@ -3,6 +3,7 @@
 
 #include <cassert>
 #include <map>
+#include <set>
 #include <memory>
 #include <string>
 #include <mutex>
@@ -24,6 +25,7 @@ struct ReplicaParam {
     std::string path;
 };
 
+// write methed only used in coding!
 class Replica {
   public:
     Replica() = default;
@@ -116,6 +118,8 @@ struct PartitionParam {
     std::string path;
 };
 
+
+// write methed only used in coding!
 class Partition {
   public:
     Partition() = default;
@@ -174,6 +178,7 @@ class Partition {
         path_ = path;
     }
 
+    // only used in coding
     std::map<std::string, std::shared_ptr<Replica>>&
     mutable_replicas() {
         return replicas_;
@@ -214,6 +219,7 @@ struct TableParam {
     int dim;
 };
 
+// write methed only used in coding!
 class Table {
   public:
     Table() = default;
@@ -282,12 +288,12 @@ class Table {
         return partitions_;
     }
 
-    std::vector<std::string>&
+    std::set<std::string>&
     mutable_indices() {
         return indices_;
     }
 
-    const std::vector<std::string>&
+    const std::set<std::string>&
     indices() const {
         return indices_;
     }
@@ -302,6 +308,16 @@ class Table {
 
     jsonxx::json64 ToJson() const;
 
+    void AddIndexName(const std::string &index_name) {
+        std::unique_lock<std::mutex> guard(mutex_);
+        indices_.insert(index_name);
+    }
+
+    void DelIndexName(const std::string &index_name) {
+        std::unique_lock<std::mutex> guard(mutex_);
+        indices_.erase(index_name);
+    }
+
   private:
     void AddAllPartitions();
 
@@ -311,13 +327,10 @@ class Table {
     int replica_num_;
     std::string path_;
     std::map<std::string, std::shared_ptr<Partition>> partitions_;
-    std::vector<std::string> indices_;  // index names, eg: test_table#annoy.xxx
-};
 
-
-struct IndexParam {
-    std::string table_name;
-    std::string index_name;
+    // will be modified at run time, so it should be protected by lock
+    std::set<std::string> indices_;  // index names, eg: test_table#annoy.xxx
+    mutable std::mutex mutex_;
 };
 
 class Meta {
@@ -334,9 +347,7 @@ class Meta {
     Status Load();
     Status Persist();
     Status AddTable(const TableParam &param);
-    Status AddIndex(const IndexParam &param);
     Status DropTable(const std::string &name);
-    Status DropIndex(const std::string &name);
     Status ReplicaNameByKey(const std::string &table_name,
                             const std::string &key,
                             std::string &replica_name) const;

@@ -94,7 +94,7 @@ int main(int argc, char** argv) {
     assert(table_sp);
 
     std::string index_name = vectordb::util::IndexName("test_table", "annoy", time(nullptr));
-    table_sp->mutable_indices().push_back(index_name);
+    table_sp->AddIndexName(index_name);
 
     /*
     int thread_num = 5;

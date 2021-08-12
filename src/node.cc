@@ -410,7 +410,7 @@ Node::OnBuildIndex(const vectordb_rpc::BuildIndexRequest* request, vectordb_rpc:
     }
 
     std::string index_name = util::IndexName(request->table_name(), request->index_type(), timestamp);
-    table_sp->mutable_indices().push_back(index_name);
+    table_sp->AddIndexName(index_name);
     auto s = meta_.Persist();
     if (!s.ok()) {
         reply->set_code(5);
@@ -480,7 +480,7 @@ Node::OnGetKNN(const vectordb_rpc::GetKNNRequest* request, vectordb_rpc::GetKNNR
                 return Status::OtherError(msg);
             }
 
-            auto index_sp = vengine_sp->mutable_vindex_manager().GetIndexByName(request->index_name());
+            auto index_sp = vengine_sp->mutable_vindex_manager().GetByName(request->index_name());
             if (!index_sp) {
                 reply->set_code(6);
                 std::string msg = "get index error, " + request->index_name();

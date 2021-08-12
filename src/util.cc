@@ -16,6 +16,14 @@ namespace vectordb {
 namespace util {
 
 bool
+RemoveDir(const std::string &path) {
+    std::string cmd = "rm -rf ";
+    cmd.append(path);
+    int ret = system(cmd.c_str());
+    return ret == 0;
+}
+
+bool
 ChildrenOfDir(const std::string &path, std::vector<std::string> &children_paths, std::vector<std::string> &children_names) {
     DIR* dir = opendir(path.c_str());
     if (!dir) {
