@@ -101,8 +101,16 @@ drop table test_table_dim10                                                     
                                                                                                                               \n \
 2.11 drop index                                                                                                               \n \
                                                                                                                               \n \
+* whole parameters                                                                                                            \n \
+drop index {\"index_names\":[\"test_table_dim10#annoy#1628842057\", \"test_table_dim10#annoy#1628840769\"]}                   \n \
+                                                                                                                              \n \
+* drop one index                                                                                                              \n \
+drop index test_table_dim10#annoy#timestamp                                                                                   \n \
+                                                                                                                              \n \
 2.12 leave index                                                                                                              \n \
-leave index 3                                                                                                                 \n \
+                                                                                                                              \n \
+* leave the newest count indexes of the table, drop the others                                                                \n \
+leave index test_table_dim10 3                                                                                                \n \
                                                                                                                               \n \
 -----------------------------------------------------------------------------------------                                     \n \
 ";
