@@ -142,6 +142,7 @@ VIndexAnnoy::ProcResults(const std::vector<int> results, const std::vector<float
     return Status::OK();
 }
 
+/*
 Status
 VIndexAnnoy::Distance(const std::string &key1, const std::string &key2, float &distance) {
     int id1, id2;
@@ -161,6 +162,7 @@ VIndexAnnoy::Distance(const std::string &key1, const std::string &key2, float &d
 
     return Status::OK();
 }
+*/
 
 Status
 VIndexAnnoy::CheckParams() const {
@@ -469,6 +471,30 @@ VIndexAnnoy::LoadAnnoy() {
 float
 VIndexAnnoy::Dt2Cos(float dt) {
     return 1 - dt / 2;
+}
+
+Status
+VIndexAnnoy::Distance(const std::vector<float> &vec1, const std::vector<float> &vec2, const std::string &distance_type, float &distance) {
+    if (vec1.size() != vec2.size()) {
+        return Status::OtherError("dim not equal");
+    }
+
+    AnnoyIndexInterface<int, float> *annoy_index = AnnoyFactory::Create(distance_type, vec1.size());
+    if (annoy_index) {
+        return Status::OtherError("create annoy index error");
+    }
+
+    const float *p1= &(*vec1.begin());
+    const float *p2= &(*vec2.begin());
+
+    annoy_index->add_item(0, p1);
+    annoy_index->add_item(1, p2);
+    distance = annoy_index->get_distance(0, 1);
+    if (distance_type == VINDEX_DISTANCE_TYPE_COSINE) {
+        distance = Dt2Cos(distance);
+    }
+    delete annoy_index;
+    return Status::OK();
 }
 
 } // namespace vectordb

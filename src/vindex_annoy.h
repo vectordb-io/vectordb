@@ -52,6 +52,8 @@ class VIndexAnnoy : public VIndex {
   public:
 #define KEY_META_ANNOY_INDEX "KEY_META_ANNOY_INDEX"
 
+    static Status Distance(const std::vector<float> &vec1, const std::vector<float> &vec2, const std::string &distance_type, float &distance);
+
   public:
     VIndexAnnoy(const std::string &path, VEngine* vengine, AnnoyParam *param);    // call Build, path: /tmp/table/partition/replica/index/  will create dir table#annoy#xxx
     VIndexAnnoy(const std::string &path, VEngine* vengine);                       // call Load,  path: /tmp/table/partition/replica/index/table#annoy#xxx
@@ -61,7 +63,6 @@ class VIndexAnnoy : public VIndex {
 
     Status GetKNN(const std::string &key, int limit, std::vector<VecDt> &results) override;
     Status GetKNN(const std::vector<float> &vec, int limit, std::vector<VecDt> &results) override;
-    Status Distance(const std::string &key1, const std::string &key2, float &distance) override;
     Status Load() override;
     Status Build() override;
 
