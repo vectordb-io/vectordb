@@ -398,10 +398,10 @@ class Meta {
 
   private:
     std::map<std::string, std::shared_ptr<Table>> tables_;
+    mutable std::mutex mutex_;
+
     std::string path_;
     leveldb::DB* db_;
-
-    mutable std::mutex mutex_;
 };
 
 } // namespace vectordb

@@ -156,11 +156,19 @@ Node::OnDropTable(const vectordb_rpc::DropTableRequest* request, vectordb_rpc::D
         return Status::OtherError(msg);
     }
 
+    s = meta_.Persist();
+    if (!s.ok()) {
+        msg = "meta drop table " + request->table_name() + " persist error: " + s.Msg();
+        reply->set_code(4);
+        reply->set_msg(msg);
+        return Status::OtherError(msg);
+    }
+
     for (auto &replica_name : replica_names) {
         s = engine_manager_.DelEngine(replica_name);
         if (!s.ok()) {
             msg = "drop table DelEngine error, " + replica_name + ", " + s.Msg();
-            reply->set_code(4);
+            reply->set_code(5);
             reply->set_msg(msg);
             return Status::OtherError(msg);
         }
@@ -169,7 +177,7 @@ Node::OnDropTable(const vectordb_rpc::DropTableRequest* request, vectordb_rpc::D
     auto b = util::RemoveDir(table_sp->path());
     if (!b) {
         msg = "drop table rm dir error, " + table_sp->path();
-        reply->set_code(5);
+        reply->set_code(6);
         reply->set_msg(msg);
         return Status::OtherError(msg);
     }

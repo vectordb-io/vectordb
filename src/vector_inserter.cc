@@ -50,7 +50,7 @@ int main(int argc, char **argv) {
         request.mutable_vec_obj()->set_attach_value2("inserter_test_attach_value2");
         request.mutable_vec_obj()->set_attach_value3("inserter_test_attach_value3");
 
-        if (i == 0) {
+        if (i == 0 || i == 1) {
             snprintf(buf, sizeof(buf), "key%d_test", i);
         } else {
             snprintf(buf, sizeof(buf), "key%d_%d", i, rand());

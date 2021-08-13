@@ -11,8 +11,6 @@ Meta::Meta(const std::string &path)
 
 Status
 Meta::Load() {
-    std::unique_lock<std::mutex> guard(mutex_);
-
     LOG(INFO) << "loading meta ...";
     std::vector<std::string> table_names;
     std::string value;
@@ -400,7 +398,7 @@ Table::ToJson() const {
 
 jsonxx::json64
 Meta::ToJson() const {
-    //std::unique_lock<std::mutex> guard(mutex_);
+    std::unique_lock<std::mutex> guard(mutex_);
 
     jsonxx::json64 j, jret;
     for (auto &kv : tables_) {

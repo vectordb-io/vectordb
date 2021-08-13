@@ -38,10 +38,10 @@ desc test_table_dim10#partition_0#replica_0                                     
 2.3 put                                                                                                                       \n \
                                                                                                                               \n \
 * whole parameters                                                                                                            \n \
-put {\"table_name\":\"test_table_dim10\", \"key\":\"kkk\", \"vector\":[1.13, 2.25, 3.73, 4.99, 3.28, 4.22, 6.21, 9.44, 8.12, 5.23], \"attach_value1\":\"attach_value1\", \"attach_value2\":\"attach_value2\", \"attach_value3\":\"attach_value3\"} \n \
+put {\"table_name\":\"test_table_dim10\", \"key\":\"key0_test\", \"vector\":[1.13, 2.25, 3.73, 4.99, 3.28, 4.22, 6.21, 9.44, 8.12, 5.23], \"attach_value1\":\"attach_value1\", \"attach_value2\":\"attach_value2\", \"attach_value3\":\"attach_value3\"} \n \
                                                                                                                               \n \
 * use default parameters, attach_value1=\"\", attach_value2=\"\", attach_value3=\"\"                                          \n \
-put {\"table_name\":\"test_table_dim10\", \"key\":\"kkk\", \"vector\":[1.13, 2.25, 3.73, 4.99, 3.28, 4.22, 6.21, 9.44, 8.12, 5.23]} \n \
+put {\"table_name\":\"test_table_dim10\", \"key\":\"key0_test\", \"vector\":[1.13, 2.25, 3.73, 4.99, 3.28, 4.22, 6.21, 9.44, 8.12, 5.23]} \n \
                                                                                                                               \n \
 2.4 build index                                                                                                               \n \
                                                                                                                               \n \
@@ -66,12 +66,12 @@ keys test_table_dim10                                                           
 2.6 get                                                                                                                       \n \
                                                                                                                               \n \
 * whole parameters                                                                                                            \n \
-get {\"table_name\":\"test_table_dim10\", \"key\":\"kkk\"}                                                                    \n \
+get {\"table_name\":\"test_table_dim10\", \"key\":\"key0_test\"}                                                              \n \
                                                                                                                               \n \
 2.7 getknn                                                                                                                    \n \
                                                                                                                               \n \
 * whole parameters                                                                                                            \n \
-getknn {\"table_name\":\"test_table_dim10\", \"key\":\"key0_test\", \"limit\":20, \"index_name\":\"annoy.xxx\"}                     \n \
+getknn {\"table_name\":\"test_table_dim10\", \"key\":\"key0_test\", \"limit\":20, \"index_name\":\"test_table_dim10#annoy#timestamp\"}                     \n \
                                                                                                                               \n \
 * use default parameters, use the newest index                                                                                \n \
 getknn {\"table_name\":\"test_table_dim10\", \"key\":\"key0_test\", \"limit\":20}                                                   \n \
@@ -93,9 +93,16 @@ distance vector {\"vector1\":[1.13, 2.25, 3.73, 4.99, 3.28, 4.22, 6.21, 9.44, 8.
 distance vector {\"vector1\":[1.13, 2.25, 3.73, 4.99, 3.28, 4.22, 6.21, 9.44, 8.12, 5.23], \"vector2\":[28.63, 22.45, 3.93, 7.93, 4.21, 8.42, 7.29, 32.44, 44.12, 12.23], \"distance_type\":\"inner_product\"}    \n \
 distance vector {\"vector1\":[1.13, 2.25, 3.73, 4.99, 3.28, 4.22, 6.21, 9.44, 8.12, 5.23], \"vector2\":[28.63, 22.45, 3.93, 7.93, 4.21, 8.42, 7.29, 32.44, 44.12, 12.23], \"distance_type\":\"euclidean\"}        \n \
                                                                                                                               \n \
+* use default parameters, distance_type = cosine                                                                              \n \
+distance vector {\"vector1\":[1.13, 2.25, 3.73, 4.99, 3.28, 4.22, 6.21, 9.44, 8.12, 5.23], \"vector2\":[28.63, 22.45, 3.93, 7.93, 4.21, 8.42, 7.29, 32.44, 44.12, 12.23]}        \n \
+                                                                                                                              \n \
 2.10 drop table                                                                                                               \n \
+drop table test_table_dim10                                                                                                   \n \
                                                                                                                               \n \
 2.11 drop index                                                                                                               \n \
+                                                                                                                              \n \
+2.12 leave index                                                                                                              \n \
+leave index 3                                                                                                                 \n \
                                                                                                                               \n \
 -----------------------------------------------------------------------------------------                                     \n \
 ";

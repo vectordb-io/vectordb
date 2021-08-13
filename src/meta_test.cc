@@ -83,6 +83,9 @@ int main(int argc, char** argv) {
     vectordb::Meta meta(vectordb::Config::GetInstance().meta_path());
     g_meta = &meta;
 
+    vectordb::util::RemoveDir("/tmp/test_meta");
+    vectordb::util::RecurMakeDir("/tmp/test_meta");
+
     s = meta.Init();
     assert(s.ok());
     LOG(INFO) << meta.ToStringPretty();
@@ -96,7 +99,6 @@ int main(int argc, char** argv) {
     std::string index_name = vectordb::util::IndexName("test_table", "annoy", time(nullptr));
     table_sp->AddIndexName(index_name);
 
-    /*
     int thread_num = 5;
     //int thread_num = 100;
     std::vector<std::thread*> threads;
@@ -114,7 +116,6 @@ int main(int argc, char** argv) {
     for (auto &t : threads) {
         t->join();
     }
-    */
 
     s = meta.Persist();
     assert(s.ok());
