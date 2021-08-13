@@ -125,6 +125,21 @@ VdbClient::DistVec(const std::vector<float> &vec1, const std::vector<float> &vec
 }
 
 Status
+VdbClient::DistKey(const std::string &table_name,
+                   const std::string &key1,
+                   const std::string &key2,
+                   const std::string &distance_type,
+                   vectordb_rpc::DistKeyReply* reply) {
+    vectordb_rpc::DistKeyRequest request;
+    request.set_table_name(table_name);
+    request.set_key1(key1);
+    request.set_key2(key2);
+    request.set_distance_type(distance_type);
+    auto s = DistKey(request, reply);
+    return s;
+}
+
+Status
 VdbClient::Ping(const vectordb_rpc::PingRequest &request, vectordb_rpc::PingReply* reply) {
     grpc::ClientContext context;
     grpc::Status status = stub_->Ping(&context, request, reply);

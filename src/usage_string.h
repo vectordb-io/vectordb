@@ -79,12 +79,12 @@ getknn {\"table_name\":\"test_table_dim10\", \"key\":\"key0_test\", \"limit\":20
 2.8 distance key, calculate the distance between the vector of key1 and the vector of key2 in one table                       \n \
                                                                                                                               \n \
 * whole parameters                                                                                                            \n \
-distance key {\"table_name\":\"test_table_dim10\", \"key1\":\"key0_test\", \"key1_test\":\"key_2\", \"distance_type\":\"cosine\"}      \n \
-distance key {\"table_name\":\"test_table_dim10\", \"key1\":\"key0_test\", \"key1_test\":\"key_2\", \"distance_type\":\"inner_product\"} \n \
-distance key {\"table_name\":\"test_table_dim10\", \"key1\":\"key0_test\", \"key1_test\":\"key_2\", \"distance_type\":\"euclidean\"}   \n \
+distance key {\"table_name\":\"test_table_dim10\", \"key1\":\"key0_test\", \"key2\":\"key1_test\", \"distance_type\":\"cosine\"}      \n \
+distance key {\"table_name\":\"test_table_dim10\", \"key1\":\"key0_test\", \"key2\":\"key1_test\", \"distance_type\":\"inner_product\"} \n \
+distance key {\"table_name\":\"test_table_dim10\", \"key1\":\"key0_test\", \"key2\":\"key1_test\", \"distance_type\":\"euclidean\"}   \n \
                                                                                                                               \n \
 * use default parameters, distance_type = cosine                                                                              \n \
-distance key {\"table_name\":\"test_table_dim10\", \"key1\":\"key0_test\", \"key1_test\":\"key_2\"}                           \n \
+distance key {\"table_name\":\"test_table_dim10\", \"key1\":\"key0_test\", \"key2\":\"key1_test\"}                           \n \
                                                                                                                               \n \
 * simple format, distance key table_name key1 key2 distance_type                                                              \n \
 distance key test_table_dim10 key0_test key1_test cosine                                                                      \n \

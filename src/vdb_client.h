@@ -31,6 +31,11 @@ class VdbClient {
     Status BuildIndex(const std::string &table_name, vectordb_rpc::BuildIndexReply* reply);
     Status GetKNN(const std::string &table_name, const std::string &key, int limit, vectordb_rpc::GetKNNReply* reply);
     Status DistVec(const std::vector<float> &vec1, const std::vector<float> &vec2, vectordb_rpc::DistVecReply* reply);
+    Status DistKey(const std::string &table_name,
+                   const std::string &key1,
+                   const std::string &key2,
+                   const std::string &distance_type,
+                   vectordb_rpc::DistKeyReply* reply);
 
     // original grpc call
     Status Ping(const vectordb_rpc::PingRequest &request, vectordb_rpc::PingReply* reply);

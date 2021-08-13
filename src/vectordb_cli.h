@@ -45,6 +45,7 @@ class VectordbCli {
     Status PreProcess(const std::string &params_json, vectordb_rpc::DropIndexRequest &request, std::string &reply_msg);
     Status PreProcess(const std::string &params_json, vectordb_rpc::GetKNNRequest &request, std::string &reply_msg);
     Status PreProcess(const std::string &params_json, vectordb_rpc::DistVecRequest &request, std::string &reply_msg);
+    Status PreProcess(const std::string &params_json, vectordb_rpc::DistKeyRequest &request, std::string &reply_msg);
 
     void Ping(const vectordb_rpc::PingRequest &request, std::string &reply_msg);
     void Info(const vectordb_rpc::InfoRequest &request, std::string &reply_msg);
@@ -60,9 +61,6 @@ class VectordbCli {
     void LeaveIndex(const vectordb_rpc::LeaveIndexRequest &request, std::string &reply_msg);
     void GetKNN(const vectordb_rpc::GetKNNRequest &request, std::string &reply_msg);
     void DistVec(const vectordb_rpc::DistVecRequest &request, std::string &reply_msg);
-
-
-
     void DistKey(const vectordb_rpc::DistKeyRequest &request, std::string &reply_msg);
 
 

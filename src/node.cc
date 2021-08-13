@@ -469,7 +469,42 @@ Node::GetVec(const std::string &table_name, const std::string &key, VecObj &vo) 
 
 Status
 Node::OnDistKey(const vectordb_rpc::DistKeyRequest* request, vectordb_rpc::DistKeyReply* reply) {
-    return Status::OK();
+    VecObj vo1, vo2;
+    auto s = GetVec(request->table_name(), request->key1(), vo1);
+    if (!s.ok()) {
+        std::string msg = "get " + request->key1() + " error";
+        reply->set_code(1);
+        reply->set_msg(msg);
+        return s;
+    }
+
+    s = GetVec(request->table_name(), request->key2(), vo2);
+    if (!s.ok()) {
+        std::string msg = "get " + request->key2() + " error";
+        reply->set_code(1);
+        reply->set_msg(msg);
+        return s;
+    }
+
+    if (vo1.vec().dim() != vo2.vec().dim()) {
+        reply->set_code(2);
+        reply->set_msg("dim not equal");
+        return Status::OtherError("dim not equal");
+    }
+
+    float distance;
+    s = VIndexAnnoy::Distance(vo1.vec().data(), vo2.vec().data(), request->distance_type(), distance);
+    if (s.ok()) {
+        reply->set_code(0);
+        reply->set_msg("ok");
+        reply->set_distance(distance);
+    } else {
+        reply->set_code(2);
+        reply->set_msg("Distance error");
+        reply->set_distance(0);
+    }
+
+    return s;
 }
 
 Status

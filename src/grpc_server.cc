@@ -153,8 +153,12 @@ grpc::Status
 VectorDBServiceImpl::DistKey(grpc::ServerContext* context,
                              const vectordb_rpc::DistKeyRequest* request,
                              vectordb_rpc::DistKeyReply* reply) {
-    //auto s = Node::GetInstance().OnDistKey(request, reply);
-    //assert(s.ok());
+    auto s = Node::GetInstance().OnDistKey(request, reply);
+    if (!s.ok()) {
+        std::string msg = "DistKey error: " + request->table_name() + ", " + request->key1() + ", " + request->key2();
+        msg.append(s.ToString());
+        LOG(INFO) << msg;
+    }
     return grpc::Status::OK;
 }
 

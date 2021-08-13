@@ -163,6 +163,29 @@ VectordbCli::Do(const std::vector<std::string> &cmd_sv, const std::string &param
             DistVec(request, reply);
         }
 
+    } else if (cmd_sv.size() == 2 && cmd_sv[0] == "distance" && cmd_sv[1] == "key") {
+        vectordb_rpc::DistKeyRequest request;
+        auto s = PreProcess(params_json, request, reply);
+        if (s.ok()) {
+            DistKey(request, reply);
+        }
+
+    } else if (cmd_sv.size() == 6 && cmd_sv[0] == "distance" && cmd_sv[1] == "key") {
+        vectordb_rpc::DistKeyRequest request;
+        request.set_table_name(cmd_sv[2]);
+        request.set_key1(cmd_sv[3]);
+        request.set_key2(cmd_sv[4]);
+        request.set_distance_type(cmd_sv[5]);
+        DistKey(request, reply);
+
+    } else if (cmd_sv.size() == 5 && cmd_sv[0] == "distance" && cmd_sv[1] == "key") {
+        vectordb_rpc::DistKeyRequest request;
+        request.set_table_name(cmd_sv[2]);
+        request.set_key1(cmd_sv[3]);
+        request.set_key2(cmd_sv[4]);
+        request.set_distance_type(VINDEX_DISTANCE_TYPE_COSINE);
+        DistKey(request, reply);
+
     } else if (cmd_sv.size() == 1 && cmd_sv[0] == "get") {
         vectordb_rpc::GetVecRequest request;
         auto s = PreProcess(params_json, request, reply);
@@ -497,17 +520,13 @@ VectordbCli::GetVec(const vectordb_rpc::GetVecRequest &request, std::string &rep
 
 void
 VectordbCli::DistKey(const vectordb_rpc::DistKeyRequest &request, std::string &reply_msg) {
-
-    /*
     vectordb_rpc::DistKeyReply reply;
-    grpc::ClientContext context;
-    grpc::Status status = stub_->DistKey(&context, request, &reply);
-    if (status.ok()) {
-    reply_msg = cli_util::ToString(reply);
+    auto s = vdb_client_.DistKey(request, &reply);
+    if (s.ok()) {
+        reply_msg = cli_util::ToString(reply);
     } else {
-    reply_msg = status.error_message();
+        reply_msg = s.Msg();
     }
-    */
 }
 
 Status
@@ -706,6 +725,67 @@ VectordbCli::LeaveIndex(const vectordb_rpc::LeaveIndexRequest &request, std::str
     } else {
         reply_msg = s.Msg();
     }
+}
+
+Status
+VectordbCli::PreProcess(const std::string &params_json, vectordb_rpc::DistKeyRequest &request, std::string &reply_msg) {
+    reply_msg.clear();
+    do {
+        jsonxx::json j;
+        std::string table_name;
+        std::string key1, key2;
+        std::string distance_type;
+
+        try {
+            j = jsonxx::json::parse(params_json);
+        } catch (std::exception &e) {
+            reply_msg = "parameters error";
+            break;
+        }
+
+        // required value
+        try {
+            table_name = j["table_name"].as_string();
+        } catch (std::exception &e) {
+            reply_msg = "table_name error, ";
+            reply_msg.append(e.what());
+            break;
+        }
+
+        // required value
+        try {
+            key1 = j["key1"].as_string();
+        } catch (std::exception &e) {
+            reply_msg = "key1 error, ";
+            reply_msg.append(e.what());
+            break;
+        }
+
+        // required value
+        try {
+            key2 = j["key2"].as_string();
+        } catch (std::exception &e) {
+            reply_msg = "key2 error, ";
+            reply_msg.append(e.what());
+            break;
+        }
+
+        // optional value
+        try {
+            distance_type = j["distance_type"].as_string();
+        } catch (std::exception &e) {
+            distance_type = VINDEX_DISTANCE_TYPE_COSINE;
+        }
+
+        request.set_table_name(table_name);
+        request.set_key1(key1);
+        request.set_key2(key2);
+        request.set_distance_type(distance_type);
+        return Status::OK();
+
+    } while (0);
+
+    return Status::OtherError(reply_msg);
 }
 
 Status
