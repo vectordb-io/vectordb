@@ -83,6 +83,18 @@ VectorDBServiceImpl::LeaveIndex(grpc::ServerContext* context,
 }
 
 grpc::Status
+VectorDBServiceImpl::DistVec(grpc::ServerContext* context,
+                             const vectordb_rpc::DistVecRequest* request,
+                             vectordb_rpc::DistVecReply* reply) {
+    auto s = Node::GetInstance().OnDistVec(request, reply);
+    if (!s.ok()) {
+        std::string msg = "DistVec error, " + s.ToString();
+        LOG(INFO) << msg;
+    }
+    return grpc::Status::OK;
+}
+
+grpc::Status
 VectorDBServiceImpl::ShowTables(grpc::ServerContext* context,
                                 const vectordb_rpc::ShowTablesRequest* request,
                                 vectordb_rpc::ShowTablesReply* reply) {

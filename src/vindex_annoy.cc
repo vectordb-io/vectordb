@@ -480,7 +480,7 @@ VIndexAnnoy::Distance(const std::vector<float> &vec1, const std::vector<float> &
     }
 
     AnnoyIndexInterface<int, float> *annoy_index = AnnoyFactory::Create(distance_type, vec1.size());
-    if (annoy_index) {
+    if (!annoy_index) {
         return Status::OtherError("create annoy index error");
     }
 

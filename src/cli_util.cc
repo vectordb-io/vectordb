@@ -255,6 +255,15 @@ ToString(const vectordb_rpc::GetKNNReply &reply) {
     return j.dump(4, ' ');
 }
 
+std::string
+ToString(const vectordb_rpc::DistVecReply &reply) {
+    jsonxx::json64 j;
+    j["code"] = reply.code();
+    j["msg"] = reply.msg();
+    j["distance"] = reply.distance();
+    return j.dump(4, ' ');
+}
+
 void
 Split(const std::string &s, char separator, std::vector<std::string> &sv, const std::string ignore) {
     sv.clear();

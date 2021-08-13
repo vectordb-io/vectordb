@@ -156,20 +156,11 @@ VectordbCli::Do(const std::vector<std::string> &cmd_sv, const std::string &param
             PutVec(request, reply);
         }
 
-    } else if (cmd_sv.size() == 2 && cmd_sv[0] == "distance" && cmd_sv[1] == "key") {
-        try {
-            auto j = jsonxx::json::parse(params_json);
-            std::string table_name = j["table_name"].as_string();
-            std::string key1 = j["key1"].as_string();
-            std::string key2 = j["key2"].as_string();
-            vectordb_rpc::DistKeyRequest request;
-            request.set_table_name(table_name);
-            request.set_key1(key1);
-            request.set_key2(key2);
-            DistKey(request, reply);
-
-        } catch (std::exception &e) {
-            std::cout << e.what() << std::endl;
+    } else if (cmd_sv.size() == 2 && cmd_sv[0] == "distance" && cmd_sv[1] == "vector") {
+        vectordb_rpc::DistVecRequest request;
+        auto s = PreProcess(params_json, request, reply);
+        if (s.ok()) {
+            DistVec(request, reply);
         }
 
     } else if (cmd_sv.size() == 1 && cmd_sv[0] == "get") {
@@ -718,6 +709,71 @@ VectordbCli::LeaveIndex(const vectordb_rpc::LeaveIndexRequest &request, std::str
 }
 
 Status
+VectordbCli::PreProcess(const std::string &params_json, vectordb_rpc::DistVecRequest &request, std::string &reply_msg) {
+    reply_msg.clear();
+    do {
+        jsonxx::json j;
+        std::string distance_type;
+
+        try {
+            j = jsonxx::json::parse(params_json);
+        } catch (std::exception &e) {
+            reply_msg = "parameters error";
+            break;
+        }
+
+        // optional value
+        try {
+            distance_type = j["distance_type"].as_string();
+        } catch (std::exception &e) {
+            distance_type = VINDEX_DISTANCE_TYPE_COSINE;
+        }
+
+        // required value
+        try {
+            bool b = j["vector1"].is_array();
+            if (!b) {
+                reply_msg = "vector1 error";
+                break;
+            }
+        } catch (std::exception &e) {
+            reply_msg = "vector1 error, ";
+            reply_msg.append(e.what());
+            break;
+        }
+        const auto& vector1_arr = j["vector1"].as_array();
+        for (auto &jobj : vector1_arr) {
+            float df = jobj.as_float();
+            request.add_vec1(df);
+        }
+
+        // required value
+        try {
+            bool b = j["vector2"].is_array();
+            if (!b) {
+                reply_msg = "vector2 error";
+                break;
+            }
+        } catch (std::exception &e) {
+            reply_msg = "vector2 error, ";
+            reply_msg.append(e.what());
+            break;
+        }
+        const auto& vector2_arr = j["vector2"].as_array();
+        for (auto &jobj : vector2_arr) {
+            float df = jobj.as_float();
+            request.add_vec2(df);
+        }
+
+        request.set_distance_type(distance_type);
+        return Status::OK();
+
+    } while (0);
+
+    return Status::OtherError(reply_msg);
+}
+
+Status
 VectordbCli::PreProcess(const std::string &params_json, vectordb_rpc::GetKNNRequest &request, std::string &reply_msg) {
     reply_msg.clear();
     do {
@@ -787,5 +843,18 @@ VectordbCli::GetKNN(const vectordb_rpc::GetKNNRequest &request, std::string &rep
         reply_msg = s.Msg();
     }
 }
+
+void
+VectordbCli::DistVec(const vectordb_rpc::DistVecRequest &request, std::string &reply_msg) {
+    vectordb_rpc::DistVecReply reply;
+    auto s = vdb_client_.DistVec(request, &reply);
+    if (s.ok()) {
+        reply_msg = cli_util::ToString(reply);
+    } else {
+        reply_msg = s.Msg();
+    }
+}
+
+
 
 } // namespace vectordb

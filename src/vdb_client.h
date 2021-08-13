@@ -30,6 +30,7 @@ class VdbClient {
                   vectordb_rpc::PutVecReply* reply);
     Status BuildIndex(const std::string &table_name, vectordb_rpc::BuildIndexReply* reply);
     Status GetKNN(const std::string &table_name, const std::string &key, int limit, vectordb_rpc::GetKNNReply* reply);
+    Status DistVec(const std::vector<float> &vec1, const std::vector<float> &vec2, vectordb_rpc::DistVecReply* reply);
 
     // original grpc call
     Status Ping(const vectordb_rpc::PingRequest &request, vectordb_rpc::PingReply* reply);
@@ -46,6 +47,7 @@ class VdbClient {
     Status Keys(const vectordb_rpc::KeysRequest &request, vectordb_rpc::KeysReply* reply);
     Status BuildIndex(const vectordb_rpc::BuildIndexRequest &request, vectordb_rpc::BuildIndexReply* reply);
     Status GetKNN(const vectordb_rpc::GetKNNRequest &request, vectordb_rpc::GetKNNReply* reply);
+    Status DistVec(const vectordb_rpc::DistVecRequest &request, vectordb_rpc::DistVecReply* reply);
 
     const std::string& address() const {
         return address_;

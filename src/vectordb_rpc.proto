@@ -123,6 +123,7 @@ message DistKeyRequest {
   string table_name = 1;
   string key1 = 2;
   string key2 = 3;
+  string distance_type = 4;
 }
 
 message DistKeyReply {
@@ -134,6 +135,7 @@ message DistKeyReply {
 message DistVecRequest {
   repeated float vec1 = 1;
   repeated float vec2 = 2;
+  string distance_type = 3;
 }
 
 message DistVecReply {

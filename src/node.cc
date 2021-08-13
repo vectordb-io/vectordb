@@ -473,6 +473,37 @@ Node::OnDistKey(const vectordb_rpc::DistKeyRequest* request, vectordb_rpc::DistK
 }
 
 Status
+Node::OnDistVec(const vectordb_rpc::DistVecRequest* request, vectordb_rpc::DistVecReply* reply) {
+    std::vector<float> vec1;
+    std::vector<float> vec2;
+
+    if (request->vec1_size() != request->vec2_size()) {
+        reply->set_code(1);
+        reply->set_msg("dim not equal");
+        return Status::OtherError("dim not equal");
+    }
+
+    for (int i = 0; i < request->vec1_size(); ++i) {
+        vec1.push_back(request->vec1(i));
+        vec2.push_back(request->vec2(i));
+    }
+
+    float distance;
+    auto s = VIndexAnnoy::Distance(vec1, vec2, request->distance_type(), distance);
+    if (s.ok()) {
+        reply->set_code(0);
+        reply->set_msg("ok");
+        reply->set_distance(distance);
+    } else {
+        reply->set_code(2);
+        reply->set_msg("Distance error");
+        reply->set_distance(0);
+    }
+
+    return s;
+}
+
+Status
 Node::OnKeys(const vectordb_rpc::KeysRequest* request, vectordb_rpc::KeysReply* reply) {
     std::vector<std::string> replica_names;
     auto s = meta_.ReplicaNamesByTable(request->table_name(), replica_names);

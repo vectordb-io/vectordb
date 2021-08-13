@@ -37,6 +37,7 @@ class Node {
     Status OnPutVec(const vectordb_rpc::PutVecRequest* request, vectordb_rpc::PutVecReply* reply);
     Status OnGetVec(const vectordb_rpc::GetVecRequest* request, vectordb_rpc::GetVecReply* reply);
     Status OnDistKey(const vectordb_rpc::DistKeyRequest* request, vectordb_rpc::DistKeyReply* reply);
+    Status OnDistVec(const vectordb_rpc::DistVecRequest* request, vectordb_rpc::DistVecReply* reply);
     Status OnKeys(const vectordb_rpc::KeysRequest* request, vectordb_rpc::KeysReply* reply);
     Status OnBuildIndex(const vectordb_rpc::BuildIndexRequest* request, vectordb_rpc::BuildIndexReply* reply);
     Status OnGetKNN(const vectordb_rpc::GetKNNRequest* request, vectordb_rpc::GetKNNReply* reply);

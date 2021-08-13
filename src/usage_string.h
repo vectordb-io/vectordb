@@ -74,19 +74,27 @@ get {\"table_name\":\"test_table_dim10\", \"key\":\"key0_test\"}                
 getknn {\"table_name\":\"test_table_dim10\", \"key\":\"key0_test\", \"limit\":20, \"index_name\":\"test_table_dim10#annoy#timestamp\"}                     \n \
                                                                                                                               \n \
 * use default parameters, use the newest index                                                                                \n \
-getknn {\"table_name\":\"test_table_dim10\", \"key\":\"key0_test\", \"limit\":20}                                                   \n \
+getknn {\"table_name\":\"test_table_dim10\", \"key\":\"key0_test\", \"limit\":20}                                             \n \
                                                                                                                               \n \
-2.8 distance key                                                                                                              \n \
+2.8 distance key, calculate the distance between the vector of key1 and the vector of key2 in one table                       \n \
                                                                                                                               \n \
 * whole parameters                                                                                                            \n \
-distance key {\"table_name\":\"test_table_dim10\", \"key1\":\"key_1\", \"key2\":\"key_2\", \"distance_type\":\"cosine\"}      \n \
-distance key {\"table_name\":\"test_table_dim10\", \"key1\":\"key_1\", \"key2\":\"key_2\", \"distance_type\":\"inner_product\"} \n \
-distance key {\"table_name\":\"test_table_dim10\", \"key1\":\"key_1\", \"key2\":\"key_2\", \"distance_type\":\"euclidean\"}   \n \
+distance key {\"table_name\":\"test_table_dim10\", \"key1\":\"key0_test\", \"key1_test\":\"key_2\", \"distance_type\":\"cosine\"}      \n \
+distance key {\"table_name\":\"test_table_dim10\", \"key1\":\"key0_test\", \"key1_test\":\"key_2\", \"distance_type\":\"inner_product\"} \n \
+distance key {\"table_name\":\"test_table_dim10\", \"key1\":\"key0_test\", \"key1_test\":\"key_2\", \"distance_type\":\"euclidean\"}   \n \
                                                                                                                               \n \
 * use default parameters, distance_type = cosine                                                                              \n \
-distance key {\"table_name\":\"test_table_dim10\", \"key1\":\"key_1\", \"key2\":\"key_2\"}                                    \n \
+distance key {\"table_name\":\"test_table_dim10\", \"key1\":\"key0_test\", \"key1_test\":\"key_2\"}                           \n \
                                                                                                                               \n \
-2.9 distance vector                                                                                                           \n \
+* simple format, distance key table_name key1 key2 distance_type                                                              \n \
+distance key test_table_dim10 key0_test key1_test cosine                                                                      \n \
+distance key test_table_dim10 key0_test key1_test inner_product                                                               \n \
+distance key test_table_dim10 key0_test key1_test euclidean                                                                   \n \
+                                                                                                                              \n \
+* simple command, use default parameters, distance_type = cosine                                                              \n \
+distance key test_table_dim10 key0_test key1_test                                                                             \n \
+                                                                                                                              \n \
+2.9 distance vector, calculate the distance between vector1 and vector2                                                       \n \
                                                                                                                               \n \
 * whole parameters                                                                                                            \n \
 distance vector {\"vector1\":[1.13, 2.25, 3.73, 4.99, 3.28, 4.22, 6.21, 9.44, 8.12, 5.23], \"vector2\":[28.63, 22.45, 3.93, 7.93, 4.21, 8.42, 7.29, 32.44, 44.12, 12.23], \"distance_type\":\"cosine\"}           \n \

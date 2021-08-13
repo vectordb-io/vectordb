@@ -112,6 +112,19 @@ VdbClient::GetKNN(const std::string &table_name, const std::string &key, int lim
 }
 
 Status
+VdbClient::DistVec(const std::vector<float> &vec1, const std::vector<float> &vec2, vectordb_rpc::DistVecReply* reply) {
+    vectordb_rpc::DistVecRequest request;
+    for (auto &f : vec1) {
+        request.add_vec1(f);
+    }
+    for (auto &f : vec2) {
+        request.add_vec2(f);
+    }
+    auto s = DistVec(request, reply);
+    return s;
+}
+
+Status
 VdbClient::Ping(const vectordb_rpc::PingRequest &request, vectordb_rpc::PingReply* reply) {
     grpc::ClientContext context;
     grpc::Status status = stub_->Ping(&context, request, reply);
@@ -256,7 +269,6 @@ VdbClient::BuildIndex(const vectordb_rpc::BuildIndexRequest &request, vectordb_r
 
 Status
 VdbClient::GetKNN(const vectordb_rpc::GetKNNRequest &request, vectordb_rpc::GetKNNReply* reply) {
-
     grpc::ClientContext context;
     grpc::Status status = stub_->GetKNN(&context, request, reply);
     if (!status.ok()) {
@@ -265,5 +277,17 @@ VdbClient::GetKNN(const vectordb_rpc::GetKNNRequest &request, vectordb_rpc::GetK
     }
     return Status::OK();
 }
+
+Status
+VdbClient::DistVec(const vectordb_rpc::DistVecRequest &request, vectordb_rpc::DistVecReply* reply) {
+    grpc::ClientContext context;
+    grpc::Status status = stub_->DistVec(&context, request, reply);
+    if (!status.ok()) {
+        std::string reply_msg = status.error_message();
+        return Status::OtherError(reply_msg);
+    }
+    return Status::OK();
+}
+
 
 } // namespace vectordb
