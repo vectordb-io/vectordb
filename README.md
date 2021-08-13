@@ -22,6 +22,21 @@ More details at [vectordb.io](http://vectordb.io)
 * auto recovery, auto rebalance
 * high throughput, low latency
 
+## Version
+| Features | Community | Enterprise | Comment |
+| :---:| :---: | :---: | :--- |
+| **data sharding** | o | o | Cut huge data into many small pieces, so that every piece has good performance |
+| **multi programming language SDK** | o | o | C++, Java, Python ... |
+| **command console** | o | o | A console run in linux shell |
+| **web console** | o | o | A web console run in explorer |
+| **plug-in index** | o | o | Various type of indexes can be "pluged" into vectordb |
+| **cluster** |  | o | Deploy the system into several machines |
+| **raft consensus** |  | o | Use raft consensus to replicate data, metadata between several replicas |
+| **insentient index** |  | o | Excellent feature! You need not to build index any more! When a vector is inserted into vectordb, it can be searched immediately! Vectordb will hold the vector in memory, and merge it into the index at a appropriate time. More details click here. |
+| **data compress** |  | o | Compress the data, save storage |
+| **GPU** |  | o | Build index on GPU, accelerate it! |
+
+
 ## Architecture
 
 #### 1. metadata
