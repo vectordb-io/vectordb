@@ -134,6 +134,14 @@ VectordbCli::Do(const std::vector<std::string> &cmd_sv, const std::string &param
         request.add_index_names(cmd_sv[2]);
         DropIndex(request, reply);
 
+    } else if (cmd_sv.size() == 4 && cmd_sv[0] == "leave" && cmd_sv[1] == "index") {
+        vectordb_rpc::LeaveIndexRequest request;
+        request.set_table_name(cmd_sv[2]);
+        uint32_t left;
+        sscanf(cmd_sv[3].c_str(), "%u", &left);
+        request.set_left(left);
+        LeaveIndex(request, reply);
+
     } else if (cmd_sv.size() == 1 && cmd_sv[0] == "keys") {
         vectordb_rpc::KeysRequest request;
         auto s = PreProcess(params_json, request, reply);
@@ -691,6 +699,17 @@ void
 VectordbCli::DropIndex(const vectordb_rpc::DropIndexRequest &request, std::string &reply_msg) {
     vectordb_rpc::DropIndexReply reply;
     auto s = vdb_client_.DropIndex(request, &reply);
+    if (s.ok()) {
+        reply_msg = cli_util::ToString(reply);
+    } else {
+        reply_msg = s.Msg();
+    }
+}
+
+void
+VectordbCli::LeaveIndex(const vectordb_rpc::LeaveIndexRequest &request, std::string &reply_msg) {
+    vectordb_rpc::LeaveIndexReply reply;
+    auto s = vdb_client_.LeaveIndex(request, &reply);
     if (s.ok()) {
         reply_msg = cli_util::ToString(reply);
     } else {

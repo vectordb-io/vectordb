@@ -29,6 +29,10 @@ class VectorDBServiceImpl final : public vectordb_rpc::VectorDB::Service {
                            const vectordb_rpc::DropIndexRequest* request,
                            vectordb_rpc::DropIndexReply* reply) override;
 
+    grpc::Status LeaveIndex(grpc::ServerContext* context,
+                            const vectordb_rpc::LeaveIndexRequest* request,
+                            vectordb_rpc::LeaveIndexReply* reply) override;
+
     grpc::Status ShowTables(grpc::ServerContext* context,
                             const vectordb_rpc::ShowTablesRequest* request,
                             vectordb_rpc::ShowTablesReply* reply) override;

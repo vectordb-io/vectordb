@@ -231,6 +231,14 @@ ToString(const vectordb_rpc::DropIndexReply &reply) {
 }
 
 std::string
+ToString(const vectordb_rpc::LeaveIndexReply &reply) {
+    jsonxx::json64 j;
+    j["code"] = reply.code();
+    j["msg"] = reply.msg();
+    return j.dump(4, ' ');
+}
+
+std::string
 ToString(const vectordb_rpc::GetKNNReply &reply) {
     jsonxx::json64 j;
     j["code"] = reply.code();

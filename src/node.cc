@@ -128,6 +128,87 @@ Node::OnCreateTable(const vectordb_rpc::CreateTableRequest* request, vectordb_rp
 }
 
 Status
+Node::OnLeaveIndex(const vectordb_rpc::LeaveIndexRequest* request, vectordb_rpc::LeaveIndexReply* reply) {
+    auto table_sp =  meta_.GetTable(request->table_name());
+    if (!table_sp) {
+        std::string msg = "get table error, " + request->table_name();
+        return Status::OtherError(msg);
+    }
+
+    std::map<time_t, std::string> index_map;
+    std::set<std::string> index_names;
+    table_sp->get_index_names(index_names);
+    for (auto &index_name : index_names) {
+        std::string table_name;
+        std::string index_type;
+        time_t timestamp;
+        bool b = util::ParseIndexName(index_name, table_name, index_type, timestamp);
+        if (!b) {
+            std::string msg = "ParseIndexName " + index_name + " error";
+            LOG(INFO) << msg;
+            continue;
+        }
+        index_map.insert(std::pair<time_t, std::string>(timestamp, index_name));
+    }
+
+    std::vector<std::string> del_index_names;
+    while (index_map.size() > request->left()) {
+        std::string del_name = index_map.begin()->second;
+        index_map.erase(index_map.begin());
+        del_index_names.push_back(del_name);
+    }
+
+    int del_count = 0;
+    for (auto &index_name : del_index_names) {
+        table_sp->DelIndexName(index_name);
+        auto s = meta_.Persist();
+        if (!s.ok()) {
+            std::string msg = "meta persist error";
+            LOG(INFO) << msg;
+            reply->set_code(1);
+            reply->set_msg(msg);
+            return s;
+        } else {
+            std::string msg = "drop index " + index_name + " " + meta_.ToString();
+            //LOG(INFO) << msg;
+        }
+
+        std::vector<std::string> replica_names;
+        for (int partition_id = 0; partition_id < table_sp->partition_num(); ++partition_id) {
+            for (int replica_id = 0; replica_id < table_sp->replica_num(); ++replica_id) {
+                replica_names.push_back(util::ReplicaName(table_sp->name(), partition_id, replica_id));
+            }
+        }
+
+        for (auto &replica_name : replica_names) {
+            auto vengine_sp = engine_manager_.GetVEngine(replica_name);
+            if (!vengine_sp) {
+                std::string msg = "get vengine " + replica_name + " error";
+                LOG(INFO) << msg;
+                continue;
+            }
+
+            s = vengine_sp->mutable_vindex_manager().Del(index_name);
+            if (!s.ok()) {
+                std::string msg = "del index " + index_name + " " + replica_name + " error " + s.ToString();
+                LOG(INFO) << msg;
+                continue;
+            }
+        }
+
+        del_count++;
+        std::string msg = "drop index " + index_name + " ok";
+        LOG(INFO) << msg;
+    }
+
+    char msg_buf[128];
+    snprintf(msg_buf, sizeof(msg_buf), "%d index dropped", del_count);
+    reply->set_code(0);
+    reply->set_msg(msg_buf);
+    return Status::OK();
+}
+
+Status
 Node::OnDropIndex(const vectordb_rpc::DropIndexRequest* request, vectordb_rpc::DropIndexReply* reply) {
     int del_count = 0;
     for (int i = 0; i < request->index_names_size(); ++i) {

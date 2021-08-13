@@ -318,6 +318,12 @@ class Table {
         indices_.erase(index_name);
     }
 
+    void get_index_names(std::set<std::string> &index_names) const {
+        index_names.clear();
+        std::unique_lock<std::mutex> guard(mutex_);
+        index_names = indices_;
+    }
+
   private:
     void AddAllPartitions();
 

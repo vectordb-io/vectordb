@@ -34,6 +34,7 @@ std::string ToString(const vectordb_rpc::DistKeyReply &reply);
 std::string ToString(const vectordb_rpc::KeysReply &reply);
 std::string ToString(const vectordb_rpc::BuildIndexReply &reply);
 std::string ToString(const vectordb_rpc::DropIndexReply &reply);
+std::string ToString(const vectordb_rpc::LeaveIndexReply &reply);
 std::string ToString(const vectordb_rpc::GetKNNReply &reply);
 
 } // namespace cli_util

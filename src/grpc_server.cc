@@ -67,7 +67,18 @@ VectorDBServiceImpl::DropIndex(grpc::ServerContext* context,
         std::string msg = "DropIndex error, " + s.ToString();
         LOG(INFO) << msg;
     }
+    return grpc::Status::OK;
+}
 
+grpc::Status
+VectorDBServiceImpl::LeaveIndex(grpc::ServerContext* context,
+                                const vectordb_rpc::LeaveIndexRequest* request,
+                                vectordb_rpc::LeaveIndexReply* reply) {
+    auto s = Node::GetInstance().OnLeaveIndex(request, reply);
+    if (!s.ok()) {
+        std::string msg = "LeaveIndex error, " + s.ToString();
+        LOG(INFO) << msg;
+    }
     return grpc::Status::OK;
 }
 

@@ -56,6 +56,7 @@ class VectordbCli {
     void Keys(const vectordb_rpc::KeysRequest &request, std::string &reply_msg);
     void BuildIndex(const vectordb_rpc::BuildIndexRequest &request, std::string &reply_msg);
     void DropIndex(const vectordb_rpc::DropIndexRequest &request, std::string &reply_msg);
+    void LeaveIndex(const vectordb_rpc::LeaveIndexRequest &request, std::string &reply_msg);
     void GetKNN(const vectordb_rpc::GetKNNRequest &request, std::string &reply_msg);
 
 
