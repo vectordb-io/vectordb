@@ -29,6 +29,7 @@ class Node {
     Status OnInfo(const vectordb_rpc::InfoRequest* request, vectordb_rpc::InfoReply* reply);
     Status OnCreateTable(const vectordb_rpc::CreateTableRequest* request, vectordb_rpc::CreateTableReply* reply);
     Status OnDropTable(const vectordb_rpc::DropTableRequest* request, vectordb_rpc::DropTableReply* reply);
+    Status OnDropIndex(const vectordb_rpc::DropIndexRequest* request, vectordb_rpc::DropIndexReply* reply);
     Status OnShowTables(const vectordb_rpc::ShowTablesRequest* request, vectordb_rpc::ShowTablesReply* reply);
     Status OnDescribe(const vectordb_rpc::DescribeRequest* request, vectordb_rpc::DescribeReply* reply);
     Status OnPutVec(const vectordb_rpc::PutVecRequest* request, vectordb_rpc::PutVecReply* reply);

@@ -44,6 +44,25 @@ VdbClient::DropTable(const std::string &table_name, vectordb_rpc::DropTableReply
 }
 
 Status
+VdbClient::DropIndex(const std::vector<std::string> &index_names, vectordb_rpc::DropIndexReply* reply) {
+    vectordb_rpc::DropIndexRequest request;
+    for (auto &index_name : index_names) {
+        request.add_index_names(index_name);
+    }
+    auto s = DropIndex(request, reply);
+    return s;
+}
+
+Status
+VdbClient::LeaveIndex(const std::string &table_name, uint32_t left, vectordb_rpc::LeaveIndexReply* reply) {
+    vectordb_rpc::LeaveIndexRequest request;
+    request.set_table_name(table_name);
+    request.set_left(left);
+    auto s = LeaveIndex(request, reply);
+    return s;
+}
+
+Status
 VdbClient::PutVec(const std::string &table_name,
                   const std::string &key,
                   const std::vector<float> &vec,
@@ -129,6 +148,28 @@ Status
 VdbClient::DropTable(const vectordb_rpc::DropTableRequest &request, vectordb_rpc::DropTableReply* reply) {
     grpc::ClientContext context;
     grpc::Status status = stub_->DropTable(&context, request, reply);
+    if (!status.ok()) {
+        std::string reply_msg = status.error_message();
+        return Status::OtherError(reply_msg);
+    }
+    return Status::OK();
+}
+
+Status
+VdbClient::DropIndex(const vectordb_rpc::DropIndexRequest &request, vectordb_rpc::DropIndexReply* reply) {
+    grpc::ClientContext context;
+    grpc::Status status = stub_->DropIndex(&context, request, reply);
+    if (!status.ok()) {
+        std::string reply_msg = status.error_message();
+        return Status::OtherError(reply_msg);
+    }
+    return Status::OK();
+}
+
+Status
+VdbClient::LeaveIndex(const vectordb_rpc::LeaveIndexRequest &request, vectordb_rpc::LeaveIndexReply* reply) {
+    grpc::ClientContext context;
+    grpc::Status status = stub_->LeaveIndex(&context, request, reply);
     if (!status.ok()) {
         std::string reply_msg = status.error_message();
         return Status::OtherError(reply_msg);

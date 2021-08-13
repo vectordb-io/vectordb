@@ -42,6 +42,7 @@ class VectordbCli {
     Status PreProcess(const std::string &params_json, vectordb_rpc::GetVecRequest &request, std::string &reply_msg);
     Status PreProcess(const std::string &params_json, vectordb_rpc::KeysRequest &request, std::string &reply_msg);
     Status PreProcess(const std::string &params_json, vectordb_rpc::BuildIndexRequest &request, std::string &reply_msg);
+    Status PreProcess(const std::string &params_json, vectordb_rpc::DropIndexRequest &request, std::string &reply_msg);
     Status PreProcess(const std::string &params_json, vectordb_rpc::GetKNNRequest &request, std::string &reply_msg);
 
     void Ping(const vectordb_rpc::PingRequest &request, std::string &reply_msg);
@@ -54,6 +55,7 @@ class VectordbCli {
     void GetVec(const vectordb_rpc::GetVecRequest &request, std::string &reply_msg);
     void Keys(const vectordb_rpc::KeysRequest &request, std::string &reply_msg);
     void BuildIndex(const vectordb_rpc::BuildIndexRequest &request, std::string &reply_msg);
+    void DropIndex(const vectordb_rpc::DropIndexRequest &request, std::string &reply_msg);
     void GetKNN(const vectordb_rpc::GetKNNRequest &request, std::string &reply_msg);
 
 

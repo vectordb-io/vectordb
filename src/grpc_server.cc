@@ -59,6 +59,19 @@ VectorDBServiceImpl::DropTable(grpc::ServerContext* context,
 }
 
 grpc::Status
+VectorDBServiceImpl::DropIndex(grpc::ServerContext* context,
+                               const vectordb_rpc::DropIndexRequest* request,
+                               vectordb_rpc::DropIndexReply* reply) {
+    auto s = Node::GetInstance().OnDropIndex(request, reply);
+    if (!s.ok()) {
+        std::string msg = "DropIndex error, " + s.ToString();
+        LOG(INFO) << msg;
+    }
+
+    return grpc::Status::OK;
+}
+
+grpc::Status
 VectorDBServiceImpl::ShowTables(grpc::ServerContext* context,
                                 const vectordb_rpc::ShowTablesRequest* request,
                                 vectordb_rpc::ShowTablesReply* reply) {

@@ -110,17 +110,29 @@ VectordbCli::Do(const std::vector<std::string> &cmd_sv, const std::string &param
         request.mutable_knn_graph_param()->set_k(20);
         BuildIndex(request, reply);
 
-    } else if (cmd_sv.size() == 3 && cmd_sv[0] == "drop" && cmd_sv[1] == "table") {
-        vectordb_rpc::DropTableRequest request;
-        request.set_table_name(cmd_sv[2]);
-        DropTable(request, reply);
-
     } else if (cmd_sv.size() == 2 && cmd_sv[0] == "build" && cmd_sv[1] == "index") {
         vectordb_rpc::BuildIndexRequest request;
         auto s = PreProcess(params_json, request, reply);
         if (s.ok()) {
             BuildIndex(request, reply);
         }
+
+    } else if (cmd_sv.size() == 3 && cmd_sv[0] == "drop" && cmd_sv[1] == "table") {
+        vectordb_rpc::DropTableRequest request;
+        request.set_table_name(cmd_sv[2]);
+        DropTable(request, reply);
+
+    } else if (cmd_sv.size() == 2 && cmd_sv[0] == "drop" && cmd_sv[1] == "index") {
+        vectordb_rpc::DropIndexRequest request;
+        auto s = PreProcess(params_json, request, reply);
+        if (s.ok()) {
+            DropIndex(request, reply);
+        }
+
+    } else if (cmd_sv.size() == 3 && cmd_sv[0] == "drop" && cmd_sv[1] == "index") {
+        vectordb_rpc::DropIndexRequest request;
+        request.add_index_names(cmd_sv[2]);
+        DropIndex(request, reply);
 
     } else if (cmd_sv.size() == 1 && cmd_sv[0] == "keys") {
         vectordb_rpc::KeysRequest request;
@@ -560,6 +572,45 @@ VectordbCli::Keys(const vectordb_rpc::KeysRequest &request, std::string &reply_m
 }
 
 Status
+VectordbCli::PreProcess(const std::string &params_json, vectordb_rpc::DropIndexRequest &request, std::string &reply_msg) {
+    reply_msg.clear();
+    do {
+        jsonxx::json j;
+
+        try {
+            j = jsonxx::json::parse(params_json);
+        } catch (std::exception &e) {
+            reply_msg = "parameters error";
+            break;
+        }
+
+        // required value
+        try {
+            bool b = j["index_names"].is_array();
+            if (!b) {
+                reply_msg = "index_names error";
+                break;
+            }
+        } catch (std::exception &e) {
+            reply_msg = "index_names error, ";
+            reply_msg.append(e.what());
+            break;
+        }
+        const auto& index_names_arr = j["index_names"].as_array();
+
+        for (auto &jobj : index_names_arr) {
+            std::string index_name = jobj.as_string();
+            request.add_index_names(index_name);
+        }
+
+        return Status::OK();
+
+    } while (0);
+
+    return Status::OtherError(reply_msg);
+}
+
+Status
 VectordbCli::PreProcess(const std::string &params_json, vectordb_rpc::BuildIndexRequest &request, std::string &reply_msg) {
     reply_msg.clear();
     do {
@@ -629,6 +680,17 @@ void
 VectordbCli::BuildIndex(const vectordb_rpc::BuildIndexRequest &request, std::string &reply_msg) {
     vectordb_rpc::BuildIndexReply reply;
     auto s = vdb_client_.BuildIndex(request, &reply);
+    if (s.ok()) {
+        reply_msg = cli_util::ToString(reply);
+    } else {
+        reply_msg = s.Msg();
+    }
+}
+
+void
+VectordbCli::DropIndex(const vectordb_rpc::DropIndexRequest &request, std::string &reply_msg) {
+    vectordb_rpc::DropIndexReply reply;
+    auto s = vdb_client_.DropIndex(request, &reply);
     if (s.ok()) {
         reply_msg = cli_util::ToString(reply);
     } else {

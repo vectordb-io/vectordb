@@ -11,9 +11,12 @@ service VectorDB {
   rpc Describe (DescribeRequest) returns (DescribeReply) {}
   rpc PutVec (PutVecRequest) returns (PutVecReply) {}
   rpc GetVec (GetVecRequest) returns (GetVecReply) {}
-  rpc DistKey (DistKeyRequest) returns (DistKeyReply) {}
   rpc Keys (KeysRequest) returns (KeysReply) {}
   rpc BuildIndex (BuildIndexRequest) returns (BuildIndexReply) {}
+  rpc DropIndex (DropIndexRequest) returns (DropIndexReply) {}
+  rpc LeaveIndex (LeaveIndexRequest) returns (LeaveIndexReply) {}
+  rpc DistKey (DistKeyRequest) returns (DistKeyReply) {}
+  rpc DistVec (DistVecRequest) returns (DistVecReply) {}
   rpc GetKNN (GetKNNRequest) returns (GetKNNReply) {}
 }
 
@@ -97,6 +100,25 @@ message BuildIndexReply {
   string msg = 2;
 }
 
+message DropIndexRequest {
+  repeated string index_names = 1;
+}
+
+message DropIndexReply {
+  int32 code = 1;
+  string msg = 2;
+}
+
+message LeaveIndexRequest {
+  string table_name = 1;
+  uint32 left = 2;
+}
+
+message LeaveIndexReply {
+  int32 code = 1;
+  string msg = 2;
+}
+
 message DistKeyRequest {
   string table_name = 1;
   string key1 = 2;
@@ -104,6 +126,17 @@ message DistKeyRequest {
 }
 
 message DistKeyReply {
+  int32 code = 1;
+  string msg = 2;
+  float distance = 3;	
+}
+
+message DistVecRequest {
+  repeated float vec1 = 1;
+  repeated float vec2 = 2;
+}
+
+message DistVecReply {
   int32 code = 1;
   string msg = 2;
   float distance = 3;	

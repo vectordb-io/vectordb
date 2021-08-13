@@ -21,6 +21,8 @@ class VdbClient {
     Status Ping(vectordb_rpc::PingReply* reply);
     Status CreateTable(const std::string &table_name, int dim, vectordb_rpc::CreateTableReply* reply);
     Status DropTable(const std::string &table_name, vectordb_rpc::DropTableReply* reply);
+    Status DropIndex(const std::vector<std::string> &index_names, vectordb_rpc::DropIndexReply* reply);
+    Status LeaveIndex(const std::string &table_name, uint32_t left, vectordb_rpc::LeaveIndexReply* reply);
     Status PutVec(const std::string &table_name,
                   const std::string &key,
                   const std::vector<float> &vec,
@@ -34,6 +36,8 @@ class VdbClient {
     Status Info(const vectordb_rpc::InfoRequest &request, vectordb_rpc::InfoReply* reply);
     Status CreateTable(const vectordb_rpc::CreateTableRequest &request, vectordb_rpc::CreateTableReply* reply);
     Status DropTable(const vectordb_rpc::DropTableRequest &request, vectordb_rpc::DropTableReply* reply);
+    Status DropIndex(const vectordb_rpc::DropIndexRequest &request, vectordb_rpc::DropIndexReply* reply);
+    Status LeaveIndex(const vectordb_rpc::LeaveIndexRequest &request, vectordb_rpc::LeaveIndexReply* reply);
     Status ShowTables(const vectordb_rpc::ShowTablesRequest &request, vectordb_rpc::ShowTablesReply* reply);
     Status Describe(const vectordb_rpc::DescribeRequest &request, vectordb_rpc::DescribeReply* reply);
     Status PutVec(const vectordb_rpc::PutVecRequest &request, vectordb_rpc::PutVecReply* reply);
