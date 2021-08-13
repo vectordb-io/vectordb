@@ -158,61 +158,21 @@ Node::OnLeaveIndex(const vectordb_rpc::LeaveIndexRequest* request, vectordb_rpc:
         del_index_names.push_back(del_name);
     }
 
-    int del_count = 0;
-    for (auto &index_name : del_index_names) {
-        table_sp->DelIndexName(index_name);
-        auto s = meta_.Persist();
-        if (!s.ok()) {
-            std::string msg = "meta persist error";
-            LOG(INFO) << msg;
-            reply->set_code(1);
-            reply->set_msg(msg);
-            return s;
-        } else {
-            std::string msg = "drop index " + index_name + " " + meta_.ToString();
-            //LOG(INFO) << msg;
-        }
-
-        std::vector<std::string> replica_names;
-        for (int partition_id = 0; partition_id < table_sp->partition_num(); ++partition_id) {
-            for (int replica_id = 0; replica_id < table_sp->replica_num(); ++replica_id) {
-                replica_names.push_back(util::ReplicaName(table_sp->name(), partition_id, replica_id));
-            }
-        }
-
-        for (auto &replica_name : replica_names) {
-            auto vengine_sp = engine_manager_.GetVEngine(replica_name);
-            if (!vengine_sp) {
-                std::string msg = "get vengine " + replica_name + " error";
-                LOG(INFO) << msg;
-                continue;
-            }
-
-            s = vengine_sp->mutable_vindex_manager().Del(index_name);
-            if (!s.ok()) {
-                std::string msg = "del index " + index_name + " " + replica_name + " error " + s.ToString();
-                LOG(INFO) << msg;
-                continue;
-            }
-        }
-
-        del_count++;
-        std::string msg = "drop index " + index_name + " ok";
-        LOG(INFO) << msg;
+    std::vector<std::string> del_success;
+    auto s = DropIndex(del_index_names, del_success);
+    if (s.ok()) {
+        table_sp->get_index_names(index_names);
+        char msg_buf[128];
+        snprintf(msg_buf, sizeof(msg_buf), "%lu index dropped, %lu index left", del_success.size(), index_names.size());
+        reply->set_msg(msg_buf);
     }
-
-    char msg_buf[128];
-    snprintf(msg_buf, sizeof(msg_buf), "%d index dropped", del_count);
-    reply->set_code(0);
-    reply->set_msg(msg_buf);
-    return Status::OK();
+    return s;
 }
 
 Status
-Node::OnDropIndex(const vectordb_rpc::DropIndexRequest* request, vectordb_rpc::DropIndexReply* reply) {
-    int del_count = 0;
-    for (int i = 0; i < request->index_names_size(); ++i) {
-        std::string index_name = request->index_names(i);
+Node::DropIndex(const std::vector<std::string> &index_names, std::vector<std::string> &del_success) {
+    del_success.clear();
+    for (auto &index_name : index_names) {
         std::string table_name;
         std::string index_type;
         time_t timestamp;
@@ -235,8 +195,6 @@ Node::OnDropIndex(const vectordb_rpc::DropIndexRequest* request, vectordb_rpc::D
         if (!s.ok()) {
             std::string msg = "meta persist error";
             LOG(INFO) << msg;
-            reply->set_code(1);
-            reply->set_msg(msg);
             return s;
         } else {
             std::string msg = "drop index " + index_name + " " + meta_.ToString();
@@ -266,16 +224,29 @@ Node::OnDropIndex(const vectordb_rpc::DropIndexRequest* request, vectordb_rpc::D
             }
         }
 
-        del_count++;
+        del_success.push_back(index_name);
         std::string msg = "drop index " + index_name + " ok";
         LOG(INFO) << msg;
     }
 
-    char msg_buf[128];
-    snprintf(msg_buf, sizeof(msg_buf), "%d index dropped", del_count);
-    reply->set_code(0);
-    reply->set_msg(msg_buf);
     return Status::OK();
+}
+
+Status
+Node::OnDropIndex(const vectordb_rpc::DropIndexRequest* request, vectordb_rpc::DropIndexReply* reply) {
+    std::vector<std::string> index_names;
+    std::vector<std::string> del_success;
+    for (int i = 0; i < request->index_names_size(); ++i) {
+        index_names.push_back(request->index_names(i));
+    }
+
+    auto s = DropIndex(index_names, del_success);
+    if (s.ok()) {
+        char msg_buf[128];
+        snprintf(msg_buf, sizeof(msg_buf), "%lu index dropped", del_success.size());
+        reply->set_msg(msg_buf);
+    }
+    return s;
 }
 
 Status

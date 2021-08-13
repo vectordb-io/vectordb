@@ -24,6 +24,7 @@ class Node {
     Status Start();
     Status Stop();
     Status GetVec(const std::string &table_name, const std::string &key, VecObj &vo) const;
+    Status DropIndex(const std::vector<std::string> &index_names, std::vector<std::string> &del_success);
 
     Status OnPing(const vectordb_rpc::PingRequest* request, vectordb_rpc::PingReply* reply);
     Status OnInfo(const vectordb_rpc::InfoRequest* request, vectordb_rpc::InfoReply* reply);
