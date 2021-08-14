@@ -27,7 +27,7 @@ More details at [vectordb.io](http://vectordb.io)
 | :---:| :---: | :---: | :--- |
 | **data sharding** | o | o | Cut huge data into many small pieces, so that every piece has good performance |
 | **multi programming language SDK** | o | o | C++, Java, Python ... |
-| **command console** | o | o | A console run in linux shell |
+| **command console** | o | o | A command console run in linux shell |
 | **web console** | o | o | A web console run in explorer |
 | **plug-in index** | o | o | Various type of indexes can be "plugged" into vectordb |
 | **cluster** |  | o | Deploy the system into hundreds of machines |
