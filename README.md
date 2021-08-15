@@ -31,16 +31,16 @@ wiki : [https://github.com/vectordb-io/vectordb/wiki](https://github.com/vectord
 ## Architecture
 
 #### 1. metadata
-<img src="http://vectordb.io/images/metadata.jpg" width="80%">
+<img src="http://vectordb.io/images/metadata2.jpg" width="80%">
 
 #### 2. stand-alone
-<img src="http://vectordb.io/images/stand-alone.jpg" width="70%">
+<img src="http://vectordb.io/images/stand-alone2.jpg" width="70%">
 
 #### 3. cluster
-<img src="http://vectordb.io/images/cluster.jpg" width="80%">
+<img src="http://vectordb.io/images/cluster2.jpg" width="80%">
 
 #### 3. class design
-<img src="http://vectordb.io/images/class-design.jpg" width="100%">
+<img src="http://vectordb.io/images/class-design2.jpg" width="100%">
 
 ## Quick start
 
