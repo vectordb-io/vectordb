@@ -346,12 +346,7 @@ VEngine::AddIndex(std::string index_type, void *param) {
 Status
 VEngine::GetKNN(const std::string &key, int limit, std::vector<VecDt> &results, const std::string &index_name) {
     std::shared_ptr<VIndex> index_sp;
-    if (index_name == "default") {
-        index_sp = vindex_manager_.GetNewest();
-    } else {
-        index_sp = vindex_manager_.GetByName(index_name);
-    }
-
+    index_sp = vindex_manager_.GetByName(index_name);
     if (!index_sp) {
         std::string msg = "index not found, " + index_name;
         return Status::OtherError(msg);
@@ -368,12 +363,7 @@ VEngine::GetKNN(const std::string &key, int limit, std::vector<VecDt> &results, 
 Status
 VEngine::GetKNN(const std::vector<float> &vec, int limit, std::vector<VecDt> &results, const std::string &index_name) {
     std::shared_ptr<VIndex> index_sp;
-    if (index_name == "default") {
-        index_sp = vindex_manager_.GetNewest();
-    } else {
-        index_sp = vindex_manager_.GetByName(index_name);
-    }
-
+    index_sp = vindex_manager_.GetByName(index_name);
     if (!index_sp) {
         std::string msg = "index not found, " + index_name;
         return Status::OtherError(msg);

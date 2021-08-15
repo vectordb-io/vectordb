@@ -5,7 +5,7 @@
 #include "status.h"
 #include "vdb_client.h"
 
-
+// use simply call
 int main(int argc, char **argv) {
     vectordb::Status s;
     srand(static_cast<unsigned>(time(nullptr)));
@@ -25,15 +25,8 @@ int main(int argc, char **argv) {
 
     // create table
     {
-        vectordb_rpc::CreateTableRequest request;
         vectordb_rpc::CreateTableReply reply;
-        request.set_table_name(table_name);
-        request.set_partition_num(1);
-        request.set_replica_num(1);
-        request.set_engine_type("vector");
-        request.set_dim(dim);
-
-        s = vdb_client.CreateTable(request, &reply);
+        s = vdb_client.CreateTable(table_name, dim, &reply);
         assert(s.ok());
         std::cout << "create table reply: " << reply.DebugString() << std::endl;
     }
@@ -44,26 +37,26 @@ int main(int argc, char **argv) {
     char buf[256];
     for (int i = 0; i < count; ++i) {
         std::string key;
-        vectordb_rpc::PutVecRequest request;
-        request.set_table(table_name);
-        request.mutable_vec_obj()->set_attach_value1("inserter_test_attach_value1");
-        request.mutable_vec_obj()->set_attach_value2("inserter_test_attach_value2");
-        request.mutable_vec_obj()->set_attach_value3("inserter_test_attach_value3");
+        std::vector<float> vec;
+        std::vector<std::string> attach_values;
+        vectordb_rpc::PutVecReply reply;
 
         snprintf(buf, sizeof(buf), "key%d_%d", i, rand());
         key = std::string(buf);
-        request.mutable_vec_obj()->set_key(key);
-
         outfile << key << ", ";
+
         for (int j = 0; j < dim; ++j) {
-            double r = static_cast<double> (rand()) / (static_cast<double>(RAND_MAX));
+            float r = static_cast<float> (rand()) / (static_cast<float>(RAND_MAX));
+            vec.push_back(r);
             outfile << r << ", ";
-            request.mutable_vec_obj()->mutable_vec()->add_data(r);
         }
         outfile << std::endl;
 
-        vectordb_rpc::PutVecReply reply;
-        s = vdb_client.PutVec(request, &reply);
+        attach_values.push_back("inserter_test_attach_value1");
+        attach_values.push_back("inserter_test_attach_value2");
+        attach_values.push_back("inserter_test_attach_value3");
+
+        s = vdb_client.PutVec(table_name, key, vec, attach_values, &reply);
         assert(s.ok());
         std::cout << "insert " << key << ", "<< reply.DebugString();
 
@@ -75,11 +68,9 @@ int main(int argc, char **argv) {
 
     // build index
     {
-        vectordb_rpc::BuildIndexRequest request;
+        std::cout << "building index ..." << std::endl;
         vectordb_rpc::BuildIndexReply reply;
-        request.set_table(table_name);
-        request.set_index_type("annoy");
-        s = vdb_client.BuildIndex(request, &reply);
+        s = vdb_client.BuildIndex(table_name, &reply);
         assert(s.ok());
         std::cout << "build index reply: " << reply.DebugString() << std::endl;
     }
@@ -88,23 +79,18 @@ int main(int argc, char **argv) {
     {
         vectordb_rpc::GetVecRequest request;
         vectordb_rpc::GetVecReply reply;
-        request.set_table(table_name);
+        request.set_table_name(table_name);
         request.set_key(test_key);
         s = vdb_client.GetVec(request, &reply);
         assert(s.ok());
         std::cout << "get " << test_key << ": "<< reply.DebugString();
     }
+    std::cout << std::endl;
 
     // get knn
     {
-        vectordb_rpc::GetKNNRequest request;
         vectordb_rpc::GetKNNReply reply;
-        request.set_table(table_name);
-        request.set_key(test_key);
-        request.set_index_name("default");
-        request.set_limit(limit);
-        std::cout << "request: " << request.DebugString();
-        s = vdb_client.GetKNN(request, &reply);
+        s = vdb_client.GetKNN(table_name, test_key, limit, &reply);
         assert(s.ok());
         std::cout << "getknn " << test_key << ": "<< reply.DebugString();
     }

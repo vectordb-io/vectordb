@@ -94,7 +94,10 @@ Status
 VdbClient::BuildIndex(const std::string &table_name, vectordb_rpc::BuildIndexReply* reply) {
     vectordb_rpc::BuildIndexRequest request;
     request.set_table_name(table_name);
-    request.set_index_type("annoy");
+    request.set_index_type(VINDEX_TYPE_ANNOY);
+    request.set_distance_type(VINDEX_DISTANCE_TYPE_COSINE);
+    request.mutable_annoy_param()->set_tree_num(20);
+    request.mutable_knn_graph_param()->set_k(20);
     auto s = BuildIndex(request, reply);
     return s;
 }
