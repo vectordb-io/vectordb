@@ -7,7 +7,11 @@
 Vectordb is an open-source database used in AI service. It supports operations on KV, vector and graph, which can help the developers to build their AI service easily and quickly.
 <br>
 <br>
-More details at [vectordb.io](http://vectordb.io)
+More details at 
+
+official website : [vectordb.io](http://vectordb.io)
+
+wiki : [wiki](https://github.com/vectordb-io/vectordb/wiki)
 
 
 ## Features
@@ -27,13 +31,13 @@ More details at [vectordb.io](http://vectordb.io)
 | :---:| :---: | :---: | :--- |
 | **data sharding** | o | o | Cut huge data into many small pieces, so that every piece has good performance |
 | **multi programming language SDK** | o | o | C++, Java, Python ... |
-| **command console** | o | o | A console run in linux shell |
+| **command console** | o | o | A command console run in linux shell |
 | **web console** | o | o | A web console run in explorer |
-| **plug-in index** | o | o | Various type of indexes can be "pluged" into vectordb |
-| **cluster** |  | o | Deploy the system into several machines |
+| **plug-in index** | o | o | Various type of indexes can be "plugged" into vectordb |
+| **cluster** |  | o | Deploy the system into hundreds of machines |
 | **raft consensus** |  | o | Use raft consensus to replicate data, metadata between several replicas |
-| **insentient index** |  | o | Excellent feature! You need not to build index any more! When a vector is inserted into vectordb, it can be searched immediately! Vectordb will hold the vector in memory, and merge it into the index at a appropriate time. More details click here. |
-| **data compress** |  | o | Compress the data, save storage |
+| **insentient index** |  | o | Excellent feature! You need not to build index any more! When a vector is inserted into vectordb, it can be searched immediately! Vectordb will hold the vector in memory, and merge it into the index at a appropriate time automatically. More details click here. |
+| **data compress** |  | o | Compress the data, save storage space |
 | **GPU** |  | o | Build index on GPU, accelerate it! |
 
 
