@@ -39,6 +39,9 @@ wiki : [https://github.com/vectordb-io/vectordb/wiki](https://github.com/vectord
 #### 3. cluster
 <img src="http://vectordb.io/images/cluster.jpg" width="80%">
 
+#### 3. class design
+<img src="http://vectordb.io/images/cluster.jpg" width="80%">
+
 ## Quick start
 
 #### 0. get executable program
