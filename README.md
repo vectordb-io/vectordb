@@ -310,7 +310,7 @@ sh one_key_build.sh
 
 #### 1. cpp
 
-* vectordb/example/cpp/test_simple.cc
+* vectordb/example/cpp/test.cc
 
 ```
 #include <random>
@@ -320,7 +320,7 @@ sh one_key_build.sh
 #include "status.h"
 #include "vdb_client.h"
 
-
+// use simply call
 int main(int argc, char **argv) {
     vectordb::Status s;
     srand(static_cast<unsigned>(time(nullptr)));
@@ -352,7 +352,7 @@ int main(int argc, char **argv) {
     char buf[256];
     for (int i = 0; i < count; ++i) {
         std::string key;
-        std::vector<double> vec;
+        std::vector<float> vec;
         std::vector<std::string> attach_values;
         vectordb_rpc::PutVecReply reply;
 
@@ -361,7 +361,7 @@ int main(int argc, char **argv) {
         outfile << key << ", ";
 
         for (int j = 0; j < dim; ++j) {
-            double r = static_cast<double> (rand()) / (static_cast<double>(RAND_MAX));
+            float r = static_cast<float> (rand()) / (static_cast<float>(RAND_MAX));
             vec.push_back(r);
             outfile << r << ", ";
         }
@@ -383,6 +383,7 @@ int main(int argc, char **argv) {
 
     // build index
     {
+        std::cout << "building index ..." << std::endl;
         vectordb_rpc::BuildIndexReply reply;
         s = vdb_client.BuildIndex(table_name, &reply);
         assert(s.ok());
@@ -393,7 +394,7 @@ int main(int argc, char **argv) {
     {
         vectordb_rpc::GetVecRequest request;
         vectordb_rpc::GetVecReply reply;
-        request.set_table(table_name);
+        request.set_table_name(table_name);
         request.set_key(test_key);
         s = vdb_client.GetVec(request, &reply);
         assert(s.ok());
@@ -413,7 +414,8 @@ int main(int argc, char **argv) {
 }
 ```
 
-* vectordb/example/cpp/test.cpp
+* vectordb/example/cpp/test2.cpp
+
 ```
 #include <random>
 #include <string>
@@ -422,7 +424,7 @@ int main(int argc, char **argv) {
 #include "status.h"
 #include "vdb_client.h"
 
-
+// use original grpc call
 int main(int argc, char **argv) {
     vectordb::Status s;
     srand(static_cast<unsigned>(time(nullptr)));
@@ -447,7 +449,6 @@ int main(int argc, char **argv) {
         request.set_table_name(table_name);
         request.set_partition_num(1);
         request.set_replica_num(1);
-        request.set_engine_type("vector");
         request.set_dim(dim);
 
         s = vdb_client.CreateTable(request, &reply);
@@ -462,7 +463,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < count; ++i) {
         std::string key;
         vectordb_rpc::PutVecRequest request;
-        request.set_table(table_name);
+        request.set_table_name(table_name);
         request.mutable_vec_obj()->set_attach_value1("inserter_test_attach_value1");
         request.mutable_vec_obj()->set_attach_value2("inserter_test_attach_value2");
         request.mutable_vec_obj()->set_attach_value3("inserter_test_attach_value3");
@@ -492,10 +493,13 @@ int main(int argc, char **argv) {
 
     // build index
     {
+        std::cout << "building index ..." << std::endl;
         vectordb_rpc::BuildIndexRequest request;
         vectordb_rpc::BuildIndexReply reply;
-        request.set_table(table_name);
-        request.set_index_type("annoy");
+        request.set_table_name(table_name);
+        request.set_index_type(VINDEX_TYPE_ANNOY);
+        request.set_distance_type(VINDEX_DISTANCE_TYPE_COSINE);
+        request.mutable_annoy_param()->set_tree_num(20);
         s = vdb_client.BuildIndex(request, &reply);
         assert(s.ok());
         std::cout << "build index reply: " << reply.DebugString() << std::endl;
@@ -505,7 +509,7 @@ int main(int argc, char **argv) {
     {
         vectordb_rpc::GetVecRequest request;
         vectordb_rpc::GetVecReply reply;
-        request.set_table(table_name);
+        request.set_table_name(table_name);
         request.set_key(test_key);
         s = vdb_client.GetVec(request, &reply);
         assert(s.ok());
@@ -516,7 +520,7 @@ int main(int argc, char **argv) {
     {
         vectordb_rpc::GetKNNRequest request;
         vectordb_rpc::GetKNNReply reply;
-        request.set_table(table_name);
+        request.set_table_name(table_name);
         request.set_key(test_key);
         request.set_index_name("default");
         request.set_limit(limit);
