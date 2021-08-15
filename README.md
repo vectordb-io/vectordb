@@ -40,31 +40,34 @@ wiki : [https://github.com/vectordb-io/vectordb/wiki](https://github.com/vectord
 <img src="http://vectordb.io/images/cluster.jpg" width="80%">
 
 #### 3. class design
-<img src="http://vectordb.io/images/cluster.jpg" width="80%">
+<img src="http://vectordb.io/images/class-design.jpg" width="100%">
 
 ## Quick start
 
-#### 0. get executable program
+#### 1. get executable program
+
 ```
 wget http://vectordb.io/downloads/packages/vectordb_exe/output.tar.gz
 tar zxvf output.tar.gz
 ```
 
-#### 1. run server
+#### 2. run server
 
 * set log path, if needed. default log path is /tmp
+    
 ```
 export GLOG_log_dir=/tmp/vectordb_log
 mkdir -p /tmp/vectordb_log
 echo $GLOG_log_dir
 ```
 
-* run server
+* start server
+    
 ```
 ./vectordb-server --addr=127.0.0.1:38000 --data_path=/tmp/vectordb
 ```
 
-#### 2. run client
+#### 3. run client
 ```
 ./vectordb-cli --addr=127.0.0.1:38000
 (vector-cli) 127.0.0.1:38000>
@@ -72,21 +75,21 @@ echo $GLOG_log_dir
 
 #### 3. create table
 ```
-(vector-cli) 127.0.0.1:38000> create table {"table_name":"test_vector_table", "engine_type":"vector", "dim":10, "partition_num":10, "replica_num":3}
+(vector-cli) 127.0.0.1:38000>  create table {"table_name":"test_table_dim10", "dim":10, "partition_num":8, "replica_num":1}
 {
     "code": 0,
-    "msg": "create table test_vector_table ok"
+    "msg": "create table test_table_dim10 ok"
 }
 ```
 
-#### 4. generate random vectors
+#### 4. insert random vectors
 ```
-./vector-inserter 127.0.0.1:38000 test_vector_table 10 100
+./vector-inserter 127.0.0.1:38000 test_table_dim10 10 200
 ```
 
 #### 5. get vector
 ```
-(vector-cli) 127.0.0.1:38000> get {"table_name":"test_vector_table", "key":"key72_261551668"}
+(vector-cli) 127.0.0.1:38000>  get {"table_name":"test_table_dim10", "key":"key0_test"}
 {
     "code": 0,
     "msg": "get vector ok",
@@ -94,18 +97,18 @@ echo $GLOG_log_dir
         "attach_value1": "inserter_test_attach_value1",
         "attach_value2": "inserter_test_attach_value2",
         "attach_value3": "inserter_test_attach_value3",
-        "key": "key72_261551668",
+        "key": "key0_test",
         "vec": [
-            0.6292882057043203,
-            0.5495009015079126,
-            0.9620135063128609,
-            0.1219228967660679,
-            0.6931321652108487,
-            0.8820888348306012,
-            0.2154071872194331,
-            0.8231134846914157,
-            0.4136770024959356,
-            0.4983163487623988
+            0.350799947977066,
+            0.383540153503418,
+            0.09649268537759781,
+            0.9368243813514709,
+            0.4860029518604279,
+            0.2966049611568451,
+            0.2317648231983185,
+            0.4419063627719879,
+            0.7600482106208801,
+            0.1696054637432098
         ]
     }
 }
@@ -113,94 +116,16 @@ echo $GLOG_log_dir
 
 #### 6. build index
 ```
-(vector-cli) 127.0.0.1:38000> build index {"table_name":"test_vector_table", "index_type":"knn_graph", "k":20}
+(vector-cli) 127.0.0.1:38000> build index test_table_dim10;
 {
     "code": 0,
-    "msg": "ok"
+    "msg": "build index ok"
 }
 ```
 
-#### 7. view metadata
+#### 7. get knn (k nearest neighbors)
 ```
-(vector-cli) 127.0.0.1:38000> show tables
-{
-    "tables": [
-        "test_vector_table"
-    ]
-}
-```
-
-```
-(vector-cli) 127.0.0.1:38000> desc test_vector_table
-{
-    "code": 0,
-    "msg": "desc test_vector_table ok",
-    "table": {
-        "dim": 10,
-        "engine_type": "vector",
-        "indices": [
-            {
-                "index_name": "knn_graph1623826143",
-                "index_type": "knn_graph"
-            }
-        ],
-        "name": "test_vector_table",
-        "partition_num": 10,
-        "partitions": [
-            "test_vector_table#partition_0",
-            "test_vector_table#partition_1",
-            "test_vector_table#partition_2",
-            "test_vector_table#partition_3",
-            "test_vector_table#partition_4",
-            "test_vector_table#partition_5",
-            "test_vector_table#partition_6",
-            "test_vector_table#partition_7",
-            "test_vector_table#partition_8",
-            "test_vector_table#partition_9"
-        ],
-        "path": "/tmp/vectordb/data/test_vector_table",
-        "replica_num": 3
-    }
-}
-```
-```
-(vector-cli) 127.0.0.1:38000> desc test_vector_table#partition_0
-{
-    "code": 0,
-    "msg": "desc test_vector_table#partition_0 ok",
-    "partition": {
-        "id": 0,
-        "name": "test_vector_table#partition_0",
-        "path": "/tmp/vectordb/data/test_vector_table/0",
-        "replica_num": 3,
-        "replicas": [
-            "test_vector_table#partition_0#replica_0",
-            "test_vector_table#partition_0#replica_1",
-            "test_vector_table#partition_0#replica_2"
-        ],
-        "table_name": "test_vector_table"
-    }
-}
-```
-```
-(vector-cli) 127.0.0.1:38000> desc test_vector_table#partition_0#replica_0
-{
-    "code": 0,
-    "msg": "desc test_vector_table#partition_0#replica_0 ok",
-    "replica": {
-        "address": "127.0.0.1:38000",
-        "id": 0,
-        "name": "test_vector_table#partition_0#replica_0",
-        "partition_name": "test_vector_table#partition_0",
-        "path": "/tmp/vectordb/data/test_vector_table/0/0",
-        "table_name": "test_vector_table"
-    }
-}
-```
-
-#### 8. get knn (k nearest neighbors)
-```
-(vector-cli) 127.0.0.1:38000> getknn {"table_name":"test_vector_table", "key":"key82_640136302", "limit":5, "index_name":"knn_graph1623826143"}
+(vector-cli) 127.0.0.1:38000> getknn {"table_name":"test_table_dim10", "key":"key0_test", "limit":20}
 {
     "code": 0,
     "msg": "ok",
@@ -210,48 +135,154 @@ echo $GLOG_log_dir
             "attach_value2": "inserter_test_attach_value2",
             "attach_value3": "inserter_test_attach_value3",
             "distance": 0,
-            "key": "key82_640136302"
+            "key": "key0_test"
         },
         {
             "attach_value1": "inserter_test_attach_value1",
             "attach_value2": "inserter_test_attach_value2",
             "attach_value3": "inserter_test_attach_value3",
-            "distance": 0.3952870669883494,
-            "key": "key39_2094485213"
+            "distance": 0.4901313781738281,
+            "key": "key110_159833662"
         },
         {
             "attach_value1": "inserter_test_attach_value1",
             "attach_value2": "inserter_test_attach_value2",
             "attach_value3": "inserter_test_attach_value3",
-            "distance": 0.4180229187303537,
-            "key": "key95_1693950771"
+            "distance": 0.5930646657943726,
+            "key": "key163_1640047440"
         },
         {
             "attach_value1": "inserter_test_attach_value1",
             "attach_value2": "inserter_test_attach_value2",
             "attach_value3": "inserter_test_attach_value3",
-            "distance": 0.4221731709119398,
-            "key": "key88_344836378"
+            "distance": 0.6078505516052246,
+            "key": "key10_400237917"
         },
         {
             "attach_value1": "inserter_test_attach_value1",
             "attach_value2": "inserter_test_attach_value2",
             "attach_value3": "inserter_test_attach_value3",
-            "distance": 0.4231269304129058,
-            "key": "key62_1717661487"
+            "distance": 0.6840280294418335,
+            "key": "key13_1660582948"
+        },
+        {
+            "attach_value1": "inserter_test_attach_value1",
+            "attach_value2": "inserter_test_attach_value2",
+            "attach_value3": "inserter_test_attach_value3",
+            "distance": 0.6992908716201782,
+            "key": "key47_650033517"
+        },
+        {
+            "attach_value1": "inserter_test_attach_value1",
+            "attach_value2": "inserter_test_attach_value2",
+            "attach_value3": "inserter_test_attach_value3",
+            "distance": 0.7374663352966309,
+            "key": "key156_443906634"
+        },
+        {
+            "attach_value1": "inserter_test_attach_value1",
+            "attach_value2": "inserter_test_attach_value2",
+            "attach_value3": "inserter_test_attach_value3",
+            "distance": 0.7490700483322144,
+            "key": "key169_1889879970"
+        },
+        {
+            "attach_value1": "inserter_test_attach_value1",
+            "attach_value2": "inserter_test_attach_value2",
+            "attach_value3": "inserter_test_attach_value3",
+            "distance": 0.7516026496887207,
+            "key": "key142_2006306509"
+        },
+        {
+            "attach_value1": "inserter_test_attach_value1",
+            "attach_value2": "inserter_test_attach_value2",
+            "attach_value3": "inserter_test_attach_value3",
+            "distance": 0.7525120377540588,
+            "key": "key23_1442398070"
+        },
+        {
+            "attach_value1": "inserter_test_attach_value1",
+            "attach_value2": "inserter_test_attach_value2",
+            "attach_value3": "inserter_test_attach_value3",
+            "distance": 0.7564345002174377,
+            "key": "key149_1280540969"
+        },
+        {
+            "attach_value1": "inserter_test_attach_value1",
+            "attach_value2": "inserter_test_attach_value2",
+            "attach_value3": "inserter_test_attach_value3",
+            "distance": 0.7582194805145264,
+            "key": "key156_2046174416"
+        },
+        {
+            "attach_value1": "inserter_test_attach_value1",
+            "attach_value2": "inserter_test_attach_value2",
+            "attach_value3": "inserter_test_attach_value3",
+            "distance": 0.7703662514686584,
+            "key": "key182_1104401994"
+        },
+        {
+            "attach_value1": "inserter_test_attach_value1",
+            "attach_value2": "inserter_test_attach_value2",
+            "attach_value3": "inserter_test_attach_value3",
+            "distance": 0.7946914434432983,
+            "key": "key49_674696936"
+        },
+        {
+            "attach_value1": "inserter_test_attach_value1",
+            "attach_value2": "inserter_test_attach_value2",
+            "attach_value3": "inserter_test_attach_value3",
+            "distance": 0.7991812825202942,
+            "key": "key180_1241319966"
+        },
+        {
+            "attach_value1": "inserter_test_attach_value1",
+            "attach_value2": "inserter_test_attach_value2",
+            "attach_value3": "inserter_test_attach_value3",
+            "distance": 0.8048728108406067,
+            "key": "key9_1612326348"
+        },
+        {
+            "attach_value1": "inserter_test_attach_value1",
+            "attach_value2": "inserter_test_attach_value2",
+            "attach_value3": "inserter_test_attach_value3",
+            "distance": 0.8286986351013184,
+            "key": "key92_40664984"
+        },
+        {
+            "attach_value1": "inserter_test_attach_value1",
+            "attach_value2": "inserter_test_attach_value2",
+            "attach_value3": "inserter_test_attach_value3",
+            "distance": 0.8425542712211609,
+            "key": "key68_823063584"
+        },
+        {
+            "attach_value1": "inserter_test_attach_value1",
+            "attach_value2": "inserter_test_attach_value2",
+            "attach_value3": "inserter_test_attach_value3",
+            "distance": 0.8446422219276428,
+            "key": "key146_1651880340"
+        },
+        {
+            "attach_value1": "inserter_test_attach_value1",
+            "attach_value2": "inserter_test_attach_value2",
+            "attach_value3": "inserter_test_attach_value3",
+            "distance": 0.8499314188957214,
+            "key": "key45_730060063"
         }
     ]
 }
 ```
 
 ## Build from source
-#### 0. os environment
+
+#### 1. os environment
 ```
 uname -a
 Linux ubuntu 5.4.0-70-generic #78~18.04.1-Ubuntu SMP Sat Mar 20 14:10:07 UTC 2021 x86_64 x86_64 x86_64 GNU/Linux
 ```
 
-#### 1. install build tools
+#### 2. install build tools
 ```
 sudo apt install autoconf automake libtool -y
 sudo apt install pkg-config -y
@@ -268,7 +299,7 @@ cmake -version
 cmake version 3.18.4
 ```
 
-#### 2. build source code
+#### 3. build 
 
 ```
 cd script
@@ -280,6 +311,7 @@ sh one_key_build.sh
 #### 1. cpp
 
 * vectordb/example/cpp/test_simple.cc
+
 ```
 #include <random>
 #include <string>
