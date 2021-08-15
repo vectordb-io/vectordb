@@ -4,40 +4,27 @@
 
 ## What is VectorDB?
 
-Vectordb is an open-source database used in AI service. It supports operations on KV, vector and graph, which can help the developers to build their AI service easily and quickly.
-<br>
-<br>
+As its name, VectorDB gives some operations on vector, such as knn-search (search K Nearest Neighbors). It can be used in AI service, which can help the developers to build their system easily and quickly.
+
 More details at 
 
 official website : [vectordb.io](http://vectordb.io)
 
-wiki : [wiki](https://github.com/vectordb-io/vectordb/wiki)
+wiki : [https://github.com/vectordb-io/vectordb/wiki](https://github.com/vectordb-io/vectordb/wiki)
 
 
 ## Features
-#### 1. multiple data structure
-* kv / document
-* vector
-* graph
-
-#### 2. distributed storage
-* a huge store
-* use raft to ensure safty
-* auto recovery, auto rebalance
-* high throughput, low latency
-
-## Version
-| Features | Community | Enterprise | Comment |
+| Features | Community Version | Enterprise Version | Comment |
 | :---:| :---: | :---: | :--- |
-| **data sharding** | o | o | Cut huge data into many small pieces, so that every piece has good performance |
+| **data sharding** | o | o | Cut huge data into many small pieces, so that every piece has good performance. |
 | **multi programming language SDK** | o | o | C++, Java, Python ... |
-| **command console** | o | o | A command console run in linux shell |
-| **web console** | o | o | A web console run in explorer |
-| **plug-in index** | o | o | Various type of indexes can be "plugged" into vectordb |
-| **cluster** |  | o | Deploy the system into hundreds of machines |
-| **raft consensus** |  | o | Use raft consensus to replicate data, metadata between several replicas |
-| **insentient index** |  | o | Excellent feature! You need not to build index any more! When a vector is inserted into vectordb, it can be searched immediately! Vectordb will hold the vector in memory, and merge it into the index at a appropriate time automatically. More details click here. |
-| **data compress** |  | o | Compress the data, save storage space |
+| **command console** | o | o | A command console run in linux shell. |
+| **web console** | o | o | A web console run in explorer. |
+| **plug-in index** | o | o | Several type of indexes can be "plugged" into vectordb. |
+| **cluster** |  | o | Deploy vectordb into hundreds of machines, auto failure recovery, auto rebalance. |
+| **raft consensus** |  | o | Use raft consensus to replicate data, metadata between several replicas, ensure safety. |
+| **insentient index** | o | o | Excellent feature! You need not to build index any more! When a vector is inserted into vectordb, it can be searched immediately! Vectordb will hold the vector in memory, and merge it into the index at a appropriate time automatically. More details click here. |
+| **data compress** |  | o | Compress the data, save storage spaces. |
 | **GPU** |  | o | Build index on GPU, accelerate it! |
 
 
