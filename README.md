@@ -12,6 +12,7 @@ official website : [vectordb.io](http://vectordb.io)
 
 wiki : [https://github.com/vectordb-io/vectordb/wiki](https://github.com/vectordb-io/vectordb/wiki)
 
+video : [video](https://www.bilibili.com/video/BV1HA411w7vb/)
 
 ## Features
 | Features | Community Version | Enterprise Version | Comment |
