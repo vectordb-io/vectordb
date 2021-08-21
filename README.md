@@ -24,7 +24,7 @@ video : [https://www.bilibili.com/video/BV1HA411w7vb/](https://www.bilibili.com/
 | **plug-in index** | o | o | Several type of indexes can be "plugged" into vectordb. |
 | **cluster** |  | o | Deploy vectordb into hundreds of machines, auto failure recovery, auto rebalance. |
 | **raft consensus** |  | o | Use raft consensus to replicate data, metadata between several replicas, ensure safety. |
-| **insentient index** | o | o | Excellent feature! You need not to build index any more! When a vector is inserted into vectordb, it can be searched immediately! Vectordb will hold the vector in memory, and merge it into the index at a appropriate time automatically. More details click here. |
+| **transparent index** | o | o | Excellent feature! You need not to build index any more! When a vector is inserted into VectorDB, it can be searched immediately! VectorDB will hold vectors in memory, and merge them into the index at a appropriate time automatically. |
 | **data compress** |  | o | Compress the data, save storage spaces. |
 | **GPU** |  | o | Build index on GPU, accelerate it! |
 
