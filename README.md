@@ -20,6 +20,7 @@ video : [https://www.bilibili.com/video/BV1HA411w7vb/](https://www.bilibili.com/
 | **data sharding** | o | o | Cut huge data into many small pieces, so that every piece has good performance. |
 | **multi programming language SDK** | o | o | C++, Java, Python ... |
 | **command console** | o | o | A command console run in linux shell. |
+| **multi distance type** | o | o | cosine, inner product, euclidean ... |
 | **web console** | o | o | A web console run in explorer. |
 | **plug-in index** | o | o | Several type of indexes can be "plugged" into vectordb. |
 | **cluster** |  | o | Deploy vectordb into hundreds of machines, auto failure recovery, auto rebalance. |
