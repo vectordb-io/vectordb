@@ -8,8 +8,6 @@ As its name, VectorDB gives some operations on vector, such as knn-search (searc
 
 More details at 
 
-official website : [vectordb.io](http://vectordb.io)
-
 wiki : [https://github.com/vectordb-io/vectordb/wiki](https://github.com/vectordb-io/vectordb/wiki)
 
 video : [https://www.bilibili.com/video/BV1HA411w7vb/](https://www.bilibili.com/video/BV1HA411w7vb/)
