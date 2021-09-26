@@ -43,7 +43,7 @@ OBJS_LOG_TEST=log_test.o config.o status.o util.o
 LIBS_LOG_TEST=-lglog -lprotobuf -lgrpc++ -lgrpc -lleveldb -lpthread
 LFLAGS_LOG_TEST=-L/usr/local/lib
 
-OBJS_SERVER=server_main.o config.o status.o vectordb_rpc.pb.o vectordb_rpc.grpc.pb.o node.o util.o grpc_server.o meta.o coding.o vengine.o vec.o engine_manager.o vindex_annoy.o vindex_knn_graph.o vindex_manager.o
+OBJS_SERVER=server_main.o config.o status.o vectordb_rpc.pb.o vectordb_rpc.grpc.pb.o node.o util.o grpc_server.o meta.o coding.o vengine.o vec.o engine_manager.o vindex_annoy.o vindex_transparent.o vindex_knn_graph.o vindex_manager.o
 LIBS_SERVER=/usr/local/lib/libglog.a /usr/local/lib/libprotobuf.a /usr/local/lib/libgrpc++.a /usr/local/lib/libgrpc.a /usr/local/lib/libleveldb.a -lpthread
 LFLAGS_SERVER=-L/usr/local/lib
 

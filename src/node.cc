@@ -650,6 +650,27 @@ Node::OnBuildIndex(const vectordb_rpc::BuildIndexRequest* request, vectordb_rpc:
                     LOG(INFO) << msg;
                 }
 
+            } else if (request->index_type() == VINDEX_TYPE_TRANSPARENT) {
+                TransparentParam param;
+                param.dim = vengine_sp->dim();
+                param.index_type = request->index_type();
+                param.distance_type = request->distance_type();
+                param.replica_name = replica_name;
+                param.timestamp = timestamp;
+                param.tree_num = request->annoy_param().tree_num();
+
+                auto s = vengine_sp->AddIndex(request->index_type(), &param);
+                if (!s.ok()) {
+                    reply->set_code(4);
+                    std::string msg = s.Msg();
+                    reply->set_msg(msg);
+                    return Status::OtherError(msg);
+
+                } else {
+                    std::string msg = replica_name + " build index ok";
+                    LOG(INFO) << msg;
+                }
+
             } else {
                 reply->set_code(4);
                 std::string msg = "index type not support: " + request->index_type();

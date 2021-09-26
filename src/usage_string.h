@@ -49,6 +49,9 @@ put {\"table_name\":\"test_table_dim10\", \"key\":\"key0_test\", \"vector\":[1.1
 build index {\"table_name\":\"test_table_dim10\", \"index_type\":\"annoy\", \"distance_type\":\"cosine\"}                     \n \
 build index {\"table_name\":\"test_table_dim10\", \"index_type\":\"annoy\", \"distance_type\":\"inner_product\"}              \n \
 build index {\"table_name\":\"test_table_dim10\", \"index_type\":\"annoy\", \"distance_type\":\"euclidean\"}                  \n \
+build index {\"table_name\":\"test_table_dim10\", \"index_type\":\"transparent\", \"distance_type\":\"cosine\"}               \n \
+build index {\"table_name\":\"test_table_dim10\", \"index_type\":\"transparent\", \"distance_type\":\"inner_product\"}        \n \
+build index {\"table_name\":\"test_table_dim10\", \"index_type\":\"transparent\", \"distance_type\":\"euclidean\"}            \n \
                                                                                                                               \n \
 * notice: the \"knn_graph\" is just for test accuracy, don't use it on line!!!                                                \n \
 build index {\"table_name\":\"test_table_dim10\", \"index_type\":\"knn_graph\", \"k\":20}                                     \n \

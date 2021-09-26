@@ -13,6 +13,7 @@ namespace vectordb {
 #define VINDEX_DISTANCE_TYPE_INNER_PRODUCT "inner_product"
 #define VINDEX_DISTANCE_TYPE_EUCLIDEAN "euclidean"
 
+#define VINDEX_TYPE_TRANSPARENT "transparent"
 #define VINDEX_TYPE_ANNOY "annoy"
 #define VINDEX_TYPE_KNN_GRAPH "knn_graph"
 #define VINDEX_TYPE_FAISS "faiss"

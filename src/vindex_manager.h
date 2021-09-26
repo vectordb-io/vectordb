@@ -8,6 +8,7 @@
 #include <functional>
 #include "vindex.h"
 #include "vindex_annoy.h"
+#include "vindex_transparent.h"
 #include "status.h"
 
 namespace vectordb {
@@ -20,6 +21,11 @@ class VIndexFactory {
         if (index_type == VINDEX_TYPE_ANNOY) {
             AnnoyParam *annoy_param = static_cast<AnnoyParam*>(param);
             index_sp = std::make_shared<VIndexAnnoy>(path, vengine, annoy_param);
+            assert(index_sp);
+
+        } else if (index_type == VINDEX_TYPE_TRANSPARENT) {
+            TransparentParam *transparent_param = static_cast<TransparentParam*>(param);
+            index_sp = std::make_shared<VIndexTransparent>(path, vengine, transparent_param);
             assert(index_sp);
 
         } else if (index_type == VINDEX_TYPE_KNN_GRAPH) {
@@ -36,6 +42,10 @@ class VIndexFactory {
         std::shared_ptr<VIndex> index_sp;
         if (index_type == VINDEX_TYPE_ANNOY) {
             index_sp = std::make_shared<VIndexAnnoy>(path, vengine);
+            assert(index_sp);
+
+        } else if (index_type == VINDEX_TYPE_TRANSPARENT) {
+            index_sp = std::make_shared<VIndexTransparent>(path, vengine);
             assert(index_sp);
 
         } else if (index_type == VINDEX_TYPE_KNN_GRAPH) {
