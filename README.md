@@ -1,6 +1,8 @@
 # vectordb
 
-<img src="http://vectordb.io/images/vectordb.jpeg" width="40%">
+Notice!! developing, unstable，do not use it online!!
+
+<img src="http://vectordb.io/vectordb.png" width="40%">
 
 ## What is VectorDB?
 
