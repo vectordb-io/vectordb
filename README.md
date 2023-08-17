@@ -2,8 +2,6 @@
 
 Notice!! developing, unstable，do not use it online!!
 
-<img src="http://vectordb.io/vectordb.png" width="40%">
-
 ## What is VectorDB?
 
 As its name, VectorDB gives some operations on vector, such as knn-search (search K Nearest Neighbors). It can be used in AI service, which can help the developers to build their system easily and quickly.
