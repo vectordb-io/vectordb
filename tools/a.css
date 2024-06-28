@@ -1,0 +1,36 @@
+/* 设置表格的边框样式 */
+table {
+  width: 90%;
+  border-collapse: collapse; /* 关键属性：合并边框 */
+  margin: 30px auto; /* 水平居中 */
+  border: 5px solid black; /* 设置最外圈的边框 */
+}
+    
+/* 设置单元格的边框样式 */
+th, td {
+  border: 1px solid black; /* 单一边框样式 */
+  padding: 10px; /* 单元格内填充 */
+  text-align: center; /* 文本靠左对齐 */
+}
+.table-title {
+  background-color: aqua;
+  font-size: large;
+  font-weight: 900;
+}
+.node {
+  background-color: rgb(166, 255, 0);
+}
+.split {
+  background-color: rgb(228, 166, 207);
+}
+.change {
+  background-color: rgba(228, 3, 3, 0.897);
+}
+.banner {
+  background-color: beige;
+  font-family:monospace;
+  font-style: italic;
+  font-weight:900;
+  font-size: 5em;
+  text-shadow: 2px 3px 3px rgba(12, 12, 12, 0.932);
+}

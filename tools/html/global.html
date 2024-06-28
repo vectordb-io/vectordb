@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>(REMU)Raft Emulator - Global State</title>
+<style>
+    table {
+        width: 90%;
+        border-collapse: collapse; /* 折叠边框 */
+        margin: 15px auto; /* 水平居中 */
+    }
+    table, th, td {
+        border: 1px solid black; /* 添加边框 */
+    }
+    th, td {
+        padding: 8px; /* 单元格内边距 */
+        text-align: center; /* 文字居中 */
+    }
+    .table-title {
+      background-color: aqua;
+    }
+    .node {
+      background-color: rgb(166, 255, 0);
+    }
+    .split {
+      background-color: rgb(75, 78, 70);
+    }
+    .change {
+      background-color: rgba(228, 3, 3, 0.897);
+    }
+    .banner {
+      background-color: beige;
+      font-family:monospace;
+      font-style: italic;
+      font-weight:900;
+      font-size: 5em;
+      text-shadow: 2px 3px 3px rgba(12, 12, 12, 0.932);
+    }
+</style>
+</head>
+<body>
+
+<table>
+    <tr>
+      <td class="banner">(REMU)Raft Emulator - Global State</td>
+    </tr>
+</table>
+
+<table>
+    <tr>
+        <td class="table-title" colspan="5">0x17D838A332B1C85A global-state: 2024:06:12 17:45:31 424225124</td>  
+    </tr>
+    <tr>
+        <td class="split" colspan="5"></td> 
+    </tr>
+
+    <tr>
+        <td class="node">127.0.0.1:9000#0</td>
+        <td>FOLLOWER</td>
+        <td colspan="3">0x558190f86af0</td> 
+    </tr>
+    <tr>
+        <td>"term":1</td>
+        <td>"vote":"0"</td>
+        <td colspan="3">"log":[0,0,1,{"chk":"0x0","ltm":0}]</td> 
+    </tr>
+    <tr>
+        <td>"apply":0</td>
+        <td>"cmt":0</td>
+        <td>"elect_ms":[0,3475]</td>
+        <td>"leader":"0.0.0.0:0#0"</td>
+        <td>"run":true</td>
+    </tr>
+    <tr>
+        <td>127.0.0.1:9001#0</td>
+        <td>"match":0</td>
+        <td>"next":1</td>
+        <td>"done":false</td>
+        <td>"grant":false</td>
+    </tr>
+        <tr>
+        <td>127.0.0.1:9002#0</td>
+        <td>"match":0</td>
+        <td>"next":1</td>
+        <td>"done":false</td>
+        <td>"grant":false</td>
+    </tr>
+    <tr>
+        <td class="split" colspan="5"></td> 
+    </tr>
+
+    <tr>
+        <td class="node">127.0.0.1:9001#0</td>
+        <td>FOLLOWER</td>
+        <td colspan="3">0x558190f8cab0</td> 
+    </tr>
+    <tr>
+        <td>"term":1</td>
+        <td>"vote":"0"</td>
+        <td colspan="3">"log":[0,0,1,{"chk":"0x0","ltm":0}]</td> 
+    </tr>
+    <tr>
+        <td>"apply":0</td>
+        <td>"cmt":0</td>
+        <td>"elect_ms":[0,0]</td>
+        <td>"leader":"0.0.0.0:0#0"</td>
+        <td>"run":true</td>
+    </tr>
+    <tr>
+        <td>127.0.0.1:9000#0</td>
+        <td>"match":0</td>
+        <td>"next":1</td>
+        <td>"done":false</td>
+        <td>"grant":false</td>
+    </tr>
+        <tr>
+        <td>127.0.0.1:9002#0</td>
+        <td>"match":0</td>
+        <td>"next":1</td>
+        <td>"done":false</td>
+        <td>"grant":false</td>
+    </tr>
+    <tr>
+        <td class="split" colspan="5"></td> 
+    </tr>
+
+    <tr>
+        <td class="node">127.0.0.1:9002#0</td>
+        <td>FOLLOWER</td>
+        <td colspan="3">0x55819106fcc0</td> 
+    </tr>
+    <tr>
+        <td>"term":1</td>
+        <td>"vote":"0"</td>
+        <td colspan="3">"log":[0,0,1,{"chk":"0x0","ltm":0}]</td> 
+    </tr>
+    <tr>
+        <td>"apply":0</td>
+        <td>"cmt":0</td>
+        <td>"elect_ms":[0,3475]</td>
+        <td>"leader":"0.0.0.0:0#0"</td>
+        <td>"run":true</td>
+    </tr>
+    <tr>
+        <td>127.0.0.1:9000#0</td>
+        <td>"match":0</td>
+        <td>"next":1</td>
+        <td>"done":false</td>
+        <td>"grant":false</td>
+    </tr>
+        <tr>
+        <td>127.0.0.1:9001#0</td>
+        <td>"match":0</td>
+        <td>"next":1</td>
+        <td>"done":false</td>
+        <td>"grant":false</td>
+    </tr>
+</table>
+
+<table>
+  <tr>
+      <td class="table-title" colspan="5">0x17D838A332CE4C5A global-state: 2024:06:12 17:45:31 426013034</td>  
+  </tr>
+  <tr>
+      <td class="split" colspan="5"></td> 
+  </tr>
+
+  <tr>
+      <td class="node">127.0.0.1:9000#0</td>
+      <td>FOLLOWER</td>
+      <td colspan="3">0x558190f86af0</td> 
+  </tr>
+  <tr>
+      <td>"term":1</td>
+      <td>"vote":"0"</td>
+      <td colspan="3">"log":[0,0,1,{"chk":"0x0","ltm":0}]</td> 
+  </tr>
+  <tr>
+      <td>"apply":0</td>
+      <td>"cmt":0</td>
+      <td>"elect_ms":[0,3475]</td>
+      <td>"leader":"0.0.0.0:0#0"</td>
+      <td>"run":true</td>
+  </tr>
+  <tr>
+      <td>127.0.0.1:9001#0</td>
+      <td class="change">"match":8</td>
+      <td class="change">"next":8</td>
+      <td>"done":false</td>
+      <td>"grant":false</td>
+  </tr>
+      <tr>
+      <td>127.0.0.1:9002#0</td>
+      <td>"match":0</td>
+      <td>"next":1</td>
+      <td>"done":false</td>
+      <td>"grant":false</td>
+  </tr>
+  <tr>
+      <td class="split" colspan="5"></td> 
+  </tr>
+
+  <tr>
+      <td class="node">127.0.0.1:9001#0</td>
+      <td>FOLLOWER</td>
+      <td colspan="3">0x558190f8cab0</td> 
+  </tr>
+  <tr>
+      <td>"term":1</td>
+      <td>"vote":"0"</td>
+      <td colspan="3">"log":[0,0,1,{"chk":"0x0","ltm":0}]</td> 
+  </tr>
+  <tr>
+      <td>"apply":0</td>
+      <td>"cmt":0</td>
+      <td>"elect_ms":[0,0]</td>
+      <td>"leader":"0.0.0.0:0#0"</td>
+      <td>"run":true</td>
+  </tr>
+  <tr>
+      <td>127.0.0.1:9000#0</td>
+      <td>"match":0</td>
+      <td>"next":1</td>
+      <td>"done":false</td>
+      <td>"grant":false</td>
+  </tr>
+      <tr>
+      <td>127.0.0.1:9002#0</td>
+      <td>"match":0</td>
+      <td>"next":1</td>
+      <td>"done":false</td>
+      <td>"grant":false</td>
+  </tr>
+  <tr>
+      <td class="split" colspan="5"></td> 
+  </tr>
+
+  <tr>
+      <td class="node">127.0.0.1:9002#0</td>
+      <td>FOLLOWER</td>
+      <td colspan="3">0x55819106fcc0</td> 
+  </tr>
+  <tr>
+      <td>"term":1</td>
+      <td>"vote":"0"</td>
+      <td class="change" colspan="3">"log":[0,9,10,{"chk":"0x0","ltm":0}]</td> 
+  </tr>
+  <tr>
+      <td>"apply":0</td>
+      <td>"cmt":0</td>
+      <td>"elect_ms":[0,3475]</td>
+      <td>"leader":"0.0.0.0:0#0"</td>
+      <td>"run":true</td>
+  </tr>
+  <tr>
+      <td>127.0.0.1:9000#0</td>
+      <td>"match":0</td>
+      <td>"next":1</td>
+      <td>"done":false</td>
+      <td>"grant":false</td>
+  </tr>
+      <tr>
+      <td>127.0.0.1:9001#0</td>
+      <td>"match":0</td>
+      <td>"next":1</td>
+      <td>"done":false</td>
+      <td>"grant":false</td>
+  </tr>
+</table>
+
+</body>
+</html>

@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>(REMU)Raft Emulator</title>
+<link rel="stylesheet" href="b.css">
+</head>
+<body>
+
+<table>
+    <tr>
+      <td class="banner">(REMU)Raft Emulator - Node State</td>
+    </tr>
+</table>
+
+<table>
+    <tr>
+      <td class="nodes">Nodes:</td>
+      <td class="nodes">127.0.0.1:9000#0</td>
+      <td class="nodes">127.0.0.1:9001#0</td>
+      <td class="nodes">127.0.0.1:9002#0</td>
+    </tr>
+</table>
+
+<table>
+    <tr>
+        <td class="table-title" colspan="5">0x17D838A332B1C85A state_change: 2024:06:12 17:45:31 423180890 --- 127.0.0.1:9000#0 ---</td>  
+    </tr>
+    <tr>
+        <td class="begin_end" colspan="5">state_begin</td>  
+    </tr>
+    <tr>
+        <td class="node">127.0.0.1:9000#0</td>
+        <td>FOLLOWER</td>
+        <td colspan="3">0x558190f86af0</td> 
+    </tr>
+    <tr>
+        <td>"term":1</td>
+        <td>"vote":"0"</td>
+        <td colspan="3">"log":[0,0,1,{"chk":"0x0","ltm":0}]</td> 
+    </tr>
+    <tr>
+        <td>"apply":0</td>
+        <td>"cmt":0</td>
+        <td>"elect_ms":[0,3475]</td>
+        <td>"leader":"0.0.0.0:0#0"</td>
+        <td>"run":true</td>
+    </tr>
+    <tr>
+        <td>127.0.0.1:9001#0</td>
+        <td>"match":0</td>
+        <td>"next":1</td>
+        <td>"done":false</td>
+        <td>"grant":false</td>
+    </tr>
+        <tr>
+        <td>127.0.0.1:9002#0</td>
+        <td>"match":0</td>
+        <td>"next":1</td>
+        <td>"done":false</td>
+        <td>"grant":false</td>
+    </tr>
+
+    <tr>
+        <td class="event">event_start</td>  
+        <td class="event" colspan="4">raft start</td>  
+    </tr>
+    <tr>
+        <td class="event">event_other</td>  
+        <td class="event" colspan="4">step down, term 1 >= 1</td>  
+    </tr>
+
+    <tr>
+        <td class="begin_end" colspan="5">state_end</td>  
+    </tr>
+
+    <tr>
+        <td class="node">127.0.0.1:9001#0</td>
+        <td>FOLLOWER</td>
+        <td colspan="3">0x558190f8cab0</td> 
+    </tr>
+    <tr>
+        <td>"term":1</td>
+        <td>"vote":"0"</td>
+        <td colspan="3">"log":[0,0,1,{"chk":"0x0","ltm":0}]</td> 
+    </tr>
+    <tr>
+        <td>"apply":0</td>
+        <td>"cmt":0</td>
+        <td>"elect_ms":[0,0]</td>
+        <td>"leader":"0.0.0.0:0#0"</td>
+        <td>"run":true</td>
+    </tr>
+    <tr>
+        <td>127.0.0.1:9000#0</td>
+        <td>"match":0</td>
+        <td>"next":1</td>
+        <td>"done":false</td>
+        <td>"grant":false</td>
+    </tr>
+        <tr>
+        <td>127.0.0.1:9002#0</td>
+        <td>"match":0</td>
+        <td>"next":1</td>
+        <td>"done":false</td>
+        <td>"grant":false</td>
+    </tr> 
+</table>
+
+<table>
+    <tr>
+        <td class="table-title" colspan="5">0x17D838A332B1C85A state_change: 2024:06:12 17:45:31 423180890 --- 127.0.0.1:9000#0 ---</td>  
+    </tr>
+    <tr>
+        <td class="begin_end" colspan="5">state_begin</td>  
+    </tr>
+    <tr>
+        <td class="node">127.0.0.1:9000#0</td>
+        <td>FOLLOWER</td>
+        <td colspan="3">0x558190f86af0</td> 
+    </tr>
+    <tr>
+        <td>"term":1</td>
+        <td>"vote":"0"</td>
+        <td colspan="3">"log":[0,0,1,{"chk":"0x0","ltm":0}]</td> 
+    </tr>
+    <tr>
+        <td>"apply":0</td>
+        <td>"cmt":0</td>
+        <td>"elect_ms":[0,3475]</td>
+        <td>"leader":"0.0.0.0:0#0"</td>
+        <td>"run":true</td>
+    </tr>
+    <tr>
+        <td>127.0.0.1:9001#0</td>
+        <td>"match":0</td>
+        <td>"next":1</td>
+        <td>"done":false</td>
+        <td>"grant":false</td>
+    </tr>
+        <tr>
+        <td>127.0.0.1:9002#0</td>
+        <td>"match":0</td>
+        <td>"next":1</td>
+        <td>"done":false</td>
+        <td>"grant":false</td>
+    </tr>
+
+    <tr>
+        <td class="event">event_start</td>  
+        <td class="event" colspan="4">raft start</td>  
+    </tr>
+    <tr>
+        <td class="event">event_other</td>  
+        <td class="event" colspan="4">step down, term 1 >= 1</td>  
+    </tr>
+
+    <tr>
+        <td class="begin_end" colspan="5">state_end</td>  
+    </tr>
+
+    <tr>
+        <td class="node">127.0.0.1:9001#0</td>
+        <td>FOLLOWER</td>
+        <td colspan="3">0x558190f8cab0</td> 
+    </tr>
+    <tr>
+        <td>"term":1</td>
+        <td>"vote":"0"</td>
+        <td colspan="3">"log":[0,0,1,{"chk":"0x0","ltm":0}]</td> 
+    </tr>
+    <tr>
+        <td>"apply":0</td>
+        <td>"cmt":0</td>
+        <td>"elect_ms":[0,0]</td>
+        <td>"leader":"0.0.0.0:0#0"</td>
+        <td>"run":true</td>
+    </tr>
+    <tr>
+        <td>127.0.0.1:9000#0</td>
+        <td>"match":0</td>
+        <td>"next":1</td>
+        <td>"done":false</td>
+        <td>"grant":false</td>
+    </tr>
+        <tr>
+        <td>127.0.0.1:9002#0</td>
+        <td>"match":0</td>
+        <td>"next":1</td>
+        <td>"done":false</td>
+        <td>"grant":false</td>
+    </tr> 
+</table>
+
+</body>
+</html>

@@ -1,0 +1,69 @@
+body {
+    font-family: Arial, sans-serif;
+}
+
+.html-files, .other-files {
+    margin: 20px;
+    padding: 20px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    width: 88%;
+    margin: 20px auto; /* 水平居中 */
+}
+
+.html-files {
+    background-color: #f9f9f9;
+}
+
+.other-files {
+    background-color: #eef;
+}
+
+h2 {
+    color: #333;
+    font-size: 30px;
+}
+
+ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+li {
+    padding: 8px;
+    margin: 5px 0;
+}
+
+li a {
+    color: deepskyblue;
+    text-decoration: none;
+    font: 2em sans-serif;
+}
+
+li a:hover {
+    text-decoration: underline;
+}
+
+.banner {
+    background-color: beige;
+    font-family:monospace;
+    font-style: italic;
+    font-weight:900;
+    font-size: 5em;
+    text-shadow: 2px 3px 3px rgba(12, 12, 12, 0.932);
+}
+
+/* 设置表格的边框样式 */
+table {
+    width: 90%;
+    border-collapse: collapse; /* 关键属性：合并边框 */
+    margin: 15px auto; /* 水平居中 */
+    border: 5px solid black; /* 设置最外圈的边框 */
+  }
+    
+    /* 设置单元格的边框样式 */
+  th, td {
+    border: 1px solid black; /* 单一边框样式 */
+    padding: 10px; /* 单元格内填充 */
+    text-align: center; /* 文本靠左对齐 */
+  }

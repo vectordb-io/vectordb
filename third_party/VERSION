@@ -1,0 +1,7 @@
+leveldb       1.22
+cxxopts       v3.2.0
+libuv         v1.40.0
+spdlog        v1.13.0
+googletest    v1.14.0
+nlohmann_json v3.10.0
+annoy         v1.17.0
