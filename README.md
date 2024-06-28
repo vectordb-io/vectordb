@@ -1,6 +1,6 @@
 # vectordb
 
-#### Notice!! developing, unstable，do not use it online!!
+#### Notice!! developing, unstable.
 
 site: [vectordb.io](vectordb.io)
 
