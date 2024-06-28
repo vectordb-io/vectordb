@@ -2,5 +2,5 @@
 
 ### Notice!! developing, unstable，do not use it online!!
 
-site: [vectordb.io)
+site: [vectordb.io](vectordb.io)
 
