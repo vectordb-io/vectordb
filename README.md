@@ -3,8 +3,9 @@
 #### This project is developing, unstable.
 #### Take a look at this project; it's more interesting! [vraft](https://github.com/vectordb-io/vraft)
 
+****
 
-### commands:
+### vectordb commands:
 
 #### create table
 ```
