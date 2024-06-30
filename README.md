@@ -1,8 +1,8 @@
 # vectordb
 
-#### Notice!! developing, unstable.
+#### This project is developing, unstable.
+#### Take a look at this project; it's more interesting! [vraft](https://github.com/vectordb-io/vraft)
 
-site: [vectordb.io](vectordb.io)
 
 ### commands:
 
