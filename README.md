@@ -1,6 +1,6 @@
 # vectordb
 
-### site: 
+### Site: 
 [vectordb.io](http://vectordb.io)
 
 #### "vectordb" is under development, unstable.
