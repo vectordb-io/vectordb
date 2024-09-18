@@ -15,7 +15,27 @@ Vectordb is a database software used in AI service, supporting operations on vec
 ### metadata
 ![metadata](images/metadata.png)
 
-## 2 vectordb-cli commands:
+## 2 Operation
+
+### write vectors
+![write](images/write.png)
+
+### build index
+![build-index](images/build-index.png)
+
+### build delta index
+![diff-index](images/diff-index.png)
+
+### get knn by vector
+![get_knn_by_vector](images/get_knn_by_vector.png)
+
+### get knn by key
+![get_knn_by_key](images/get_knn_by_key.png)
+
+### get knn in cluster
+![getknn-in-cluster](images/getknn-in-cluster.png)
+
+## 3 vectordb-cli commands:
 
 #### create table
 ```
