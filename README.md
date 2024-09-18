@@ -3,11 +3,9 @@
 ### Site: 
 [vectordb.io](http://vectordb.io)
 
-#### "vectordb" is under development, unstable.
-### Take a look at this project([vraft](https://github.com/vectordb-io/vraft)), it's more interesting! 
-#### [https://github.com/vectordb-io/vraft](https://github.com/vectordb-io/vraft)
-
-****
+```
+Vectordb is a database software used in AI service, supporting operations on vectors, such as getKNN (get K Nearest Neighbors). It can work together with the LLM(Large-Language Model), especially in RAG(Retrieval-Augmented Generation) service. It is based on the project([vraft](https://github.com/vectordb-io/vraft)), which supports its distributed architecture.
+```
 
 ### vectordb commands:
 
