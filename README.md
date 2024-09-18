@@ -1,3 +1,5 @@
+<img src="https://github.com/vectordb-io/vraft/blob/main/images/vectordb-io.png" alt="vectordb.io" width="300" height="200">
+
 # vectordb
 
 **site:** [vectordb.io](http://vectordb.io)
