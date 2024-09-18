@@ -6,8 +6,11 @@ Vectordb is a database software used in AI service, supporting operations on vec
 
 ## Architecture
 
-### node
-![](images/node.png)
+### single-server
+![node](images/node.png)
+
+### cluster
+![cluster](images/cluster.png)
 
 ## vectordb-cli commands:
 
