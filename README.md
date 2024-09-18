@@ -4,7 +4,7 @@
 
 Vectordb is a database software used in AI service, supporting operations on vectors, such as getKNN (get K Nearest Neighbors). It can work together with the LLM(Large-Language Model), especially in RAG(Retrieval-Augmented Generation) service. It is based on the project([vraft](https://github.com/vectordb-io/vraft)), which supports its distributed architecture.
 
-## Architecture
+## 1 Architecture
 
 ### single-server
 ![node](images/node.png)
@@ -12,7 +12,10 @@ Vectordb is a database software used in AI service, supporting operations on vec
 ### cluster
 ![cluster](images/cluster.png)
 
-## vectordb-cli commands:
+### metadata
+![metadata](images/metadata.png)
+
+## 2 vectordb-cli commands:
 
 #### create table
 ```
