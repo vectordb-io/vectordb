@@ -86,7 +86,7 @@ int32_t Raft::OnAppendEntries(struct AppendEntries &msg) {
     tracer.PrepareEvent(kEventRecv, msg.ToJsonString(false, true));
 
     // temp variable used behind, define here due to "goto", make compiler happy
-    RaftIndex index;
+    RaftIndex index = 0;
 
     // set response to a rejection
     // if we accept, we will overwrite it
@@ -95,6 +95,8 @@ int32_t Raft::OnAppendEntries(struct AppendEntries &msg) {
     reply.dest = msg.src;
     reply.term = meta_.term();
     reply.uid = UniqId(&reply);
+    reply.send_ts = Clock::NSec();
+    reply.elapse = 0;
     reply.success = false;
     reply.last_log_index = LastIndex();
     reply.req_pre_index = msg.pre_log_index;
@@ -123,6 +125,9 @@ int32_t Raft::OnAppendEntries(struct AppendEntries &msg) {
     // reset election timer immediately
     timer_mgr_.StopRequestVote();
     timer_mgr_.AgainElection();
+
+    // record last_heartbeat_timestamp
+    last_heartbeat_timestamp_ = Clock::NSec();
 
     // update leader cache
     if (leader_.ToU64() == 0) {
@@ -185,7 +190,7 @@ int32_t Raft::OnAppendEntries(struct AppendEntries &msg) {
 
         assert(commit_ < index);
 
-        rv = log_.DeleteFrom(index);
+        rv = log_.DeleteFrom(index, &tracer);
         assert(rv == 0);
 
         char buf[128];
@@ -229,31 +234,13 @@ int32_t Raft::OnAppendEntries(struct AppendEntries &msg) {
     timer_mgr_.StopRequestVote();
     timer_mgr_.AgainElection();
 
+    // record last_heartbeat_timestamp
+    last_heartbeat_timestamp_ = Clock::NSec();
+
   end:
     SendAppendEntriesReply(reply, &tracer);
     tracer.PrepareState1();
     tracer.Finish();
-  }
-  return 0;
-}
-
-int32_t Raft::SendAppendEntriesReply(AppendEntriesReply &msg, Tracer *tracer) {
-  std::string body_str;
-  int32_t bytes = msg.ToString(body_str);
-
-  MsgHeader header;
-  header.body_bytes = bytes;
-  header.type = kAppendEntriesReply;
-  std::string header_str;
-  header.ToString(header_str);
-
-  if (send_) {
-    header_str.append(std::move(body_str));
-    send_(msg.dest.ToU64(), header_str.data(), header_str.size());
-
-    if (tracer != nullptr) {
-      tracer->PrepareEvent(kEventSend, msg.ToJsonString(false, true));
-    }
   }
 
   return 0;
@@ -300,7 +287,7 @@ int32_t Raft::OnAppendEntriesReply(struct AppendEntriesReply &msg) {
       goto end;
     }
 
-    assert((state_ == LEADER));
+    assert((state_ == STATE_LEADER));
 
     if (msg.term > meta_.term()) {
       StepDown(msg.term, &tracer);
@@ -338,7 +325,7 @@ int32_t Raft::OnAppendEntriesReply(struct AppendEntriesReply &msg) {
         }
       }
 
-      // send reply immediately
+      // send msg immediately
       if (index_mgr_.GetNext(msg.src) <= LastIndex()) {
         SendAppendEntries(msg.src.ToU64(), &tracer);
 
@@ -351,6 +338,102 @@ int32_t Raft::OnAppendEntriesReply(struct AppendEntriesReply &msg) {
     tracer.PrepareState1();
     tracer.Finish();
   }
+  return 0;
+}
+
+int32_t Raft::SendAppendEntries(uint64_t dest, Tracer *tracer) {
+  RaftIndex last_index = LastIndex();
+  RaftIndex next_index = index_mgr_.GetNext(dest);
+  RaftIndex pre_index = next_index - 1;
+  assert(pre_index <= last_index);
+
+  if (next_index < log_.First()) {
+    // do not have log, send snapshot
+    SendInstallSnapshot(dest, tracer);
+    return 0;
+  }
+  assert(next_index >= log_.First());
+
+  RaftTerm pre_term = 0;
+  if (pre_index >= log_.First()) {
+    pre_term = GetTerm(pre_index);
+
+  } else if (pre_index == 0) {
+    pre_term = 0;
+
+  } else if (sm_ && pre_index == sm_->LastIndex()) {
+    pre_term = sm_->LastTerm();
+
+  } else {
+    // do not have log, send snapshot
+    SendInstallSnapshot(dest, tracer);
+    return 0;
+  }
+
+  AppendEntries msg;
+  msg.src = Me();
+  msg.dest = RaftAddr(dest);
+  msg.term = meta_.term();
+  msg.uid = UniqId(&msg);
+  msg.send_ts = Clock::NSec();
+  msg.elapse = 0;
+  msg.pre_log_index = pre_index;
+  msg.pre_log_term = pre_term;
+
+  if (log_.IndexValid(next_index)) {
+    LogEntry entry;
+    int32_t rv = log_.Get(next_index, entry);
+    assert(rv == 0);
+    msg.entries.push_back(entry);
+  }
+
+  // tla+
+  // mcommitIndex   |-> Min({commitIndex[i], lastEntry}),
+  // logcabin:
+  // request.set_commit_index(std::min(commitIndex, prevLogIndex + numEntries));
+  msg.commit_index =
+      std::min(commit_, pre_index + static_cast<RaftIndex>(msg.entries.size()));
+
+  std::string body_str;
+  int32_t bytes = msg.ToString(body_str);
+
+  MsgHeader header;
+  header.body_bytes = bytes;
+  header.type = kAppendEntries;
+  std::string header_str;
+  header.ToString(header_str);
+
+  if (send_) {
+    header_str.append(std::move(body_str));
+    int32_t rv = send_(dest, header_str.data(), header_str.size());
+
+    if (tracer != nullptr && rv == 0) {
+      tracer->PrepareEvent(kEventSend, msg.ToJsonString(false, true));
+    }
+  }
+
+  return 0;
+}
+
+int32_t Raft::SendAppendEntriesReply(AppendEntriesReply &msg, Tracer *tracer) {
+  std::string body_str;
+  int32_t bytes = msg.ToString(body_str);
+
+  MsgHeader header;
+  header.body_bytes = bytes;
+  header.type = kAppendEntriesReply;
+  std::string header_str;
+  header.ToString(header_str);
+
+  if (send_) {
+    header_str.append(std::move(body_str));
+    int32_t rv = send_(msg.dest.ToU64(), header_str.data(), header_str.size());
+
+    if (tracer != nullptr && rv == 0) {
+      tracer->PrepareEvent(kEventSend, msg.ToJsonString(false, true));
+    }
+  }
+
   return 0;
 }
 

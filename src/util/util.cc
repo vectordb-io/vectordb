@@ -164,7 +164,7 @@ std::string StrToHexStr(const char *ptr, int32_t size) {
   char buf[8];
   memset(buf, 0, sizeof(buf));
   for (int32_t i = 0; i < size; ++i) {
-    snprintf(buf, sizeof(buf), "0x%X ", ptr[i]);
+    snprintf(buf, sizeof(buf), "0x%X_", ptr[i]);
     str.append(buf);
   }
   if (str.size() > 0) {
@@ -240,7 +240,7 @@ std::string NsToString2(uint64_t ns) {
 
   // Stringstream to format strings with leading zeros & concatenation
   std::ostringstream ss;
-  ss << std::put_time(&tm, "%Y:%m:%d-%H:%M:%S")
+  ss << std::put_time(&tm, "%Y-%m-%d-%H-%M-%S")
      << "-";  // format and add date and time up to seconds
   ss << std::setw(9) << std::setfill('0')
      << leftover_ns;  // format nanoseconds with padding
@@ -400,6 +400,17 @@ void ListDir(const std::string &path, std::vector<std::string> &paths) {
   }
 
   closedir(dir);
+}
+
+int32_t AtomicMove(const std::string &src_path, const std::string &dest_path) {
+  // Use the rename function which is atomic
+  if (rename(src_path.c_str(), dest_path.c_str()) != 0) {
+    // Error occurred, print it and return -1
+    perror("Error renaming file or directory");
+    return -1;
+  }
+  // Success
+  return 0;
 }
 
 }  // namespace vraft

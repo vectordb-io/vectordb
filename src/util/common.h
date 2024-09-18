@@ -10,7 +10,11 @@ namespace vraft {
 
 #define MAX_QUEUE_SIZE (4096)
 
+#define MAX_TRANSFER_TERM 3
+
 #define JSON_TAB 2
+
+#define SNAPSHOT_MAX_READ 10
 
 using RaftIndex = uint32_t;
 using RaftTerm = uint64_t;
@@ -22,6 +26,11 @@ using TracerCb = std::function<void(std::string)>;
 
 using SendFunc =
     std::function<int32_t(uint64_t dest, const char *buf, unsigned int size)>;
+
+class RaftConfig;
+using RaftConfigSPtr = std::shared_ptr<RaftConfig>;
+using RaftConfigUPtr = std::unique_ptr<RaftConfig>;
+using RaftConfigWPtr = std::weak_ptr<RaftConfig>;
 
 class Console;
 using ConsoleSPtr = std::shared_ptr<Console>;
@@ -82,10 +91,30 @@ using RaftSPtr = std::shared_ptr<Raft>;
 using RaftUPtr = std::unique_ptr<Raft>;
 using RaftWPtr = std::weak_ptr<Raft>;
 
+class Config;
+using ConfigSPtr = std::shared_ptr<Config>;
+using ConfigUPtr = std::unique_ptr<Config>;
+using ConfigWPtr = std::weak_ptr<Config>;
+
 class StateMachine;
 using StateMachineSPtr = std::shared_ptr<StateMachine>;
 using StateMachineUPtr = std::unique_ptr<StateMachine>;
 using StateMachineWPtr = std::weak_ptr<StateMachine>;
+
+class SnapshotManager;
+using SnapshotManagerSPtr = std::shared_ptr<SnapshotManager>;
+using SnapshotManagerUPtr = std::unique_ptr<SnapshotManager>;
+using SnapshotManagerWPtr = std::weak_ptr<SnapshotManager>;
+
+class SnapshotReader;
+using SnapshotReaderSPtr = std::shared_ptr<SnapshotReader>;
+using SnapshotReaderUPtr = std::unique_ptr<SnapshotReader>;
+using SnapshotReaderWPtr = std::weak_ptr<SnapshotReader>;
+
+class SnapshotWriter;
+using SnapshotWriterSPtr = std::shared_ptr<SnapshotWriter>;
+using SnapshotWriterUPtr = std::unique_ptr<SnapshotWriter>;
+using SnapshotWriterWPtr = std::weak_ptr<SnapshotWriter>;
 
 class WorkThread;
 using WorkThreadSPtr = std::shared_ptr<WorkThread>;

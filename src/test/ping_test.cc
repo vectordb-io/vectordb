@@ -19,6 +19,8 @@ TEST(Ping, test) {
   msg.src = src;
   msg.dest = dest;
   msg.uid = vraft::UniqId(&msg);
+  msg.send_ts = 100;
+  msg.elapse = 200;
   msg.msg = "ping";
 
   std::string msg_str;
@@ -45,6 +47,8 @@ TEST(Ping, test) {
   ASSERT_EQ(msg.dest.ToU64(), msg2.dest.ToU64());
   ASSERT_EQ(msg.msg, msg2.msg);
   ASSERT_EQ(msg.uid, msg2.uid);
+  ASSERT_EQ(msg.send_ts, msg2.send_ts);
+  ASSERT_EQ(msg.elapse, msg2.elapse);
 }
 
 int main(int argc, char **argv) {

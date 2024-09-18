@@ -5,6 +5,7 @@
 
 #include <cassert>
 #include <memory>
+#include <set>
 #include <type_traits>
 #include <utility>
 
@@ -14,6 +15,7 @@
 #include "leveldb/comparator.h"
 #include "leveldb/db.h"
 #include "nlohmann/json.hpp"
+#include "raft_config.h"
 #include "slice.h"
 #include "util.h"
 
@@ -374,9 +376,10 @@ class RaftLog final {
   void Check();
   bool IndexValid(RaftIndex index);
 
+  int32_t AppendFirstConfig(RaftConfig &rc, RaftTerm term, Tracer *tracer);
   int32_t AppendOne(AppendEntry &entry, Tracer *tracer);
   int32_t AppendSome(std::vector<AppendEntry> &entries);
-  int32_t DeleteFrom(RaftIndex from_index);
+  int32_t DeleteFrom(RaftIndex from_index, Tracer *tracer);
   int32_t DeleteUtil(RaftIndex to_index);
   int32_t Get(RaftIndex index, LogEntry &entry);
   int32_t GetMeta(RaftIndex index, MetaValue &meta);
@@ -390,41 +393,39 @@ class RaftLog final {
   RaftIndex First() const { return first_; };
   RaftIndex Last() const { return last_; }
   RaftIndex Append() const { return append_; }
-  RaftIndex LastCheck() const { return last_checksum_; }
+  uint32_t LastCheck() const { return last_checksum_; }
+  int32_t LastConfig(RaftConfig &rc, MetaValue &meta);
 
   nlohmann::json ToJson();
   nlohmann::json ToJsonTiny();
   std::string ToJsonString(bool tiny, bool one_line);
 
+  void set_insert_cb(AppendConfigFunc cb) { insert_cb_ = cb; }
+  void set_delete_cb(DeleteConfigFunc cb) { delete_cb_ = cb; }
+
+  // for debug
+  RaftAddr me;
+
  private:
   RaftIndex first_;
   RaftIndex last_;
   RaftIndex append_;
+  std::set<RaftIndex> config_indices_;
   bool checksum_;
   uint32_t last_checksum_;
 
   std::string path_;
+  std::string config_path_;
+
   leveldb::Options db_options_;
   std::shared_ptr<leveldb::DB> db_;
+  std::shared_ptr<leveldb::DB> config_db_;
+
+  AppendConfigFunc insert_cb_;
+  DeleteConfigFunc delete_cb_;
 };
 
 inline RaftLog::~RaftLog() {}
-
-inline nlohmann::json RaftLog::ToJson() {
-  nlohmann::json j;
-  j["first"] = first_;
-  j["last"] = last_;
-  j["append"] = append_;
-  j["checksum"] = U32ToHexStr(last_checksum_);
-  MetaValuePtr ptr = LastMeta();
-  if (ptr) {
-    j["last_term"] = ptr->term;
-  } else {
-    j["last_term"] = 0;
-  }
-
-  return j;
-}
 
 inline nlohmann::json RaftLog::ToJsonTiny() {
   nlohmann::json j;
@@ -438,6 +439,16 @@ inline nlohmann::json RaftLog::ToJsonTiny() {
   } else {
     j[3]["ltm"] = 0;
   }
+
+  if (config_indices_.size() > 0) {
+    int32_t i = 0;
+    for (auto index : config_indices_) {
+      j[4]["cfs"][i++] = index;
+    }
+  } else {
+    j[4]["cfs"] = "null";
+  }
+
   return j;
 }
 

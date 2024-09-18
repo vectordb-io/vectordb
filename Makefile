@@ -1,15 +1,22 @@
 ASAN ?= no
-
 ifeq ($(ASAN),yes)
 	SANITIZE_FLAGS = -fsanitize=address
 else
 	SANITIZE_FLAGS =
 endif
 
+CLIBS ?= no
+ifeq ($(CLIBS),yes)
+	LIBS_CXXFLAGS = -shared -fPIC
+else
+	LIBS_CXXFLAGS =
+endif
+
 CXX := g++
 
 CXXFLAGS := -g -Wall -std=c++14 -DANNOYLIB_MULTITHREADED_BUILD
 CXXFLAGS += $(SANITIZE_FLAGS)
+CXXFLAGS += $(LIBS_CXXFLAGS)
 
 INCLUDES := -Isrc/raft -Isrc/seda -Isrc/util -Isrc/test -Isrc/example
 INCLUDES += -Isrc/vmeta -Isrc/vstore -Isrc/vpaxos -Isrc/vectordb
@@ -20,6 +27,7 @@ INCLUDES += -Ithird_party/leveldb/include
 INCLUDES += -Ithird_party/libuv/include 
 INCLUDES += -Ithird_party/nlohmann_json/single_include
 INCLUDES += -Ithird_party/annoy/src
+INCLUDES += $(shell python -m pybind11 --includes)
 
 LDFLAGS := third_party/libuv/.libs/libuv.a 
 LDFLAGS += third_party/leveldb/build/libleveldb.a 
@@ -33,6 +41,9 @@ SRC_DIRS := src/raft src/seda src/util
 SRC_DIRS += src/vmeta src/vstore src/vpaxos src/vectordb
 COMMON_SRCS := $(wildcard $(SRC_DIRS:=/*.cc))
 
+# lib src
+VDB_MODULE_SRCS := src/lib/vdb_module.cc $(COMMON_SRCS)
+
 # main src
 VRAFT_SERVER_SRCS := src/main/vraft_server.cc $(COMMON_SRCS)
 RLOG_TOOL_SRCS := src/main/rlog_tool.cc $(COMMON_SRCS)
@@ -41,33 +52,41 @@ DB_TOOL_SRCS := src/main/db_tool.cc $(COMMON_SRCS)
 REMU_SRCS := src/main/remu_main.cc $(COMMON_SRCS)
 VECTORDB_SERVER_SRCS := src/main/vectordb_server.cc $(COMMON_SRCS)
 VECTORDB_CLI_SRCS := src/main/vectordb_cli.cc $(COMMON_SRCS)
+VSTORE_SERVER_SRCS := src/main/vstore_server.cc $(COMMON_SRCS)
+VSTORE_CLI_SRCS := src/main/vstore_cli.cc $(COMMON_SRCS)
 
 # example src
 ECHO_SERVER_SRCS := src/example/echo_server.cc $(COMMON_SRCS)
 ECHO_CLIENT_SRCS := src/example/echo_client.cc $(COMMON_SRCS)
 ECHO_CONSOLE_SRCS := src/example/echo_console.cc $(COMMON_SRCS)
+TURING_MACHINE_SRCS := src/example/turing_machine.cc $(COMMON_SRCS)
 
 # test src
 LOGGER_TEST_SRCS := src/test/logger_test.cc $(COMMON_SRCS)
+KV_TEST_SRCS := src/test/kv_test.cc $(COMMON_SRCS)
 PING_TEST_SRCS := src/test/ping_test.cc $(COMMON_SRCS)
 PING_REPLY_TEST_SRCS := src/test/ping_reply_test.cc $(COMMON_SRCS)
+INSTALL_SNAPSHOT_TEST_SRCS := src/test/install_snapshot_test.cc $(COMMON_SRCS)
+INSTALL_SNAPSHOT_REPLY_TEST_SRCS := src/test/install_snapshot_reply_test.cc $(COMMON_SRCS)
+CLIENT_REQUEST_TEST_SRCS := src/test/client_request_test.cc $(COMMON_SRCS)
+CLIENT_REQUEST_REPLY_TEST_SRCS := src/test/client_request_reply_test.cc $(COMMON_SRCS)
 RAFT_LOG_TEST_SRCS := src/test/raft_log_test.cc $(COMMON_SRCS)
 SOLID_DATA_TEST_SRCS := src/test/solid_data_test.cc $(COMMON_SRCS)
 UTIL_TEST_SRCS := src/test/util_test.cc $(COMMON_SRCS)
+RAFT_ADDR_TEST_SRCS := src/test/raft_addr_test.cc $(COMMON_SRCS)
+RAFT_CONFIG_TEST_SRCS := src/test/raft_config_test.cc $(COMMON_SRCS)
 JSON_TEST_SRCS := src/test/json_test.cc $(COMMON_SRCS)
+CONFIG_MANAGER_TEST_SRCS := src/test/config_manager_test.cc $(COMMON_SRCS)
 REQUEST_VOTE_TEST_SRCS := src/test/request_vote_test.cc $(COMMON_SRCS)
 REQUEST_VOTE_REPLY_TEST_SRCS := src/test/request_vote_reply_test.cc $(COMMON_SRCS)
+TIMEOUT_NOW_TEST_SRCS := src/test/timeout_now_test.cc $(COMMON_SRCS)
 APPEND_ENTRIES_TEST_SRCS := src/test/append_entries_test.cc $(COMMON_SRCS)
 CODING_TEST_SRCS := src/test/coding_test.cc $(COMMON_SRCS)
 APPEND_ENTRIES_REPLY_TEST_SRCS := src/test/append_entries_reply_test.cc $(COMMON_SRCS)
 TRACER_TEST_SRCS := src/test/tracer_test.cc $(COMMON_SRCS)
 RAFT_TEST_SRCS := src/test/raft_test.cc $(COMMON_SRCS)
 TPL_TEST_SRCS := src/test/tpl_test.cc $(COMMON_SRCS)
-REMU_ELECT_TEST_SRCS := src/test/remu_elect_test.cc $(COMMON_SRCS)
-REMU_ELECT2_TEST_SRCS := src/test/remu_elect2_test.cc $(COMMON_SRCS)
-REMU_PROPOSE_TEST_SRCS := src/test/remu_propose_test.cc $(COMMON_SRCS)
-REMU_SM_TEST_SRCS := src/test/remu_sm_test.cc $(COMMON_SRCS)
-REMU_SM2_TEST_SRCS := src/test/remu_sm2_test.cc $(COMMON_SRCS)
+TEST_SUITE_TEST_SRCS := src/test/test_suite_test.cc $(COMMON_SRCS)
 HOSTPORT_TEST_SRCS := src/test/hostport_test.cc $(COMMON_SRCS)
 BUFFER_TEST_SRCS := src/test/buffer_test.cc $(COMMON_SRCS)
 EVENTLOOP_TEST_SRCS := src/test/eventloop_test.cc $(COMMON_SRCS)
@@ -95,11 +114,31 @@ KEYID_META_TEST_SRCS := src/test/keyid_meta_test.cc $(COMMON_SRCS)
 METADATA_TEST_SRCS := src/test/metadata_test.cc $(COMMON_SRCS)
 VDB_ENGINE_TEST_SRCS := src/test/vdb_engine_test.cc $(COMMON_SRCS)
 PARSER_TEST_SRCS := src/test/parser_test.cc $(COMMON_SRCS)
-
+VSTORE_MSG_TEST_SRCS := src/test/vstore_msg_test.cc $(COMMON_SRCS)
 
 # remu test src
+REMU_RECONFIG_TEST_SRCS := src/test/remu_reconfig_test.cc $(COMMON_SRCS)
+REMU_RECONFIG2_TEST_SRCS := src/test/remu_reconfig2_test.cc $(COMMON_SRCS)
+REMU_ELECT_TEST_SRCS := src/test/remu_elect_test.cc $(COMMON_SRCS)
+REMU_ELECT2_TEST_SRCS := src/test/remu_elect2_test.cc $(COMMON_SRCS)
+REMU_PROPOSE_TEST_SRCS := src/test/remu_propose_test.cc $(COMMON_SRCS)
+REMU_PROPOSE2_TEST_SRCS := src/test/remu_propose2_test.cc $(COMMON_SRCS)
+REMU_SM_TEST_SRCS := src/test/remu_sm_test.cc $(COMMON_SRCS)
+REMU_SM2_TEST_SRCS := src/test/remu_sm2_test.cc $(COMMON_SRCS)
+REMU_SM3_TEST_SRCS := src/test/remu_sm3_test.cc $(COMMON_SRCS)
+REMU_SM4_TEST_SRCS := src/test/remu_sm4_test.cc $(COMMON_SRCS)
+REMU_SM5_TEST_SRCS := src/test/remu_sm5_test.cc $(COMMON_SRCS)
+REMU_RESTART_TEST_SRCS := src/test/remu_restart_test.cc $(COMMON_SRCS)
+REMU_LEADERTRANSFER_TEST_SRCS := src/test/remu_leadertransfer_test.cc $(COMMON_SRCS)
+REMU_TIMEOUT_BYSELF_TEST_SRCS := src/test/remu_timeout_byself_test.cc $(COMMON_SRCS)
+REMU_DISABLE_RECV_TEST_SRCS := src/test/remu_disable_recv_test.cc $(COMMON_SRCS)
+REMU_DISABLE_RECV2_TEST_SRCS := src/test/remu_disable_recv2_test.cc $(COMMON_SRCS)
+REMU_NET_ERROR_TEST_SRCS := src/test/remu_net_error_test.cc $(COMMON_SRCS)
 
 # generate .o
+# lib
+VDB_MODULE_OBJECTS := $(VDB_MODULE_SRCS:.cc=.o)
+
 # main
 VRAFT_SERVER_OBJECTS := $(VRAFT_SERVER_SRCS:.cc=.o)
 RLOG_TOOL_OBJECTS := $(RLOG_TOOL_SRCS:.cc=.o)
@@ -108,33 +147,42 @@ DB_TOOL_OBJECTS := $(DB_TOOL_SRCS:.cc=.o)
 REMU_OBJECTS := $(REMU_SRCS:.cc=.o)
 VECTORDB_SERVER_OBJECTS := $(VECTORDB_SERVER_SRCS:.cc=.o)
 VECTORDB_CLI_OBJECTS := $(VECTORDB_CLI_SRCS:.cc=.o)
+VSTORE_SERVER_OBJECTS := $(VSTORE_SERVER_SRCS:.cc=.o)
+VSTORE_CLI_OBJECTS := $(VSTORE_CLI_SRCS:.cc=.o)
 
 # example
 ECHO_SERVER_OBJECTS := $(ECHO_SERVER_SRCS:.cc=.o)
 ECHO_CLIENT_OBJECTS := $(ECHO_CLIENT_SRCS:.cc=.o)
 ECHO_CONSOLE_OBJECTS := $(ECHO_CONSOLE_SRCS:.cc=.o)
+TURING_MACHINE_OBJECTS := $(TURING_MACHINE_SRCS:.cc=.o)
 
 # test
 LOGGER_TEST_OBJECTS := $(LOGGER_TEST_SRCS:.cc=.o)
+KV_TEST_OBJECTS := $(KV_TEST_SRCS:.cc=.o)
 PING_TEST_OBJECTS := $(PING_TEST_SRCS:.cc=.o)
 PING_REPLY_TEST_OBJECTS := $(PING_REPLY_TEST_SRCS:.cc=.o)
+INSTALL_SNAPSHOT_TEST_OBJECTS := $(INSTALL_SNAPSHOT_TEST_SRCS:.cc=.o)
+INSTALL_SNAPSHOT_REPLY_TEST_OBJECTS := $(INSTALL_SNAPSHOT_REPLY_TEST_SRCS:.cc=.o)
+CLIENT_REQUEST_TEST_OBJECTS := $(CLIENT_REQUEST_TEST_SRCS:.cc=.o)
+CLIENT_REQUEST_REPLY_TEST_OBJECTS := $(CLIENT_REQUEST_REPLY_TEST_SRCS:.cc=.o)
 RAFT_LOG_TEST_OBJECTS := $(RAFT_LOG_TEST_SRCS:.cc=.o)
 SOLID_DATA_TEST_OBJECTS := $(SOLID_DATA_TEST_SRCS:.cc=.o)
 UTIL_TEST_OBJECTS := $(UTIL_TEST_SRCS:.cc=.o)
+RAFT_ADDR_TEST_OBJECTS := $(RAFT_ADDR_TEST_SRCS:.cc=.o)
+RAFT_CONFIG_TEST_OBJECTS := $(RAFT_CONFIG_TEST_SRCS:.cc=.o)
 JSON_TEST_OBJECTS := $(JSON_TEST_SRCS:.cc=.o)
+CONFIG_MANAGER_TEST_OBJECTS := $(CONFIG_MANAGER_TEST_SRCS:.cc=.o)
+CONFIG_MANAGER_TEST_OBJECTS := $(CONFIG_MANAGER_TEST_SRCS:.cc=.o)
 REQUEST_VOTE_TEST_OBJECTS := $(REQUEST_VOTE_TEST_SRCS:.cc=.o)
 REQUEST_VOTE_REPLY_TEST_OBJECTS := $(REQUEST_VOTE_REPLY_TEST_SRCS:.cc=.o)
+TIMEOUT_NOW_TEST_OBJECTS := $(TIMEOUT_NOW_TEST_SRCS:.cc=.o)
 APPEND_ENTRIES_TEST_OBJECTS := $(APPEND_ENTRIES_TEST_SRCS:.cc=.o)
 CODING_TEST_OBJECTS := $(CODING_TEST_SRCS:.cc=.o)
 APPEND_ENTRIES_REPLY_TEST_OBJECTS := $(APPEND_ENTRIES_REPLY_TEST_SRCS:.cc=.o)
 TRACER_TEST_OBJECTS := $(TRACER_TEST_SRCS:.cc=.o)
 RAFT_TEST_OBJECTS := $(RAFT_TEST_SRCS:.cc=.o)
 TPL_TEST_OBJECTS := $(TPL_TEST_SRCS:.cc=.o)
-REMU_ELECT_TEST_OBJECTS := $(REMU_ELECT_TEST_SRCS:.cc=.o)
-REMU_ELECT2_TEST_OBJECTS := $(REMU_ELECT2_TEST_SRCS:.cc=.o)
-REMU_PROPOSE_TEST_OBJECTS := $(REMU_PROPOSE_TEST_SRCS:.cc=.o)
-REMU_SM_TEST_OBJECTS := $(REMU_SM_TEST_SRCS:.cc=.o)
-REMU_SM2_TEST_OBJECTS := $(REMU_SM2_TEST_SRCS:.cc=.o)
+TEST_SUITE_TEST_OBJECTS := $(TEST_SUITE_TEST_SRCS:.cc=.o)
 HOSTPORT_TEST_OBJECTS := $(HOSTPORT_TEST_SRCS:.cc=.o)
 BUFFER_TEST_OBJECTS := $(BUFFER_TEST_SRCS:.cc=.o)
 EVENTLOOP_TEST_OBJECTS := $(EVENTLOOP_TEST_SRCS:.cc=.o)
@@ -162,32 +210,55 @@ KEYID_META_TEST_OBJECTS := $(KEYID_META_TEST_SRCS:.cc=.o)
 METADATA_TEST_OBJECTS := $(METADATA_TEST_SRCS:.cc=.o)
 VDB_ENGINE_TEST_OBJECTS := $(VDB_ENGINE_TEST_SRCS:.cc=.o)
 PARSER_TEST_OBJECTS := $(PARSER_TEST_SRCS:.cc=.o)
+VSTORE_MSG_TEST_OBJECTS := $(VSTORE_MSG_TEST_SRCS:.cc=.o)
+REMU_ELECT_TEST_OBJECTS := $(REMU_ELECT_TEST_SRCS:.cc=.o)
+REMU_RECONFIG_TEST_OBJECTS := $(REMU_RECONFIG_TEST_SRCS:.cc=.o)
+REMU_RECONFIG2_TEST_OBJECTS := $(REMU_RECONFIG2_TEST_SRCS:.cc=.o)
+REMU_ELECT2_TEST_OBJECTS := $(REMU_ELECT2_TEST_SRCS:.cc=.o)
+REMU_PROPOSE_TEST_OBJECTS := $(REMU_PROPOSE_TEST_SRCS:.cc=.o)
+REMU_PROPOSE2_TEST_OBJECTS := $(REMU_PROPOSE2_TEST_SRCS:.cc=.o)
+REMU_SM_TEST_OBJECTS := $(REMU_SM_TEST_SRCS:.cc=.o)
+REMU_SM2_TEST_OBJECTS := $(REMU_SM2_TEST_SRCS:.cc=.o)
+REMU_SM3_TEST_OBJECTS := $(REMU_SM3_TEST_SRCS:.cc=.o)
+REMU_SM4_TEST_OBJECTS := $(REMU_SM4_TEST_SRCS:.cc=.o)
+REMU_SM5_TEST_OBJECTS := $(REMU_SM5_TEST_SRCS:.cc=.o)
+REMU_RESTART_TEST_OBJECTS := $(REMU_RESTART_TEST_SRCS:.cc=.o)
+REMU_LEADERTRANSFER_TEST_OBJECTS := $(REMU_LEADERTRANSFER_TEST_SRCS:.cc=.o)
+REMU_TIMEOUT_BYSELF_TEST_OBJECTS := $(REMU_TIMEOUT_BYSELF_TEST_SRCS:.cc=.o)
+REMU_DISABLE_RECV_TEST_OBJECTS := $(REMU_DISABLE_RECV_TEST_SRCS:.cc=.o)
+REMU_DISABLE_RECV2_TEST_OBJECTS := $(REMU_DISABLE_RECV2_TEST_SRCS:.cc=.o)
+REMU_NET_ERROR_TEST_OBJECTS := $(REMU_NET_ERROR_TEST_SRCS:.cc=.o)
 
-
-# generate exe
-MAIN := vraft-server rlog-tool meta-tool db-tool remu vectordb-server vectordb-cli
-EXAMPLE := echo-server echo-client echo-console
+# generate exe, lib
+LIBS := vdb_module.so
+MAIN := vraft-server rlog-tool meta-tool db-tool remu vectordb-server vectordb-cli vstore-server vstore-cli
+EXAMPLE := echo-server echo-client echo-console turing-machine
 
 TEST := tpl_test
+TEST := test_suite_test
 TEST += logger_test 
+TEST += kv_test
 TEST += ping_test 
 TEST += ping_reply_test 
+TEST += install_snapshot_test 
+TEST += install_snapshot_reply_test 
+TEST += client_request_test
+TEST += client_request_reply_test
 TEST += raft_log_test 
 TEST += solid_data_test 
 TEST += util_test 
+TEST += raft_addr_test 
+TEST += raft_config_test 
 TEST += json_test 
+TEST += config_manager_test 
 TEST += request_vote_test 
 TEST += request_vote_reply_test 
+TEST += timeout_now_test 
 TEST += append_entries_test 
 TEST += coding_test 
 TEST += append_entries_reply_test 
 TEST += tracer_test 
 TEST += raft_test  
-TEST += remu_elect_test
-TEST += remu_elect2_test
-TEST += remu_propose_test 
-TEST += remu_sm_test 
-TEST += remu_sm2_test
 TEST += hostport_test
 TEST += buffer_test
 TEST += eventloop_test
@@ -215,13 +286,38 @@ TEST += keyid_meta_test
 TEST += metadata_test
 TEST += vdb_engine_test
 TEST += parser_test
+TEST += vstore_msg_test
+
+REMU_TEST := remu_elect_test
+REMU_TEST += remu_reconfig_test
+REMU_TEST += remu_reconfig2_test
+REMU_TEST += remu_elect2_test
+REMU_TEST += remu_propose_test 
+REMU_TEST += remu_propose2_test
+REMU_TEST += remu_sm_test 
+REMU_TEST += remu_sm2_test
+REMU_TEST += remu_sm3_test
+REMU_TEST += remu_sm4_test
+REMU_TEST += remu_sm5_test
+REMU_TEST += remu_restart_test
+REMU_TEST += remu_leadertransfer_test
+REMU_TEST += remu_timeout_byself_test
+REMU_TEST += remu_disable_recv_test
+REMU_TEST += remu_disable_recv2_test
+REMU_TEST += remu_net_error_test
 
 
 # compile
-all: $(MAIN) $(EXAMPLE) $(TEST)
+all: $(MAIN) $(EXAMPLE) $(TEST) $(REMU_TEST) $(LIBS)
+
 main: $(MAIN) 
 example: $(EXAMPLE)
 test: $(TEST)
+remu-test: $(REMU_TEST)
+libs: $(LIBS)
+
+clibs:
+	make CLIBS=yes libs -j4
 
 
 # .cc -> .o
@@ -229,7 +325,11 @@ test: $(TEST)
 	$(CXX) $(INCLUDES) $(CXXFLAGS) -c $< -o $@
 
 
-# exe rules
+# exe, libs rules
+# libs
+vdb_module.so: $(VDB_MODULE_OBJECTS)
+	$(CXX) $(INCLUDES) $(LIBS_CXXFLAGS) $^ $(LDFLAGS) -o ./output/libs/$@
+
 # main
 vraft-server: $(VRAFT_SERVER_OBJECTS)
 	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/main/$@
@@ -252,6 +352,12 @@ vectordb-server: $(VECTORDB_SERVER_OBJECTS)
 vectordb-cli: $(VECTORDB_CLI_OBJECTS)
 	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/main/$@
 
+vstore-server: $(VSTORE_SERVER_OBJECTS)
+	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/main/$@
+
+vstore-cli: $(VSTORE_CLI_OBJECTS)
+	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/main/$@
+
 # example
 echo-server: $(ECHO_SERVER_OBJECTS)
 	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/example/$@
@@ -262,8 +368,14 @@ echo-client: $(ECHO_CLIENT_OBJECTS)
 echo-console: $(ECHO_CONSOLE_OBJECTS)
 	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/example/$@
 
+turing-machine: $(TURING_MACHINE_OBJECTS)
+	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
+
 # test
 logger_test: $(LOGGER_TEST_OBJECTS)
+	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
+
+kv_test: $(KV_TEST_OBJECTS)
 	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
 
 ping_test: $(PING_TEST_OBJECTS)
@@ -271,6 +383,18 @@ ping_test: $(PING_TEST_OBJECTS)
 
 ping_reply_test: $(PING_REPLY_TEST_OBJECTS)
 	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
+
+install_snapshot_test: $(INSTALL_SNAPSHOT_TEST_OBJECTS)
+	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
+
+install_snapshot_reply_test: $(INSTALL_SNAPSHOT_REPLY_TEST_OBJECTS)
+	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
+
+client_request_test: $(CLIENT_REQUEST_TEST_OBJECTS)
+	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@	
+
+client_request_reply_test: $(CLIENT_REQUEST_REPLY_TEST_OBJECTS)
+	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@	
 
 raft_log_test: $(RAFT_LOG_TEST_OBJECTS)
 	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
@@ -281,14 +405,26 @@ solid_data_test: $(SOLID_DATA_TEST_OBJECTS)
 util_test: $(UTIL_TEST_OBJECTS)
 	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
 
+raft_addr_test: $(RAFT_ADDR_TEST_OBJECTS)
+	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
+
+raft_config_test: $(RAFT_CONFIG_TEST_OBJECTS)
+	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
+
 json_test: $(JSON_TEST_OBJECTS)
+	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
+
+config_manager_test: $(CONFIG_MANAGER_TEST_OBJECTS)
 	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
 
 request_vote_test: $(REQUEST_VOTE_TEST_OBJECTS)
 	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@	
 
 request_vote_reply_test: $(REQUEST_VOTE_REPLY_TEST_OBJECTS)
-	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@		
+	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
+
+timeout_now_test: $(TIMEOUT_NOW_TEST_OBJECTS)
+	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@	
 
 append_entries_test: $(APPEND_ENTRIES_TEST_OBJECTS)
 	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@	
@@ -308,7 +444,16 @@ raft_test: $(RAFT_TEST_OBJECTS)
 tpl_test: $(TPL_TEST_OBJECTS)
 	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
 
+test_suite_test: $(TEST_SUITE_TEST_OBJECTS)
+	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
+
 remu_elect_test: $(REMU_ELECT_TEST_OBJECTS)
+	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
+
+remu_reconfig_test: $(REMU_RECONFIG_TEST_OBJECTS)
+	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
+
+remu_reconfig2_test: $(REMU_RECONFIG2_TEST_OBJECTS)
 	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
 
 remu_elect2_test: $(REMU_ELECT2_TEST_OBJECTS)
@@ -317,10 +462,40 @@ remu_elect2_test: $(REMU_ELECT2_TEST_OBJECTS)
 remu_propose_test: $(REMU_PROPOSE_TEST_OBJECTS)
 	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
 
+remu_propose2_test: $(REMU_PROPOSE2_TEST_OBJECTS)
+	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
+
 remu_sm_test: $(REMU_SM_TEST_OBJECTS)
 	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
 
 remu_sm2_test: $(REMU_SM2_TEST_OBJECTS)
+	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
+
+remu_sm3_test: $(REMU_SM3_TEST_OBJECTS)
+	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
+
+remu_sm4_test: $(REMU_SM4_TEST_OBJECTS)
+	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
+
+remu_sm5_test: $(REMU_SM5_TEST_OBJECTS)
+	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
+
+remu_restart_test: $(REMU_RESTART_TEST_OBJECTS)
+	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
+
+remu_leadertransfer_test: $(REMU_LEADERTRANSFER_TEST_OBJECTS)
+	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
+
+remu_timeout_byself_test: $(REMU_TIMEOUT_BYSELF_TEST_OBJECTS)
+	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@	
+
+remu_disable_recv_test: $(REMU_DISABLE_RECV_TEST_OBJECTS)
+	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
+
+remu_disable_recv2_test: $(REMU_DISABLE_RECV2_TEST_OBJECTS)
+	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
+
+remu_net_error_test: $(REMU_NET_ERROR_TEST_OBJECTS)
 	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
 
 hostport_test: $(HOSTPORT_TEST_OBJECTS)
@@ -404,12 +579,16 @@ vdb_engine_test: $(VDB_ENGINE_TEST_OBJECTS)
 parser_test: $(PARSER_TEST_OBJECTS)
 	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
 
+vstore_msg_test: $(VSTORE_MSG_TEST_OBJECTS)
+	$(CXX) $(INCLUDES) $(CXXFLAGS) $^ $(LDFLAGS) -o ./output/test/$@
+
 
 # clean
 clean:
 	find output/main/ -type f ! -name '*.sh' | xargs rm -f
 	find output/example/ -type f ! -name '*.sh' | xargs rm -f
-	find output/test/ -type f ! -name '*.sh' | xargs rm -f
+	find output/test -type f ! -name "*.sh" ! -name "*.param" | xargs rm -f
+	find output/libs/ -type f ! -name '*.sh' | xargs rm -f
 	find ./src/ -name "*.o" | xargs rm -f
 
 

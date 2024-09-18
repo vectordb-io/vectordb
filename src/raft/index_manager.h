@@ -48,12 +48,7 @@ class IndexManager final {
 };
 
 inline IndexManager::IndexManager(const std::vector<RaftAddr> &peers) {
-  for (auto addr : peers) {
-    IndexItem item;
-    item.next = 1;
-    item.match = 0;
-    indices[addr.ToU64()] = item;
-  }
+  Reset(peers);
 }
 
 inline IndexManager::~IndexManager() {}

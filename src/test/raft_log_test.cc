@@ -8,6 +8,7 @@
 #include <utility>
 
 #include "coding.h"
+#include "config_manager.h"
 #include "leveldb/comparator.h"
 #include "leveldb/db.h"
 
@@ -467,7 +468,7 @@ TEST(RaftLog, CheckSum) {
     EXPECT_EQ(raft_log.Last(), static_cast<uint32_t>(10));
     EXPECT_EQ(raft_log.Append(), static_cast<uint32_t>(11));
 
-    raft_log.DeleteFrom(1);
+    raft_log.DeleteFrom(1, nullptr);
     std::cout << raft_log.ToJsonString(true, true) << std::endl;
     EXPECT_EQ(raft_log.First(), static_cast<uint32_t>(0));
     EXPECT_EQ(raft_log.Last(), static_cast<uint32_t>(0));
@@ -517,7 +518,7 @@ TEST(RaftLog, DeleteFrom) {
     EXPECT_EQ(raft_log.Last(), static_cast<uint32_t>(10));
     EXPECT_EQ(raft_log.Append(), static_cast<uint32_t>(11));
 
-    raft_log.DeleteFrom(7);
+    raft_log.DeleteFrom(7, nullptr);
     std::cout << raft_log.ToJsonString(true, true) << std::endl;
     EXPECT_EQ(raft_log.First(), static_cast<uint32_t>(1));
     EXPECT_EQ(raft_log.Last(), static_cast<uint32_t>(6));
@@ -564,7 +565,7 @@ TEST(RaftLog, DeleteFrom2) {
     EXPECT_EQ(raft_log.Last(), static_cast<uint32_t>(10));
     EXPECT_EQ(raft_log.Append(), static_cast<uint32_t>(11));
 
-    raft_log.DeleteFrom(1);
+    raft_log.DeleteFrom(1, nullptr);
     std::cout << raft_log.ToJsonString(true, true) << std::endl;
     EXPECT_EQ(raft_log.First(), static_cast<uint32_t>(0));
     EXPECT_EQ(raft_log.Last(), static_cast<uint32_t>(0));
@@ -615,7 +616,7 @@ TEST(RaftLog, DeleteFrom2) {
     EXPECT_EQ(raft_log.Last(), static_cast<uint32_t>(5));
     EXPECT_EQ(raft_log.Append(), static_cast<uint32_t>(6));
 
-    raft_log.DeleteFrom(3);
+    raft_log.DeleteFrom(3, nullptr);
     std::cout << raft_log.ToJsonString(true, true) << std::endl;
     EXPECT_EQ(raft_log.First(), static_cast<uint32_t>(1));
     EXPECT_EQ(raft_log.Last(), static_cast<uint32_t>(2));
@@ -631,7 +632,7 @@ TEST(RaftLog, DeleteFrom2) {
     EXPECT_EQ(raft_log.Last(), static_cast<uint32_t>(2));
     EXPECT_EQ(raft_log.Append(), static_cast<uint32_t>(3));
 
-    raft_log.DeleteFrom(0);
+    raft_log.DeleteFrom(0, nullptr);
     std::cout << raft_log.ToJsonString(true, true) << std::endl;
     EXPECT_EQ(raft_log.First(), static_cast<uint32_t>(0));
     EXPECT_EQ(raft_log.Last(), static_cast<uint32_t>(0));
@@ -808,7 +809,7 @@ TEST(RaftLog, DeleteFrom_DeleteUtil) {
     EXPECT_EQ(raft_log.Last(), static_cast<uint32_t>(10));
     EXPECT_EQ(raft_log.Append(), static_cast<uint32_t>(11));
 
-    raft_log.DeleteFrom(7);
+    raft_log.DeleteFrom(7, nullptr);
     std::cout << raft_log.ToJsonString(true, true) << std::endl;
     EXPECT_EQ(raft_log.First(), static_cast<uint32_t>(6));
     EXPECT_EQ(raft_log.Last(), static_cast<uint32_t>(6));
@@ -887,7 +888,7 @@ TEST(RaftLog, DeleteFrom_DeleteUtil2) {
     EXPECT_EQ(raft_log.Last(), static_cast<uint32_t>(10));
     EXPECT_EQ(raft_log.Append(), static_cast<uint32_t>(11));
 
-    raft_log.DeleteFrom(8);
+    raft_log.DeleteFrom(8, nullptr);
     std::cout << raft_log.ToJsonString(true, true) << std::endl;
     EXPECT_EQ(raft_log.First(), static_cast<uint32_t>(6));
     EXPECT_EQ(raft_log.Last(), static_cast<uint32_t>(7));
@@ -903,7 +904,7 @@ TEST(RaftLog, DeleteFrom_DeleteUtil2) {
     EXPECT_EQ(raft_log.Last(), static_cast<uint32_t>(7));
     EXPECT_EQ(raft_log.Append(), static_cast<uint32_t>(8));
 
-    raft_log.DeleteFrom(3);
+    raft_log.DeleteFrom(3, nullptr);
     std::cout << raft_log.ToJsonString(true, true) << std::endl;
     EXPECT_EQ(raft_log.First(), static_cast<uint32_t>(0));
     EXPECT_EQ(raft_log.Last(), static_cast<uint32_t>(0));
@@ -962,7 +963,7 @@ TEST(RaftLog, Get) {
       EXPECT_EQ(rv, -1);
     }
 
-    raft_log.DeleteFrom(5);
+    raft_log.DeleteFrom(5, nullptr);
     std::cout << raft_log.ToJsonString(true, true) << std::endl;
     EXPECT_EQ(raft_log.First(), static_cast<uint32_t>(1));
     EXPECT_EQ(raft_log.Last(), static_cast<uint32_t>(4));
@@ -1117,7 +1118,7 @@ TEST(RaftLog, CheckSum2) {
     rv = raft_log.GetMeta(4, meta);
     assert(rv == 0);
 
-    raft_log.DeleteFrom(5);
+    raft_log.DeleteFrom(5, nullptr);
     std::cout << raft_log.ToJsonString(true, true) << std::endl;
     EXPECT_EQ(raft_log.First(), static_cast<uint32_t>(1));
     EXPECT_EQ(raft_log.Last(), static_cast<uint32_t>(4));
@@ -1169,6 +1170,136 @@ TEST(RaftLog, CheckSum2) {
   }
 
   // system("rm -rf /tmp/raftlog_test_dir");
+}
+
+TEST(RaftLog, LastConfig) {
+  system("rm -rf /tmp/raftlog_test_dir");
+
+  {
+    vraft::RaftLog raft_log("/tmp/raftlog_test_dir");
+    raft_log.Init();
+
+    std::cout << raft_log.ToJsonString(true, true) << std::endl;
+    EXPECT_EQ(raft_log.First(), static_cast<uint32_t>(0));
+    EXPECT_EQ(raft_log.Last(), static_cast<uint32_t>(0));
+    EXPECT_EQ(raft_log.Append(), static_cast<uint32_t>(1));
+
+    for (int i = 1; i <= 10; ++i) {
+      vraft::AppendEntry entry;
+      entry.term = i * 10;
+      entry.type = vraft::kData;
+      char buf[32];
+      snprintf(buf, sizeof(buf), "value_%d", i);
+      entry.value = buf;
+      raft_log.AppendOne(entry, nullptr);
+      std::cout << "append " << buf << ": " << raft_log.ToJsonString(true, true)
+                << std::endl;
+
+      vraft::RaftConfig rc2;
+      vraft::MetaValue meta;
+      int32_t rv = raft_log.LastConfig(rc2, meta);
+      ASSERT_EQ(rv, -1);
+    }
+    std::cout << "=======" << raft_log.ToJsonString(false, true) << std::endl;
+
+    {
+      vraft::RaftConfig rc;
+      rc.me.FromString("127.0.0.1:9000#7");
+      raft_log.AppendFirstConfig(rc, 1234, nullptr);
+
+      vraft::RaftConfig rc2;
+      vraft::MetaValue meta;
+      int32_t rv = raft_log.LastConfig(rc2, meta);
+      ASSERT_EQ(rv, 0);
+      ASSERT_EQ(rc.me.ToU64(), rc2.me.ToU64());
+    }
+    std::cout << "=======" << raft_log.ToJsonString(false, true) << std::endl;
+
+    {
+      vraft::RaftConfig rc;
+      rc.me.FromString("127.0.0.1:9000#7");
+
+      vraft::RaftAddr addr;
+      addr.FromString("127.0.0.1:9001#7");
+      rc.peers.push_back(addr);
+      addr.FromString("127.0.0.1:9002#7");
+      rc.peers.push_back(addr);
+
+      vraft::AppendEntry entry;
+      entry.term = 1234;
+      entry.type = vraft::kConfig;
+      rc.ToString(entry.value);
+      raft_log.AppendOne(entry, nullptr);
+
+      vraft::RaftConfig rc2;
+      vraft::MetaValue meta;
+      int32_t rv = raft_log.LastConfig(rc2, meta);
+      ASSERT_EQ(rv, 1);
+      ASSERT_EQ(rc.me.ToU64(), rc2.me.ToU64());
+      ASSERT_EQ(rc.peers[0].ToU64(), rc2.peers[0].ToU64());
+      ASSERT_EQ(rc.peers[1].ToU64(), rc2.peers[1].ToU64());
+      ASSERT_EQ(meta.term, entry.term);
+      ASSERT_EQ(meta.type, entry.type);
+    }
+    std::cout << "=======" << raft_log.ToJsonString(false, true) << std::endl;
+
+    {
+      vraft::RaftConfig rc;
+      rc.me.FromString("8.8.8.8:9000#7");
+
+      vraft::RaftAddr addr;
+      addr.FromString("8.8.8.8:9001#7");
+      rc.peers.push_back(addr);
+      addr.FromString("8.8.8.8:9002#7");
+      rc.peers.push_back(addr);
+
+      vraft::AppendEntry entry;
+      entry.term = 5678;
+      entry.type = vraft::kConfig;
+      rc.ToString(entry.value);
+      raft_log.AppendOne(entry, nullptr);
+
+      vraft::RaftConfig rc2;
+      vraft::MetaValue meta;
+      int32_t rv = raft_log.LastConfig(rc2, meta);
+      ASSERT_EQ(rv, 1);
+      ASSERT_EQ(rc.me.ToU64(), rc2.me.ToU64());
+      ASSERT_EQ(rc.peers[0].ToU64(), rc2.peers[0].ToU64());
+      ASSERT_EQ(rc.peers[1].ToU64(), rc2.peers[1].ToU64());
+      ASSERT_EQ(meta.term, entry.term);
+      ASSERT_EQ(meta.type, entry.type);
+    }
+    std::cout << "=======" << raft_log.ToJsonString(false, true) << std::endl;
+  }
+
+  {
+    // restart
+    vraft::RaftLog raft_log("/tmp/raftlog_test_dir");
+    raft_log.Init();
+    std::cout << "=======" << raft_log.ToJsonString(false, true) << std::endl;
+
+    std::cout << "delete from 12" << std::endl;
+    raft_log.DeleteFrom(12, nullptr);
+    std::cout << "=======" << raft_log.ToJsonString(false, true) << std::endl;
+  }
+
+  {
+    // restart
+    vraft::RaftLog raft_log("/tmp/raftlog_test_dir");
+    raft_log.Init();
+    std::cout << "=======" << raft_log.ToJsonString(false, true) << std::endl;
+
+    std::cout << "delete from 11" << std::endl;
+    raft_log.DeleteFrom(11, nullptr);
+    std::cout << "=======" << raft_log.ToJsonString(false, true) << std::endl;
+  }
+
+  {
+    // restart
+    vraft::RaftLog raft_log("/tmp/raftlog_test_dir");
+    raft_log.Init();
+    std::cout << "=======" << raft_log.ToJsonString(false, true) << std::endl;
+  }
 }
 
 int main(int argc, char **argv) {

@@ -20,7 +20,12 @@ TEST(RequestVoteReply, test) {
   msg.dest = dest;
   msg.term = 77;
   msg.uid = vraft::UniqId(&msg);
+  msg.send_ts = 100;
+  msg.elapse = 200;
   msg.granted = true;
+  msg.log_ok = true;
+  msg.pre_vote = true;
+  msg.interval_ok = true;
   msg.req_term = 88;
 
   std::string msg_str;
@@ -48,7 +53,12 @@ TEST(RequestVoteReply, test) {
   ASSERT_EQ(msg.term, msg2.term);
   ASSERT_EQ(msg.uid, msg2.uid);
   ASSERT_EQ(msg.granted, msg2.granted);
+  ASSERT_EQ(msg.log_ok, msg2.log_ok);
+  ASSERT_EQ(msg.pre_vote, msg2.pre_vote);
+  ASSERT_EQ(msg.interval_ok, msg2.interval_ok);
   ASSERT_EQ(msg.req_term, msg2.req_term);
+  ASSERT_EQ(msg.send_ts, msg2.send_ts);
+  ASSERT_EQ(msg.elapse, msg2.elapse);
 }
 
 int main(int argc, char **argv) {

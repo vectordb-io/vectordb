@@ -9,13 +9,9 @@
 
 #include "cxxopts.hpp"
 #include "hostport.h"
+#include "vdb_common.h"
 
 namespace vectordb {
-
-class VdbConfig;
-using VdbConfigSPtr = std::shared_ptr<VdbConfig>;
-using VdbConfigUPtr = std::unique_ptr<VdbConfig>;
-using VdbConfigWPtr = std::weak_ptr<VdbConfig>;
 
 class VdbConfig final {
  public:

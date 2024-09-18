@@ -20,6 +20,8 @@ TEST(AppendEntriesReply, test) {
   msg.dest = dest;
   msg.term = 77;
   msg.uid = vraft::UniqId(&msg);
+  msg.send_ts = 100;
+  msg.elapse = 200;
   msg.success = true;
   msg.last_log_index = 88;
   msg.req_pre_index = 99;
@@ -50,6 +52,8 @@ TEST(AppendEntriesReply, test) {
   ASSERT_EQ(msg.dest.ToU64(), msg2.dest.ToU64());
   ASSERT_EQ(msg.term, msg2.term);
   ASSERT_EQ(msg.uid, msg2.uid);
+  ASSERT_EQ(msg.send_ts, msg2.send_ts);
+  ASSERT_EQ(msg.elapse, msg2.elapse);
   ASSERT_EQ(msg.success, msg2.success);
   ASSERT_EQ(msg.last_log_index, msg2.last_log_index);
   ASSERT_EQ(msg.req_pre_index, msg2.req_pre_index);

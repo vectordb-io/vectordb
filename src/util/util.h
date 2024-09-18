@@ -85,6 +85,8 @@ void DelTail(std::string &s, const std::string &del);
 
 void ListDir(const std::string &path, std::vector<std::string> &paths);
 
+int32_t AtomicMove(const std::string &src_path, const std::string &dest_path);
+
 }  // namespace vraft
 
 #endif

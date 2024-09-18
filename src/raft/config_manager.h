@@ -5,100 +5,95 @@
 
 #include "common.h"
 #include "nlohmann/json.hpp"
-#include "raft_addr.h"
+#include "raft_config.h"
 
 namespace vraft {
 
-class RaftConfig final {
- public:
-  RaftAddr me;
-  std::vector<RaftAddr> peers;
-
-  nlohmann::json ToJson();
-  nlohmann::json ToJsonTiny();
-  std::string ToJsonString(bool tiny, bool one_line);
-
- public:
-};
-
-inline nlohmann::json RaftConfig::ToJson() {
-  nlohmann::json j;
-  j["me"][0] = me.ToU64();
-  j["me"][1] = me.ToString();
-  int32_t i = 0;
-  for (auto peer : peers) {
-    j["peers"][i][0] = peer.ToU64();
-    j["peers"][i][1] = peer.ToString();
-    i++;
-  }
-  return j;
-}
-
-inline nlohmann::json RaftConfig::ToJsonTiny() {
-  nlohmann::json j;
-  j["me"] = me.ToString();
-  int32_t i = 0;
-  for (auto peer : peers) {
-    j["peers"][i++] = peer.ToString();
-  }
-  return j;
-}
-
-inline std::string RaftConfig::ToJsonString(bool tiny, bool one_line) {
-  nlohmann::json j;
-  if (tiny) {
-    j["rc"] = ToJsonTiny();
-  } else {
-    j["raft_config"] = ToJson();
-  }
-
-  if (one_line) {
-    return j.dump();
-  } else {
-    return j.dump(JSON_TAB);
-  }
-}
-
 class ConfigManager final {
  public:
-  ConfigManager(const RaftConfig& config);
+  ConfigManager(const RaftConfig& current);
   ~ConfigManager();
   ConfigManager(const ConfigManager& t) = delete;
   ConfigManager& operator=(const ConfigManager& t) = delete;
 
-  RaftConfig& Current();
-  void SetCurrent(RaftConfig rc);
+  RaftConfigSPtr Previous();
+  RaftConfigSPtr Current();
+  void SetCurrent(const RaftConfig& rc);
+  void Rollback();
 
   nlohmann::json ToJson();
   nlohmann::json ToJsonTiny();
   std::string ToJsonString(bool tiny, bool one_line);
 
+  void set_current_cb(Functor cb);
+  void RunCb();
+
  private:
-  RaftConfig current_;
+  RaftConfigSPtr current_;
+  RaftConfigSPtr previous_;
+
+  Functor current_cb_;
 };
 
-inline ConfigManager::ConfigManager(const RaftConfig& config)
-    : current_(config) {}
+inline ConfigManager::ConfigManager(const RaftConfig& current) {
+  current_ = std::make_shared<RaftConfig>();
+  *current_ = current;
+
+  previous_ = nullptr;
+  current_cb_ = nullptr;
+}
 
 inline ConfigManager::~ConfigManager() {}
 
-inline RaftConfig& ConfigManager::Current() { return current_; }
+inline RaftConfigSPtr ConfigManager::Previous() { return previous_; }
 
-inline void ConfigManager::SetCurrent(RaftConfig rc) {
-  current_.me = rc.me;
-  current_.peers.clear();
-  current_.peers.swap(rc.peers);
+inline RaftConfigSPtr ConfigManager::Current() { return current_; }
+
+inline void ConfigManager::SetCurrent(const RaftConfig& rc) {
+  if (current_) {
+    previous_ = current_;
+  }
+  current_ = std::make_shared<RaftConfig>();
+  *current_ = rc;
+
+  RunCb();
+}
+
+inline void ConfigManager::Rollback() {
+  assert(previous_);
+  current_ = previous_;
+  previous_ = nullptr;
+
+  RunCb();
 }
 
 inline nlohmann::json ConfigManager::ToJson() {
   nlohmann::json j;
-  j = current_.ToJson();
+  if (current_) {
+    j["cur"] = current_->ToJson();
+  } else {
+    j["cur"] = "null";
+  }
+  if (previous_) {
+    j["pre"] = previous_->ToJson();
+  } else {
+    j["pre"] = "null";
+  }
   return j;
 }
 
 inline nlohmann::json ConfigManager::ToJsonTiny() {
   nlohmann::json j;
-  j = current_.ToJsonTiny();
+  if (current_) {
+    j["cur"] = current_->ToJsonTiny();
+  } else {
+    j["cur"] = "null";
+  }
+  if (previous_) {
+    j["pre"] = previous_->ToJsonTiny();
+  } else {
+    j["pre"] = "null";
+  }
   return j;
 }
 

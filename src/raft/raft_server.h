@@ -36,6 +36,16 @@ class RaftServer final {
   // debug
   void Print(bool tiny, bool one_line);
   void AssertInLoopThread();
+  void DisableSend();
+  void EnableSend();
+  void DisableRecv();
+  void EnableRecv();
+  bool enable_send() const;
+  void set_enable_send(bool enable_send);
+  bool enable_recv() const;
+  void set_enable_recv(bool enable_recv);
+
+  TcpClientSPtr GetClientOrCreate(uint64_t dest_addr);
 
  private:
   void Init();
@@ -43,13 +53,15 @@ class RaftServer final {
 
   TimerSPtr MakeTimer(TimerParam &param);
   TcpClientSPtr GetClient(uint64_t dest_addr);
-  TcpClientSPtr GetClientOrCreate(uint64_t dest_addr);
 
  private:
   Config config_;
   EventLoopWPtr loop_;
   TcpServerSPtr server_;
   std::unordered_map<uint64_t, TcpClientSPtr> clients_;
+
+  bool enable_send_;
+  bool enable_recv_;
 
   RaftSPtr raft_;
 };

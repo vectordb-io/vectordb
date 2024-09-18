@@ -59,8 +59,23 @@ class TimerManager final {
   void set_heartbeat_func(TimerFunctor func);
   void set_maketimer_func(MakeTimerFunc func);
 
+  TimerFunctor requestvote_func() const;
+
+  uint32_t election_ms() const;
+  uint32_t heartbeat_ms() const;
+  uint32_t request_vote_ms() const;
   uint32_t last_election_ms() const;
   uint32_t next_election_ms() const;
+  void *data() const;
+
+  TimerSPtr CreateRpcTimer(const RaftAddr &dest);
+  void AddRpcTimer(const RaftAddr &dest, TimerSPtr sptr);
+
+  TimerSPtr CreateHeartbeatTimer(const RaftAddr &dest);
+  void AddHeartbeatTimer(const RaftAddr &dest, TimerSPtr sptr);
+
+  void DeleteRpcTimer(const RaftAddr &dest);
+  void DeleteHeartBeat(const RaftAddr &dest);
 
  private:
   void *data_;
@@ -130,6 +145,18 @@ inline void TimerManager::set_maketimer_func(MakeTimerFunc func) {
   maketimer_func_ = func;
 }
 
+inline TimerFunctor TimerManager::requestvote_func() const {
+  return requestvote_func_;
+}
+
+inline uint32_t TimerManager::election_ms() const { return election_ms_; }
+
+inline uint32_t TimerManager::heartbeat_ms() const { return heartbeat_ms_; }
+
+inline uint32_t TimerManager::request_vote_ms() const {
+  return request_vote_ms_;
+}
+
 inline uint32_t TimerManager::last_election_ms() const {
   return last_election_ms_;
 }
@@ -137,6 +164,8 @@ inline uint32_t TimerManager::last_election_ms() const {
 inline uint32_t TimerManager::next_election_ms() const {
   return next_election_ms_;
 }
+
+inline void *TimerManager::data() const { return data_; }
 
 }  // namespace vraft
 

@@ -34,6 +34,7 @@ void HandleClientClose(UvHandle *handle);
 struct WriteReq {
   UvWrite req;
   UvBuf buf;
+  uint64_t ts;
 };
 
 class TcpConnection final : public std::enable_shared_from_this<TcpConnection> {

@@ -17,6 +17,8 @@ struct AppendEntriesReply : public Message {
   RaftAddr dest;  // uint64_t
   RaftTerm term;
   uint32_t uid;
+  uint64_t send_ts;  // nanosecond
+  uint64_t elapse;   // microsecond
 
   bool success;              // uint8_t
   RaftIndex last_log_index;  // to speed up
@@ -38,9 +40,19 @@ struct AppendEntriesReply : public Message {
 };
 
 inline int32_t AppendEntriesReply::MaxBytes() {
-  return sizeof(uint64_t) + sizeof(uint64_t) + sizeof(term) + sizeof(uid) +
-         sizeof(uint8_t) + sizeof(last_log_index) + sizeof(req_pre_index) +
-         sizeof(req_num_entries) + sizeof(req_term);
+  int32_t size = 0;
+  size += sizeof(uint64_t);
+  size += sizeof(uint64_t);
+  size += sizeof(term);
+  size += sizeof(uid);
+  size += sizeof(send_ts);
+  size += sizeof(elapse);
+  size += sizeof(uint8_t);
+  size += sizeof(last_log_index);
+  size += sizeof(req_pre_index);
+  size += sizeof(req_num_entries);
+  size += sizeof(req_term);
+  return size;
 }
 
 inline int32_t AppendEntriesReply::ToString(std::string &s) {
@@ -75,6 +87,14 @@ inline int32_t AppendEntriesReply::ToString(const char *ptr, int32_t len) {
   EncodeFixed32(p, uid);
   p += sizeof(uid);
   size += sizeof(uid);
+
+  EncodeFixed64(p, send_ts);
+  p += sizeof(send_ts);
+  size += sizeof(send_ts);
+
+  EncodeFixed64(p, elapse);
+  p += sizeof(elapse);
+  size += sizeof(elapse);
 
   EncodeFixed8(p, success);
   p += sizeof(success);
@@ -127,6 +147,14 @@ inline int32_t AppendEntriesReply::FromString(const char *ptr, int32_t len) {
   p += sizeof(uid);
   size += sizeof(uid);
 
+  send_ts = DecodeFixed64(p);
+  p += sizeof(send_ts);
+  size += sizeof(send_ts);
+
+  elapse = DecodeFixed64(p);
+  p += sizeof(elapse);
+  size += sizeof(elapse);
+
   success = DecodeFixed8(p);
   p += sizeof(uint8_t);
   size += sizeof(uint8_t);
@@ -161,6 +189,8 @@ inline nlohmann::json AppendEntriesReply::ToJson() {
   j[2]["req-pre"] = req_pre_index;
   j[2]["req-entry-count"] = req_num_entries;
   j[2]["req-term"] = req_term;
+  j[3]["send_ts"] = send_ts;
+  j[3]["elapse"] = elapse;
   return j;
 }
 
@@ -175,6 +205,8 @@ inline nlohmann::json AppendEntriesReply::ToJsonTiny() {
   j["req-pre"] = req_pre_index;
   j["req-cnt"] = req_num_entries;
   j["req-tm"] = req_term;
+  j["send"] = send_ts;
+  j["elapse"] = elapse;
   return j;
 }
 

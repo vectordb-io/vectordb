@@ -25,36 +25,74 @@ Timeout(i) == /\ state[i] \in {Follower, Candidate}
 ********************************************************************************************/
 void Elect(Timer *timer) {
   Raft *r = reinterpret_cast<Raft *>(timer->data());
-  assert(r->state_ == FOLLOWER || r->state_ == CANDIDATE);
+  assert(r->state_ == STATE_FOLLOWER || r->state_ == STATE_CANDIDATE);
+
+  if (r->standby()) {
+    // reset election timer
+    r->AgainElection();
+    return;
+  }
 
   Tracer tracer(r, true, r->tracer_cb_);
   tracer.PrepareState0();
 
-  r->meta_.IncrTerm();
-  r->state_ = CANDIDATE;
-  r->leader_ = RaftAddr(0);
+  std::string str = r->Me().ToString() + std::string(" election-timer timeout");
+  tracer.PrepareEvent(kEventTimer, str);
 
-  // reset candidate state, vote-manager
-  r->vote_mgr_.Clear();
+  if (r->enable_pre_vote() && r->Peers().size() > 0) {
+    r->set_pre_voting(true);
+    r->DoPreVote(&tracer);
+
+  } else {
+    r->set_pre_voting(false);
+    r->DoRequestVote(&tracer);
+  }
+
+  tracer.PrepareState1();
+  tracer.Finish();
+}
+
+void Raft::DoRequestVote(Tracer *tracer) {
+  // increase term
+  RaftTerm old_term = meta_.term();
+  meta_.IncrTerm();
+  RaftTerm new_term = meta_.term();
+
+  if (tracer) {
+    char buf[128];
+    snprintf(buf, sizeof(buf), "%s increase-term term:%lu_to_%lu",
+             Me().ToString().c_str(), old_term, new_term);
+    tracer->PrepareEvent(kEventOther, std::string(buf));
+  }
+
+  // become candidate
+  BecomeCandidate(tracer);
 
   // vote for myself
-  r->meta_.SetVote(r->Me().ToU64());
+  meta_.SetVote(Me().ToU64());
 
   // only myself, become leader
-  if (r->vote_mgr_.QuorumAll(r->IfSelfVote())) {
-    r->BecomeLeader(&tracer);
+  if (vote_mgr_.QuorumAll(IfSelfVote())) {
+    BecomeLeader(tracer);
     return;
   }
 
-  tracer.PrepareEvent(kEventTimer, "election-timer timeout");
-  tracer.PrepareState1();
-  tracer.Finish();
-
   // start request-vote
-  r->timer_mgr_.StartRequestVote();
+  timer_mgr_.StartRequestVote();
 
   // reset election timer
-  r->timer_mgr_.AgainElection();
+  timer_mgr_.AgainElection();
+}
+
+void Raft::DoPreVote(Tracer *tracer) {
+  // become candidate
+  BecomeCandidate(tracer);
+
+  // start request-vote
+  timer_mgr_.StartRequestVote();
+
+  // reset election timer
+  timer_mgr_.AgainElection();
 }
 
 /********************************************************************************************
@@ -72,7 +110,7 @@ RequestVote(i, j) ==
 ********************************************************************************************/
 void RequestVoteRpc(Timer *timer) {
   Raft *r = reinterpret_cast<Raft *>(timer->data());
-  assert(r->state_ == CANDIDATE);
+  assert(r->state_ == STATE_CANDIDATE);
 
   Tracer tracer(r, true, r->tracer_cb_);
   tracer.PrepareState0();
@@ -82,36 +120,6 @@ void RequestVoteRpc(Timer *timer) {
 
   tracer.PrepareState1();
   tracer.Finish();
-}
-
-int32_t Raft::SendRequestVote(uint64_t dest, Tracer *tracer) {
-  RequestVote msg;
-  msg.src = Me();
-  msg.dest = RaftAddr(dest);
-  msg.term = meta_.term();
-  msg.uid = UniqId(&msg);
-
-  msg.last_log_index = LastIndex();
-  msg.last_log_term = LastTerm();
-
-  std::string body_str;
-  int32_t bytes = msg.ToString(body_str);
-
-  MsgHeader header;
-  header.body_bytes = bytes;
-  header.type = kRequestVote;
-  std::string header_str;
-  header.ToString(header_str);
-
-  if (send_) {
-    header_str.append(std::move(body_str));
-    send_(dest, header_str.data(), header_str.size());
-
-    if (tracer != nullptr) {
-      tracer->PrepareEvent(kEventSend, msg.ToJsonString(false, true));
-    }
-  }
-  return 0;
 }
 
 /********************************************************************************************
@@ -144,143 +152,19 @@ AppendEntries(i, j) ==
 ********************************************************************************************/
 void HeartBeat(Timer *timer) {
   Raft *r = reinterpret_cast<Raft *>(timer->data());
-  assert(r->state_ == LEADER);
+  assert(r->state_ == STATE_LEADER);
 
   Tracer tracer(r, true, r->tracer_cb_);
   tracer.PrepareState0();
 
-  tracer.PrepareEvent(kEventTimer, "heartbeat-timer timeout");
+  std::string str =
+      r->Me().ToString() + std::string(" heartbeat-timer timeout");
+  tracer.PrepareEvent(kEventTimer, str);
   int32_t rv = r->SendAppendEntries(timer->dest_addr(), &tracer);
   assert(rv == 0);
 
   tracer.PrepareState1();
   tracer.Finish();
-}
-
-int32_t Raft::SendAppendEntries(uint64_t dest, Tracer *tracer) {
-  RaftIndex last_index = LastIndex();
-  RaftIndex next_index = index_mgr_.GetNext(dest);
-  RaftIndex pre_index = next_index - 1;
-  assert(pre_index <= last_index);
-
-  if (next_index < log_.First()) {
-    // do not have log, send snapshot
-    assert(0);
-    return 0;
-  }
-  assert(next_index >= log_.First());
-
-  RaftTerm pre_term = 0;
-  if (pre_index >= log_.First()) {
-    pre_term = GetTerm(pre_index);
-
-  } else if (pre_index == 0) {
-    pre_term = 0;
-
-  } else if (sm_ && pre_index == sm_->LastIndex()) {
-    pre_term = sm_->LastTerm();
-
-  } else {
-    // do not have log, send snapshot
-    assert(0);
-    return 0;
-  }
-
-  AppendEntries msg;
-  msg.src = Me();
-  msg.dest = RaftAddr(dest);
-  msg.term = meta_.term();
-  msg.uid = UniqId(&msg);
-  msg.pre_log_index = pre_index;
-  msg.pre_log_term = pre_term;
-
-  if (log_.IndexValid(next_index)) {
-    LogEntry entry;
-    int32_t rv = log_.Get(next_index, entry);
-    assert(rv == 0);
-    msg.entries.push_back(entry);
-  }
-
-  // tla+
-  // mcommitIndex   |-> Min({commitIndex[i], lastEntry}),
-  // logcabin:
-  // request.set_commit_index(std::min(commitIndex, prevLogIndex + numEntries));
-  msg.commit_index =
-      std::min(commit_, pre_index + static_cast<RaftIndex>(msg.entries.size()));
-
-  std::string body_str;
-  int32_t bytes = msg.ToString(body_str);
-
-  MsgHeader header;
-  header.body_bytes = bytes;
-  header.type = kAppendEntries;
-  std::string header_str;
-  header.ToString(header_str);
-
-  if (send_) {
-    header_str.append(std::move(body_str));
-    send_(dest, header_str.data(), header_str.size());
-
-    if (tracer != nullptr) {
-      tracer->PrepareEvent(kEventSend, msg.ToJsonString(false, true));
-    }
-  }
-
-  return 0;
-}
-
-int32_t Raft::SendInstallSnapshot(uint64_t dest, Tracer *tracer) { return 0; }
-
-/********************************************************************************************
-\* Leader i receives a client request to add v to the log.
-ClientRequest(i, v) ==
-    /\ state[i] = Leader
-    /\ LET entry == [term  |-> currentTerm[i],
-                     value |-> v]
-           newLog == Append(log[i], entry)
-       IN  log' = [log EXCEPT ![i] = newLog]
-    /\ UNCHANGED <<messages, serverVars, candidateVars,
-                   leaderVars, commitIndex>>
-********************************************************************************************/
-int32_t Raft::Propose(std::string value, Functor cb) {
-  if (assert_loop_) {
-    assert_loop_();
-  }
-
-  Tracer tracer(this, true, tracer_cb_);
-  tracer.PrepareState0();
-  char buf[128];
-  snprintf(buf, sizeof(buf), "propose value, length:%lu", value.size());
-  tracer.PrepareEvent(kEventOther, std::string(buf));
-
-  int32_t rv = 0;
-  AppendEntry entry;
-
-  if (state_ != LEADER) {
-    rv = -1;
-    goto end;
-  }
-
-  entry.term = meta_.term();
-  entry.type = kData;
-  entry.value = value;
-  rv = log_.AppendOne(entry, &tracer);
-  assert(rv == 0);
-
-  MaybeCommit(&tracer);
-  if (config_mgr_.Current().peers.size() > 0) {
-    for (auto &peer : config_mgr_.Current().peers) {
-      rv = SendAppendEntries(peer.ToU64(), &tracer);
-      assert(rv == 0);
-
-      timer_mgr_.AgainHeartBeat(peer.ToU64());
-    }
-  }
-
-end:
-  tracer.PrepareState1();
-  tracer.Finish();
-  return rv;
 }
 
 /********************************************************************************************
@@ -319,23 +203,18 @@ UpdateTerm(i, j, m) ==
     /\ UNCHANGED <<messages, candidateVars, leaderVars, logVars>>
 ********************************************************************************************/
 void Raft::StepDown(RaftTerm new_term, Tracer *tracer) {
-  if (tracer != nullptr) {
-    char buf[128];
-    snprintf(buf, sizeof(buf), "step down, term %ld >= %ld", new_term,
-             meta_.term());
-    tracer->PrepareEvent(kEventOther, std::string(buf));
-  }
+  State old_state = state_;
 
   assert(meta_.term() <= new_term);
   if (meta_.term() < new_term) {  // larger term
     meta_.SetTerm(new_term);
     meta_.SetVote(0);
     leader_ = RaftAddr(0);
-    state_ = FOLLOWER;
+    state_ = STATE_FOLLOWER;
 
   } else {  // equal term
-    if (state_ != FOLLOWER) {
-      state_ = FOLLOWER;
+    if (state_ != STATE_FOLLOWER) {
+      state_ = STATE_FOLLOWER;
     }
   }
 
@@ -345,6 +224,19 @@ void Raft::StepDown(RaftTerm new_term, Tracer *tracer) {
   // start election timer
   timer_mgr_.StopRequestVote();
   timer_mgr_.AgainElection();
+
+  if (last_heartbeat_timestamp_ == INT64_MAX) {
+    last_heartbeat_timestamp_ = 0;
+  }
+
+  if (tracer != nullptr) {
+    RaftTerm old_term = meta_.term();
+    char buf[128];
+    snprintf(buf, sizeof(buf), "%s step-down term:%lu_to_%lu %s_to_%s",
+             Me().ToString().c_str(), old_term, new_term, StateToStr(old_state),
+             StateToStr(state_));
+    tracer->PrepareEvent(kEventOther, std::string(buf));
+  }
 }
 
 /********************************************************************************************
@@ -366,13 +258,17 @@ BecomeLeader(i) ==
     /\ UNCHANGED <<messages, currentTerm, votedFor, candidateVars, logVars>>
 ********************************************************************************************/
 void Raft::BecomeLeader(Tracer *tracer) {
-  if (tracer != nullptr) {
-    tracer->PrepareEvent(kEventOther, "become leader");
-  }
+  State old_state = state_;
 
-  assert(state_ == CANDIDATE);
-  state_ = LEADER;
-  leader_ = Me().ToU64();
+  leader_transfer_ = false;
+
+  assert(state_ == STATE_CANDIDATE);
+  state_ = STATE_LEADER;
+  leader_ = Me();
+  ++leader_times_;
+
+  // update last_heartbeat_timestamp
+  last_heartbeat_timestamp_ = INT64_MAX;
 
   // stop election timer
   timer_mgr_.StopElection();
@@ -385,8 +281,34 @@ void Raft::BecomeLeader(Tracer *tracer) {
   // start heartbeat timer
   timer_mgr_.StartHeartBeat();
 
+  if (tracer != nullptr) {
+    char buf[128];
+    snprintf(buf, sizeof(buf), "%s become-leader term:%lu %s_to_%s",
+             Me().ToString().c_str(), meta_.term(), StateToStr(old_state),
+             StateToStr(state_));
+    tracer->PrepareEvent(kEventOther, std::string(buf));
+  }
+
   // append noop
   AppendNoop(tracer);
+}
+
+void Raft::BecomeCandidate(Tracer *tracer) {
+  State old_state = state_;
+
+  state_ = STATE_CANDIDATE;
+  leader_ = RaftAddr(0);
+
+  // reset candidate state, vote-manager
+  vote_mgr_.Clear();
+
+  if (tracer != nullptr) {
+    char buf[128];
+    snprintf(buf, sizeof(buf), "%s become-candidate term:%lu %s_to_%s",
+             Me().ToString().c_str(), meta_.term(), StateToStr(old_state),
+             StateToStr(state_));
+    tracer->PrepareEvent(kEventOther, std::string(buf));
+  }
 }
 
 /********************************************************************************************
@@ -414,7 +336,7 @@ AdvanceCommitIndex(i) ==
     /\ UNCHANGED <<messages, serverVars, candidateVars, leaderVars, log>>
 ********************************************************************************************/
 void Raft::MaybeCommit(Tracer *tracer) {
-  assert(state_ == LEADER);
+  assert(state_ == STATE_LEADER);
   uint64_t new_commit = index_mgr_.MajorityMax(LastIndex());
   if (commit_ >= new_commit) {
     return;
@@ -456,20 +378,44 @@ void Raft::StateMachineApply(Tracer *tracer) {
 
   // state machine apply
   if (commit_ > last_apply_) {
-    if (sm_) {
-      for (RaftIndex i = last_apply_ + 1; i <= commit_; ++i) {
-        LogEntry log_entry;
-        int32_t rv = log_.Get(i, log_entry);
-        assert(rv == 0);
+    for (RaftIndex i = last_apply_ + 1; i <= commit_; ++i) {
+      LogEntry log_entry;
+      int32_t rv = log_.Get(i, log_entry);
+      assert(rv == 0);
 
-        if (log_entry.append_entry.type == kData) {
+      if (log_entry.append_entry.type == kData) {
+        if (sm_) {
           rv = sm_->Apply(&log_entry, Me());
           assert(rv == 0);
-
-          // propose call back with rv
         }
+        // propose call back with rv
+
+      } else if (log_entry.append_entry.type == kConfig) {
+        if (changing_index_ == log_entry.index) {
+          changing_index_ = 0;
+
+          if (tracer) {
+            RaftConfig rc;
+            rc.FromString(log_entry.append_entry.value);
+
+            char buf[256];
+            snprintf(buf, sizeof(buf), "%s config-change-finish index:%u %s",
+                     Me().ToString().c_str(), i,
+                     rc.ToJsonString(true, true).c_str());
+            tracer->PrepareEvent(kEventOther, std::string(buf));
+          }
+
+          standby_ = false;
+        }
+
+        // cb
+
+      } else if (log_entry.append_entry.type == kNoop) {
+      } else {
+        assert(0);
       }
     }
+
     last_apply_ = commit_;
   }
 }

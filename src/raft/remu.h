@@ -11,7 +11,10 @@ namespace vraft {
 
 // raft emulator, good!!
 struct Remu {
-  Remu(EventLoopSPtr &l) : loop(l) {}
+  Remu(EventLoopSPtr &l, bool enable_pre_vote, bool interval_check)
+      : loop(l),
+        enable_pre_vote_(enable_pre_vote),
+        interval_check_(interval_check) {}
 
   EventLoopWPtr loop;
   std::vector<vraft::Config> configs;
@@ -21,13 +24,29 @@ struct Remu {
   TracerCb tracer_cb;
   CreateSMFunc create_sm;
 
+  int32_t LeaderTimes();
+
   void Create();
   void Start();
   void Stop();
   void Clear();
+  void AddOneNode();
 
   void Log(std::string key);
   void Print(bool tiny = true, bool one_line = true);
+  void PrintConfig();
+
+  void Check();
+
+ private:
+  void CheckLeader();
+  void CheckLog();
+  void CheckMeta();
+  void CheckIndex();
+
+ private:
+  bool enable_pre_vote_;
+  bool interval_check_;
 };
 
 }  // namespace vraft

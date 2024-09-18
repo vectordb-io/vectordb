@@ -58,6 +58,11 @@ using VindexAnnoySPtr = std::shared_ptr<VindexAnnoy>;
 using VindexAnnoyUPtr = std::unique_ptr<VindexAnnoy>;
 using VindexAnnoyWPtr = std::weak_ptr<VindexAnnoy>;
 
+class VdbConfig;
+using VdbConfigSPtr = std::shared_ptr<VdbConfig>;
+using VdbConfigUPtr = std::unique_ptr<VdbConfig>;
+using VdbConfigWPtr = std::weak_ptr<VdbConfig>;
+
 class EngineMeta;
 using EngineMetaSPtr = std::shared_ptr<EngineMeta>;
 using EngineMetaUPtr = std::unique_ptr<EngineMeta>;

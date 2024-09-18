@@ -35,6 +35,7 @@ class Console {
   virtual int32_t Parse(const std::string &cmd_line) = 0;
   virtual int32_t Execute() = 0;
   virtual void OnMessage(const TcpConnectionSPtr &conn, Buffer *buf) = 0;
+  virtual std::string HelpString() { return ""; }
 
  private:
   std::atomic<bool> start;

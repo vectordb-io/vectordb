@@ -22,7 +22,7 @@ void Config::Parse(int32_t argc, char **argv) {
       cxxopts::value<std::string>()->default_value("single"))(
       "loglevel", "trace/debug/info/warn/error/fatal/off",
       cxxopts::value<std::string>()->default_value("trace"))(
-      "debug", "enable debug log");
+      "debug", "enable debug log")("print", "print to screen");
 
   result_ = options_->parse(argc, argv);
 
@@ -83,6 +83,12 @@ void Config::Parse(int32_t argc, char **argv) {
     enable_debug_ = true;
   } else {
     enable_debug_ = false;
+  }
+
+  if (result_.count("print")) {
+    print_screen_ = true;
+  } else {
+    print_screen_ = false;
   }
 }
 

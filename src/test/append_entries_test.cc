@@ -20,6 +20,8 @@ TEST(AppendEntries, test) {
   msg.dest = dest;
   msg.term = 77;
   msg.uid = vraft::UniqId(&msg);
+  msg.send_ts = 100;
+  msg.elapse = 200;
   msg.pre_log_index = 88;
   msg.pre_log_term = 99;
   msg.commit_index = 100;
@@ -60,6 +62,8 @@ TEST(AppendEntries, test) {
   ASSERT_EQ(msg.dest.ToU64(), msg2.dest.ToU64());
   ASSERT_EQ(msg.term, msg2.term);
   ASSERT_EQ(msg.uid, msg2.uid);
+  ASSERT_EQ(msg.send_ts, msg2.send_ts);
+  ASSERT_EQ(msg.elapse, msg2.elapse);
   ASSERT_EQ(msg.pre_log_index, msg2.pre_log_index);
   ASSERT_EQ(msg.pre_log_term, msg2.pre_log_term);
   ASSERT_EQ(msg.commit_index, msg2.commit_index);
@@ -85,6 +89,8 @@ TEST(AppendEntries, test2) {
   msg.dest = dest;
   msg.term = 77;
   msg.uid = vraft::UniqId(&msg);
+  msg.send_ts = 100;
+  msg.elapse = 200;
   msg.pre_log_index = 88;
   msg.pre_log_term = 99;
   msg.commit_index = 100;
@@ -113,6 +119,8 @@ TEST(AppendEntries, test2) {
   ASSERT_EQ(msg.dest.ToU64(), msg2.dest.ToU64());
   ASSERT_EQ(msg.term, msg2.term);
   ASSERT_EQ(msg.uid, msg2.uid);
+  ASSERT_EQ(msg.send_ts, msg2.send_ts);
+  ASSERT_EQ(msg.elapse, msg2.elapse);
   ASSERT_EQ(msg.pre_log_index, msg2.pre_log_index);
   ASSERT_EQ(msg.pre_log_term, msg2.pre_log_term);
   ASSERT_EQ(msg.commit_index, msg2.commit_index);

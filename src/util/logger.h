@@ -13,6 +13,8 @@
 
 namespace vraft {
 
+#define MAX_DEBUG_LEN 256
+
 #define LOG_BUF_SIZE 8192
 using LogFunc = std::function<void(const char *)>;
 

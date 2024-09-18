@@ -4,6 +4,7 @@
 #include <iostream>
 
 #include "allocator.h"
+#include "clock.h"
 #include "eventloop.h"
 #include "hostport.h"
 #include "vraft_logger.h"
@@ -19,7 +20,21 @@ void TcpConnectionHandleRead(UvStream *client, ssize_t nread,
     uint32_t u32 = Crc32(buf->base, nread);
     vraft_logger.FTrace("recv data, handle:%p, nread:%d, check:%X", client,
                         nread, u32);
-    vraft_logger.FDebug("recv data:%s", StrToHexStr(buf->base, nread).c_str());
+
+    // FIX ME!! coredump
+    // ./output/test/remu_sm5_test --enable-pre-vote
+    {
+      int32_t print_bytes = nread;
+      std::string end_str = "";
+      if (print_bytes > MAX_DEBUG_LEN) {
+        print_bytes = MAX_DEBUG_LEN;
+        end_str = " ...";
+      }
+      vraft_logger.FDebug("recv data:%s%s",
+                          StrToHexStr(buf->base, print_bytes).c_str(),
+                          end_str.c_str());
+    }
+
     conn->OnMessage(buf->base, nread);
 
   } else {
@@ -69,6 +84,10 @@ void BufWriteComplete(UvWrite *req, int status) {
 
   assert(status == 0);
   WriteReq *wr = reinterpret_cast<WriteReq *>(req);
+
+  uint64_t elapse = (Clock::NSec() - wr->ts);
+  vraft_logger.FDebug("buf-write-complete finish, elapse:%lu ns", elapse);
+
   conn->allocator().Free(wr->buf.base);
   conn->allocator().Free(wr);
 
@@ -129,10 +148,20 @@ int32_t TcpConnection::Close() {
 }
 
 bool TcpConnection::Connected() const {
+  bool b1 = UvIsActive(reinterpret_cast<UvHandle *>(conn_.get()));
+  bool b2 = UvIsReadable(reinterpret_cast<UvStream *>(conn_.get()));
+  bool b3 = UvIsWritable(reinterpret_cast<UvStream *>(conn_.get()));
+  bool b = b1 && b2 && b3;
+  return b;
+}
+
+#if 0
+bool TcpConnection::Connected() const {
   return UvIsActive(reinterpret_cast<UvHandle *>(conn_.get())) &&
          UvIsReadable(reinterpret_cast<UvStream *>(conn_.get())) &&
          UvIsWritable(reinterpret_cast<UvStream *>(conn_.get()));
 }
+#endif
 
 int32_t TcpConnection::Send(const char *buf, ssize_t size) {
   AssertInLoopThread();
@@ -165,6 +194,7 @@ int32_t TcpConnection::CopySend(const char *buf, ssize_t size) {
   memcpy(send_buf, buf, size);
 
   WriteReq *write_req = (WriteReq *)allocator_.Malloc(sizeof(WriteReq));
+  write_req->ts = Clock::NSec();
   write_req->buf =
       UvBufInit(const_cast<char *>(send_buf), static_cast<unsigned int>(size));
   UvWrite2(reinterpret_cast<UvWrite *>(write_req),
@@ -197,7 +227,12 @@ int32_t TcpConnection::BufSend(const char *buf, ssize_t size) {
 void TcpConnection::OnMessage(const char *buf, ssize_t size) {
   AssertInLoopThread();
 
+  uint64_t append_begin = Clock::NSec();
   input_buf_.Append(buf, size);
+  uint64_t append_end = Clock::NSec();
+  uint64_t elapse = append_end - append_begin;
+  vraft_logger.FDebug("input-buffer append elapse:%lu ns", elapse);
+
   if (on_message_cb_) {
     on_message_cb_(shared_from_this(), &input_buf_);
   } else {

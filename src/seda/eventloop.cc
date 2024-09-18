@@ -154,6 +154,8 @@ void EventLoop::Close() {
   }
   stop_->Close();
   functors_->Close();
+
+  UvStop(&uv_loop_);
 }
 
 }  // namespace vraft

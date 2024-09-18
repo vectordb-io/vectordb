@@ -16,6 +16,10 @@ struct Ping : public Message {
   RaftAddr src;   // uint64_t
   RaftAddr dest;  // uint64_t
   uint32_t uid;
+
+  uint64_t send_ts;  // nanosecond
+  uint64_t elapse;   // microsecond
+
   std::string msg;
 
   int32_t MaxBytes() override;
@@ -30,8 +34,14 @@ struct Ping : public Message {
 };
 
 inline int32_t Ping::MaxBytes() {
-  return sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uid) +
-         2 * sizeof(int32_t) + msg.size();
+  int32_t size = 0;
+  size += sizeof(uint64_t);
+  size += sizeof(uint64_t);
+  size += sizeof(uid);
+  size += sizeof(send_ts);
+  size += sizeof(elapse);
+  size += 2 * sizeof(int32_t) + msg.size();
+  return size;
 }
 
 inline int32_t Ping::ToString(std::string &s) {
@@ -62,6 +72,14 @@ inline int32_t Ping::ToString(const char *ptr, int32_t len) {
   EncodeFixed32(p, uid);
   p += sizeof(uid);
   size += sizeof(uid);
+
+  EncodeFixed64(p, send_ts);
+  p += sizeof(send_ts);
+  size += sizeof(send_ts);
+
+  EncodeFixed64(p, elapse);
+  p += sizeof(elapse);
+  size += sizeof(elapse);
 
   Slice sls(msg.c_str(), msg.size());
   char *p2 = EncodeString2(p, len - size, sls);
@@ -95,6 +113,14 @@ inline int32_t Ping::FromString(const char *ptr, int32_t len) {
   p += sizeof(uid);
   size += sizeof(uid);
 
+  send_ts = DecodeFixed64(p);
+  p += sizeof(send_ts);
+  size += sizeof(send_ts);
+
+  elapse = DecodeFixed64(p);
+  p += sizeof(elapse);
+  size += sizeof(elapse);
+
   Slice result;
   Slice input(p, len - size);
   int32_t sz = DecodeString2(&input, &result);
@@ -102,7 +128,9 @@ inline int32_t Ping::FromString(const char *ptr, int32_t len) {
     msg.clear();
     msg.append(result.data(), result.size());
     size += sz;
+    p += sz;
   }
+
   return size;
 }
 
@@ -111,6 +139,8 @@ inline nlohmann::json Ping::ToJson() {
   j[0]["src"] = src.ToString();
   j[0]["dest"] = dest.ToString();
   j[0]["uid"] = U32ToHexStr(uid);
+  j[0]["send_ts"] = send_ts;
+  j[0]["elapse"] = elapse;
   j[1]["msg"] = msg;
   return j;
 }
@@ -120,7 +150,9 @@ inline nlohmann::json Ping::ToJsonTiny() {
   j[0] = src.ToString();
   j[1] = dest.ToString();
   j[2] = U32ToHexStr(uid);
-  j[3] = msg;
+  j[3] = send_ts;
+  j[4] = elapse;
+  j[5] = msg;
   return j;
 }
 

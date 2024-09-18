@@ -37,7 +37,7 @@ TEST(Remu, Print) {
   int32_t rv = loop->Init();
   ASSERT_EQ(rv, 0);
 
-  vraft::Remu remu(loop);
+  vraft::Remu remu(loop, true, true);
   GenerateConfig(remu.configs, 4);
   remu.Create();
   remu.Print();

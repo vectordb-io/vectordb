@@ -70,10 +70,19 @@ void VectorDB::OnMessage(const vraft::TcpConnectionSPtr &conn,
                          vraft::Buffer *buf) {
   vraft::vraft_logger.FTrace("vectordb recv msg, readable-bytes:%d",
                              buf->ReadableBytes());
-  int32_t print_bytes = buf->ReadableBytes() > 100 ? 100 : buf->ReadableBytes();
-  vraft::vraft_logger.FDebug(
-      "recv buf data:%s",
-      vraft::StrToHexStr(buf->BeginRead(), print_bytes).c_str());
+
+  {
+    int32_t print_bytes = buf->ReadableBytes();
+    std::string end_str = "";
+    if (print_bytes > MAX_DEBUG_LEN) {
+      print_bytes = MAX_DEBUG_LEN;
+      end_str = " ...";
+    }
+    vraft::vraft_logger.FDebug(
+        "recv buf data:%s%s",
+        vraft::StrToHexStr(buf->BeginRead(), print_bytes).c_str(),
+        end_str.c_str());
+  }
 
   if (buf->ReadableBytes() >= static_cast<int32_t>(sizeof(vraft::MsgHeader))) {
     int32_t body_bytes = buf->PeekInt32();

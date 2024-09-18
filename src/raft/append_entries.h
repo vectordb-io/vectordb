@@ -20,6 +20,8 @@ struct AppendEntries : public Message {
   RaftAddr dest;  // uint64_t
   RaftTerm term;
   uint32_t uid;
+  uint64_t send_ts;  // nanosecond
+  uint64_t elapse;   // microsecond
 
   RaftIndex pre_log_index;
   RaftTerm pre_log_term;
@@ -38,9 +40,17 @@ struct AppendEntries : public Message {
 };
 
 inline int32_t AppendEntries::MaxBytes() {
-  int32_t size = sizeof(uint64_t) + sizeof(uint64_t) + sizeof(term) +
-                 sizeof(uid) + sizeof(pre_log_index) + sizeof(pre_log_term) +
-                 sizeof(commit_index) + 2 * sizeof(int32_t);
+  int32_t size = 0;
+  size += sizeof(uint64_t);
+  size += sizeof(uint64_t);
+  size += sizeof(term);
+  size += sizeof(uid);
+  size += sizeof(send_ts);
+  size += sizeof(elapse);
+  size += sizeof(pre_log_index);
+  size += sizeof(pre_log_term);
+  size += sizeof(commit_index);
+  size += 2 * sizeof(int32_t);
   for (auto &e : entries) {
     size += sizeof(e.index);
     size += sizeof(e.pre_chk_all);
@@ -86,6 +96,14 @@ inline int32_t AppendEntries::ToString(const char *ptr, int32_t len) {
   EncodeFixed32(p, uid);
   p += sizeof(uid);
   size += sizeof(uid);
+
+  EncodeFixed64(p, send_ts);
+  p += sizeof(send_ts);
+  size += sizeof(send_ts);
+
+  EncodeFixed64(p, elapse);
+  p += sizeof(elapse);
+  size += sizeof(elapse);
 
   EncodeFixed32(p, pre_log_index);
   p += sizeof(pre_log_index);
@@ -147,6 +165,14 @@ inline int32_t AppendEntries::FromString(const char *ptr, int32_t len) {
   size += sizeof(uid);
   len2 -= sizeof(uid);
 
+  send_ts = DecodeFixed64(p);
+  p += sizeof(send_ts);
+  size += sizeof(send_ts);
+
+  elapse = DecodeFixed64(p);
+  p += sizeof(elapse);
+  size += sizeof(elapse);
+
   pre_log_index = DecodeFixed32(p);
   p += sizeof(pre_log_index);
   size += sizeof(pre_log_index);
@@ -191,9 +217,18 @@ inline nlohmann::json AppendEntries::ToJson() {
   j[1]["pre-term"] = pre_log_term;
   j[1]["commit"] = commit_index;
   j[1]["entry-count"] = entries.size();
+#if 0
   for (size_t i = 0; i < entries.size(); ++i) {
     j[2]["entries"][i] = entries[i].ToJson();
   }
+#endif
+  for (size_t i = 0; i < entries.size(); ++i) {
+    j[2]["entries"][i]["tm"] = entries[i].append_entry.term;
+    j[2]["entries"][i]["tp"] = EntryTypeToStr(entries[i].append_entry.type);
+    j[2]["entries"][i]["sz"] = entries[i].append_entry.value.size();
+  }
+  j[3]["send_ts"] = send_ts;
+  j[3]["elapse"] = elapse;
   return j;
 }
 
@@ -210,6 +245,8 @@ inline nlohmann::json AppendEntries::ToJsonTiny() {
   for (size_t i = 0; i < entries.size(); ++i) {
     j[2]["etr"][i] = entries[i].ToJsonTiny();
   }
+  j[3]["send"] = send_ts;
+  j[3]["elapse"] = elapse;
   return j;
 }
 

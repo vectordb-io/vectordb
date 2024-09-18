@@ -147,8 +147,15 @@ inline int UvWrite2(UvWrite *req, UvStream *handle, const uv_buf_t bufs[],
       UvIsActive(reinterpret_cast<UvHandle *>(handle)), rv, UvStrError(rv));
 
   for (unsigned int i = 0; i < nbufs; ++i) {
-    vraft_logger.FDebug("send data:%s",
-                        StrToHexStr(bufs[i].base, bufs[i].len).c_str());
+    int32_t print_bytes = bufs[i].len;
+    std::string end_str = "";
+    if (print_bytes > MAX_DEBUG_LEN) {
+      print_bytes = MAX_DEBUG_LEN;
+      end_str = " ...";
+    }
+    vraft_logger.FDebug("send data:%s%s",
+                        StrToHexStr(bufs[i].base, print_bytes).c_str(),
+                        end_str.c_str());
   }
 
   return rv;

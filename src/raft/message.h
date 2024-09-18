@@ -10,8 +10,60 @@
 
 namespace vraft {
 
+enum ClientCmd {
+  kCmdPropose = 0,
+  kCmdLeaderTransfer,
+  kCmdAddServer,
+  kCmdRemoveServer,
+
+  // vstore
+  kCmdGet,
+
+  kCmdError,
+};
+
+inline ClientCmd U32ToClientCmd(uint32_t u32) {
+  ClientCmd start = kCmdPropose;
+  switch (u32 - start) {
+    case kCmdPropose:
+      return kCmdPropose;
+    case kCmdLeaderTransfer:
+      return kCmdLeaderTransfer;
+    case kCmdAddServer:
+      return kCmdAddServer;
+    case kCmdRemoveServer:
+      return kCmdRemoveServer;
+    case kCmdGet:
+      return kCmdGet;
+    default:
+      return kCmdError;
+  }
+}
+
+inline uint32_t ClientCmdToU32(ClientCmd c) {
+  ClientCmd start = kCmdPropose;
+  return (c - start);
+}
+
+inline std::string ClientCmdToStr(ClientCmd c) {
+  switch (c) {
+    case kCmdPropose:
+      return "propose";
+    case kCmdLeaderTransfer:
+      return "leader-transfer";
+    case kCmdAddServer:
+      return "add-server";
+    case kCmdRemoveServer:
+      return "remove-server";
+    default:
+      return "unknown-client-cmd";
+  }
+}
+
 enum MsgType {
-  kPing = 0,
+  kClientRequet,
+  kClientRequetReply,
+  kPing,
   kPingReply,
   kRequestVote,
   kRequestVoteReply,
@@ -19,6 +71,8 @@ enum MsgType {
   kAppendEntriesReply,
   kInstallSnapshot,
   kInstallSnapshotReply,
+  kTimeoutNow,
+
   kMsgNum,
 };
 
