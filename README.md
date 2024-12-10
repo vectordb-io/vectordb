@@ -4,7 +4,7 @@
 
 **site:** [vectordb.io](http://vectordb.io)
 
-Vectordb is a database software used in AI service, supporting operations on vector, graph, session, kv, etc. It can work together with the LLM(Large-Language Model), especially in RAG(Retrieval-Augmented Generation) service. It is based on the project([vraft](https://github.com/vectordb-io/vraft)), which supports its distributed architecture.
+Vectordb is a database software used in AI service, supporting operations on **vector**, **graph**, **session**, **kv**, etc. It can work together with the LLM(Large-Language Model), especially in RAG(Retrieval-Augmented Generation) service. It is based on the project([vraft](https://github.com/vectordb-io/vraft)), which supports its distributed architecture.
 
 ## 1 Architecture
 
