@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>vgraph</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="form-section">
+                <h3>添加节点</h3>
+                <form id="nodeForm">
+                    <div>
+                        <label>节点ID:</label>
+                        <input type="number" id="nodeId" min="1" required>
+                    </div>
+                    <div>
+                        <label>节点名称:</label>
+                        <input type="text" id="nodeName" required>
+                    </div>
+                    <button type="submit">添加节点</button>
+                </form>
+            </div>
+
+            <div class="form-section">
+                <h3>添加边</h3>
+                <form id="edgeForm">
+                    <div>
+                        <label>起始节点:</label>
+                        <input type="number" id="fromNode" min="1" required>
+                    </div>
+                    <div>
+                        <label>目标节点:</label>
+                        <input type="number" id="toNode" min="1" required>
+                    </div>
+                    <div>
+                        <label>权重:</label>
+                        <input type="number" id="weight" min="0" step="0.1" required>
+                    </div>
+                    <div>
+                        <label>类型:</label>
+                        <input type="text" id="edgeType" required>
+                    </div>
+                    <button type="submit">添加边</button>
+                </form>
+            </div>
+
+            <div class="form-section">
+                <h3>查找最短路径</h3>
+                <form id="pathForm">
+                    <div>
+                        <label>起始节点:</label>
+                        <input type="number" id="pathFrom" min="1" required>
+                    </div>
+                    <div>
+                        <label>目标节点:</label>
+                        <input type="number" id="pathTo" min="1" required>
+                    </div>
+                    <button type="submit">查找路径</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="graph-container">
+            <svg id="graph"></svg>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/graph.js') }}"></script>
+</body>
+</html> 
