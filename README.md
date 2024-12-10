@@ -37,7 +37,16 @@ Vectordb is a database software used in AI service, supporting operations on **v
 ### get knn in cluster
 ![getknn-in-cluster](images/getknn-in-cluster.png)
 
-## 3 restful api
+## 3 web monitor
+![v-monitor1.png](images/v-monitor1.png)
+
+![v-monitor2.png](images/v-monitor2.png)
+
+![v-monitor3.png](images/v-monitor3.png)
+
+![v-vgraph_web.png](images/vgraph_web.png)
+
+## 4 restful api
 ### add node request
 ```
 POST /nodes/add
@@ -1182,7 +1191,7 @@ curl -X POST http://127.0.0.1:5000/tables/reblance -H "Content-Type: application
 ```
 
 
-## 4 vectordb-cli commands:
+## 5 vectordb-cli commands:
 
 #### create table
 ```
