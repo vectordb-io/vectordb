@@ -37,7 +37,1152 @@ Vectordb is a database software used in AI service, supporting operations on **v
 ### get knn in cluster
 ![getknn-in-cluster](images/getknn-in-cluster.png)
 
-## 3 vectordb-cli commands:
+## 3 restful api
+### add node request
+```
+POST /nodes/add
+{
+    "address": "127.0.0.1:8000",
+    "memory": "64GB",
+    "cpu-cores": 32,
+    "disk": "1024GB",
+    "gpu-cores": 1024,
+    "gpu-memory": "16GB",
+    "replicas": []
+}
+```
+
+```
+curl -X POST http://127.0.0.1:5000/nodes/add -H "Content-Type: application/json" -d '{"address":"127.0.0.1:8000","memory":"64GB","cpu-cores":32,"disk":"1024GB","gpu-cores":1024,"gpu-memory":"16GB","replicas":[]}'
+```
+
+### add node response
+```
+{
+    "status": 0,
+    "message": "ok"
+}
+```
+
+### get one node request
+```
+POST /nodes/get
+{
+    "address": "127.0.0.1:8000"
+}
+```
+
+```
+curl -X POST http://127.0.0.1:5000/nodes/get -H "Content-Type: application/json" -d '{"address":"127.0.0.1:8000"}'
+```
+
+### get one node response
+```
+{
+    "status": 0,
+    "message": "ok",
+    "node": {
+        "address": "127.0.0.1:8000",
+        "memory": "64GB",
+        "cpu-cores": 32,
+        "disk": "1024GB",
+        "gpu-cores": 1024,
+        "gpu-memory": "16GB",
+        "replicas": []
+    }
+}
+```
+
+### get all nodes request
+```
+POST /nodes/get
+{
+}
+```
+
+```
+curl -X POST http://127.0.0.1:5000/nodes/get
+curl -X POST http://127.0.0.1:5000/nodes/get -H "Content-Type: application/json" -d '{}'
+```
+
+### get all nodes response
+```
+{
+    "status": 0,
+    "message": "ok",
+    "nodes": [
+      {
+        "address": "127.0.0.1:8000",
+        "memory": "64GB",
+        "cpu-cores": 32,
+        "disk": "1024GB",
+        "gpu-cores": 1024,
+        "gpu-memory": "16GB",
+        "replicas": []
+      },
+      {
+        "address": "127.0.0.1:8001",
+        "memory": "64GB",
+        "cpu-cores": 32,
+        "disk": "1024GB",
+        "gpu-cores": 1024,
+        "gpu-memory": "16GB",
+        "replicas": []
+      },
+      {
+        "address": "127.0.0.1:8002",
+        "memory": "64GB",
+        "cpu-cores": 32,
+        "disk": "1024GB",
+        "gpu-cores": 1024,
+        "gpu-memory": "16GB",
+        "replicas": []
+      }
+    ]
+}
+```
+
+### add region request
+```
+POST /regions/add
+{
+    "name": "region1",
+    "nodes": ["127.0.0.1:8000", "127.0.0.1:8001", "127.0.0.1:8002"]
+}
+```
+
+```
+curl -X POST http://127.0.0.1:5000/regions/add -H "Content-Type: application/json" -d '{"name":"region1","nodes":["127.0.0.1:8000","127.0.0.1:8001","127.0.0.1:8002"]}'
+```
+
+### add region response
+```
+{
+    "status": 0,
+    "message": "ok"
+}
+```
+
+### add one node to region request
+```
+POST /regions/add_node
+{
+    "region_name": "region1",
+    "node_address": "127.0.0.1:8000"
+}
+```
+
+```
+curl -X POST http://127.0.0.1:5000/regions/add_node -H "Content-Type: application/json" -d '{"region_name":"region1","node_address":"127.0.0.1:8000"}'
+```
+
+### add one node to region response
+```
+{
+    "status": 0,
+    "message": "ok"
+}
+```
+
+### delete one node from region request
+```
+POST /regions/delete_node
+{
+    "region_name": "region1",
+    "node_address": "127.0.0.1:8000"
+}
+```
+
+```
+curl -X POST http://127.0.0.1:5000/regions/delete_node -H "Content-Type: application/json" -d '{"region_name":"region1","node_address":"127.0.0.1:8000"}'
+```
+
+### delete one node from region response
+```
+{
+    "status": 0,
+    "message": "ok"
+}
+``` 
+
+### get one region request
+```
+POST /regions/get
+{
+    "name": "region1"
+}
+```
+
+```
+curl -X POST http://127.0.0.1:5000/regions/get -H "Content-Type: application/json" -d '{"name":"region1"}'
+```
+
+### get one region response
+```
+{
+    "status": 0,
+    "message": "ok",
+    "region": {
+        "name": "region1",
+        "nodes": ["127.0.0.1:8000", "127.0.0.1:8001", "127.0.0.1:8002"]
+    }
+}
+```
+
+### get all regions request
+```
+POST /regions/get
+{
+}
+```
+
+```
+curl -X POST http://127.0.0.1:5000/regions/get
+curl -X POST http://127.0.0.1:5000/regions/get -H "Content-Type: application/json" -d '{}'
+```
+
+### get all regions response
+```
+{
+    "status": 0,
+    "message": "ok",
+    "regions": [
+      {
+        "name": "global_region",
+        "nodes": ["127.0.0.1:8000", "127.0.0.1:8001", "127.0.0.1:8002", "127.0.0.1:8003", "127.0.0.1:8004", "127.0.0.1:8005"]
+      },
+      {
+        "name": "region1",
+        "nodes": ["127.0.0.1:8000", "127.0.0.1:8001", "127.0.0.1:8002"]
+      },
+      {
+        "name": "region2",
+        "nodes": ["127.0.0.1:8003", "127.0.0.1:8004", "127.0.0.1:8005"]
+      }
+    ]
+}
+```
+
+### add table request
+```
+POST /tables/add
+{
+    "name": "table1",
+    "region": "region1",
+    "type": "vector",
+    "partition_num": 10,
+    "replica_num": 3,
+    "auto_add_all_replicas": true
+}
+```
+
+```
+curl -X POST http://127.0.0.1:5000/tables/add -H "Content-Type: application/json" -d '{"name":"table1","region":"region1","type":"vector","partition_num":10,"replica_num":3,"auto_add_all_replicas":true}'
+curl -X POST http://127.0.0.1:5000/tables/add -H "Content-Type: application/json" -d '{"name":"mytable","region":"region1","type":"vector","partition_num":10,"replica_num":3,"auto_add_all_replicas":true}'
+```
+
+### add table response
+```
+{
+    "status": 0,
+    "message": "ok"
+}
+```
+
+### delete table request
+```
+POST /tables/delete
+{
+    "name": "table1"
+}
+```
+
+```
+curl -X POST http://127.0.0.1:5000/tables/delete -H "Content-Type: application/json" -d '{"name":"table1"}'
+```
+
+### delete table response
+```
+{
+    "status": 0,
+    "message": "ok"
+}
+```
+
+### get one table request
+```
+POST /tables/get
+{
+    "name": "table1"
+}
+```
+
+```
+curl -X POST http://127.0.0.1:5000/tables/get -H "Content-Type: application/json" -d '{"name":"table1"}'
+```
+
+### get one table response
+```
+{
+    "status": 0,
+    "message": "ok",
+    "table": {
+        "name": "table1",
+        "region": "region1",
+        "type": "vector",
+        "partition_num": 10,
+        "replica_num": 3
+    } 
+  }
+```
+
+### get all tables request
+```
+POST /tables/get
+{
+}
+```
+
+```
+curl -X POST http://127.0.0.1:5000/tables/get
+curl -X POST http://127.0.0.1:5000/tables/get -H "Content-Type: application/json" -d '{}'
+```
+
+### get all tables response
+```
+{
+    "status": 0,
+    "message": "ok",
+    "tables": [
+      {
+        "name": "table1",
+        "region": "region1",
+        "type": "vector",
+        "partition_num": 10,
+        "replica_num": 3
+      },
+      {
+        "name": "table2",
+        "region": "global_region",
+        "type": "graph",
+        "partition_num": 10,
+        "replica_num": 3
+      }
+    ]
+}
+```
+
+### add all replicas of one table request
+```
+POST /tables/add_all_replicas
+{
+    "name": "mytable"
+}
+```
+
+```
+curl -X POST http://127.0.0.1:5000/tables/add_all_replicas -H "Content-Type: application/json" -d '{"name":"mytable"}'
+```
+
+### add all replicas of one table response
+
+```
+{
+    "status": 0,
+    "message": "ok"
+}
+```
+
+### update replica_num of one table request
+```
+POST /tables/update_replica_num
+{
+    "name": "mytable",
+    "new_replica_num": 3
+}
+```
+
+```
+curl -X POST http://127.0.0.1:5000/tables/update_replica_num -H "Content-Type: application/json" -d '{"name":"mytable","new_replica_num":3}'
+```
+
+### update replica_num of one table response
+```
+{
+    "status": 0,
+    "message": "ok"
+}
+```
+
+### update partition_num of one table request
+```
+POST /tables/update_partition_num
+{
+    "name": "mytable",
+    "new_partition_num": 3
+}
+```
+
+```
+curl -X POST http://127.0.0.1:5000/tables/update_partition_num -H "Content-Type: application/json" -d '{"name":"mytable","new_partition_num":20}'
+```
+
+### update partition_num of one table response
+```
+{
+    "status": 0,
+    "message": "ok"
+}
+```
+
+### update region of one table request
+```
+POST /tables/update_region
+{
+    "name": "mytable",
+    "new_region": "region2"
+}
+```
+
+```
+curl -X POST http://127.0.0.1:5000/tables/update_region -H "Content-Type: application/json" -d '{"name":"mytable","new_region":"region2"}'
+``` 
+
+### update region of one table response
+```
+{
+    "status": 0,
+    "message": "ok"
+}
+```
+
+### add partition request
+```
+POST /partitions/add
+{
+    "table_name": "mytable",
+    "partition_id": 3
+}
+```
+
+```
+curl -X POST http://127.0.0.1:5000/partitions/add -H "Content-Type: application/json" -d '{"table_name":"mytable","partition_id":3}'
+```
+
+### add partition response
+```
+{
+    "status": 0,
+    "message": "ok"
+}
+```
+
+### get one partition request
+```
+POST /partitions/get
+{
+    "partition_name": "mytable#3"
+}
+```
+
+```
+curl -X POST http://127.0.0.1:5000/partitions/get -H "Content-Type: application/json" -d '{"partition_name":"mytable#3"}'
+```
+
+### get one partition response
+```
+{
+    "status": 0,
+    "message": "ok",
+    "partition": {
+        "partition_name": "mytable#3",
+        "partition_id": 3,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+    }
+}
+```
+
+### get all partitions of one table request
+```
+POST /partitions/get
+{
+    "table_name": "mytable"
+}
+```
+
+```
+curl -X POST http://127.0.0.1:5000/partitions/get -H "Content-Type: application/json" -d '{"table_name":"mytable"}'
+```
+
+### get all partitions of one table response
+```
+{
+    "status": 0,
+    "message": "ok",
+    "partitions": [
+      {
+        "partition_name": "mytable#0",
+        "partition_id": 0,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "partition_name": "mytable#1",
+        "partition_id": 1,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "partition_name": "mytable#2",
+        "partition_id": 2,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "partition_name": "mytable#3",
+        "partition_id": 3,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "partition_name": "mytable#4",
+        "partition_id": 4,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "partition_name": "mytable#5",
+        "partition_id": 5,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "partition_name": "mytable#6",
+        "partition_id": 6,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "partition_name": "mytable#7",
+        "partition_id": 7,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "partition_name": "mytable#8",
+        "partition_id": 8,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "partition_name": "mytable#9",
+        "partition_id": 9,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      }
+    ]
+}
+```
+
+### add replica request
+```
+POST /replicas/add
+{
+    "table_name": "mytable",
+    "partition_id": 3,
+    "replica_id": 1,
+    "node_address": "127.0.0.1:8000"
+}
+```
+
+```
+curl -X POST http://127.0.0.1:5000/replicas/add -H "Content-Type: application/json" -d '{"table_name":"mytable","partition_id":3,"replica_id":1,"node_address":"127.0.0.1:8000"}'
+```
+
+### add replica response
+```
+{
+    "status": 0,
+    "message": "ok"
+}
+```
+
+### move replica request
+```
+POST /replicas/move
+{
+    "replica_name": "mytable#3#1",
+    "dest_node_address": "127.0.0.1:8000"
+}
+```
+
+```
+curl -X POST http://127.0.0.1:5000/replicas/move -H "Content-Type: application/json" -d '{"replica_name":"mytable#3#1","dest_node_address":"127.0.0.1:8000"}'
+```
+
+### move replica response
+```
+{
+    "status": 0,
+    "message": "ok"
+}
+```
+
+### delete replica request
+```
+POST /replicas/delete
+{
+    "replica_name": "mytable#3#1"
+}
+```
+
+```
+curl -X POST http://127.0.0.1:5000/replicas/delete -H "Content-Type: application/json" -d '{"replica_name":"mytable#3#1"}'
+```
+
+### delete replica response
+```
+{
+    "status": 0,
+    "message": "ok"
+}
+```
+
+### get one replica request
+```
+POST /replicas/get
+{
+    "replica_name": "mytable#3#1"
+}
+```
+
+```
+curl -X POST http://127.0.0.1:5000/replicas/get -H "Content-Type: application/json" -d '{"replica_name":"mytable#3#1"}'
+```
+
+### get one replica response
+```
+{
+    "status": 0,
+    "message": "ok",
+    "replica": {
+        "replica_name": "mytable#3#1",
+        "replica_id": 1,
+        "partition_id": 3,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      }
+}
+```
+
+### get all replicas of one table request
+```
+POST /replicas/get
+{
+    "table_name": "mytable"
+}
+```
+
+```
+curl -X POST http://127.0.0.1:5000/replicas/get -H "Content-Type: application/json" -d '{"table_name":"mytable"}'
+```
+
+
+### get all replicas of one table response
+```
+{
+    "status": 0,
+    "message": "ok",
+    "replicas": [
+      {
+        "replica_name": "mytable#0#0",
+        "replica_id": 0,
+        "partition_id": 0,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "replica_name": "mytable#0#1",
+        "replica_id": 1,
+        "partition_id": 0,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "replica_name": "mytable#0#2",
+        "replica_id": 2,
+        "partition_id": 0,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "replica_name": "mytable#1#0",
+        "replica_id": 0,
+        "partition_id": 1,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "replica_name": "mytable#1#1",
+        "replica_id": 1,
+        "partition_id": 1,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "replica_name": "mytable#1#2",
+        "replica_id": 2,
+        "partition_id": 1,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "replica_name": "mytable#2#0",
+        "replica_id": 0,
+        "partition_id": 2,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "replica_name": "mytable#2#1",
+        "replica_id": 1,
+        "partition_id": 2,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "replica_name": "mytable#2#2",
+        "replica_id": 2,
+        "partition_id": 2,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "replica_name": "mytable#3#0",
+        "replica_id": 0,
+        "partition_id": 3,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "replica_name": "mytable#3#1",
+        "replica_id": 1,
+        "partition_id": 3,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "replica_name": "mytable#3#2",
+        "replica_id": 2,
+        "partition_id": 3,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "replica_name": "mytable#4#0",
+        "replica_id": 0,
+        "partition_id": 4,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "replica_name": "mytable#4#1",
+        "replica_id": 1,
+        "partition_id": 4,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "replica_name": "mytable#4#2",
+        "replica_id": 2,
+        "partition_id": 4,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "replica_name": "mytable#5#0",
+        "replica_id": 0,
+        "partition_id": 5,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "replica_name": "mytable#5#1",
+        "replica_id": 1,
+        "partition_id": 5,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "replica_name": "mytable#5#2",
+        "replica_id": 2,
+        "partition_id": 5,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "replica_name": "mytable#6#0",
+        "replica_id": 0,
+        "partition_id": 6,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "replica_name": "mytable#6#1",
+        "replica_id": 1,
+        "partition_id": 6,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "replica_name": "mytable#6#2",
+        "replica_id": 2,
+        "partition_id": 6,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "replica_name": "mytable#7#0",
+        "replica_id": 0,
+        "partition_id": 7,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "replica_name": "mytable#7#1",
+        "replica_id": 1,
+        "partition_id": 7,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "replica_name": "mytable#7#2",
+        "replica_id": 2,
+        "partition_id": 7,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "replica_name": "mytable#8#0",
+        "replica_id": 0,
+        "partition_id": 8,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "replica_name": "mytable#8#1",
+        "replica_id": 1,
+        "partition_id": 8,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "replica_name": "mytable#8#2",
+        "replica_id": 2,
+        "partition_id": 8,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "replica_name": "mytable#9#0",
+        "replica_id": 0,
+        "partition_id": 9,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "replica_name": "mytable#9#1",
+        "replica_id": 1,
+        "partition_id": 9,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      },
+      {
+        "replica_name": "mytable#9#2",
+        "replica_id": 2,
+        "partition_id": 9,
+        "table_name": "mytable",
+        "table_info": {
+            "name": "mytable",
+            "region": "region1",
+            "type": "vector",
+            "partition_num": 10,
+            "replica_num": 3
+        }
+      }
+    ]
+}
+```
+
+### reblance table request
+```
+POST /tables/reblance
+{
+    "table_name": "mytable"
+}
+```
+
+```
+curl -X POST http://127.0.0.1:5000/tables/reblance -H "Content-Type: application/json" -d '{"table_name":"mytable"}'
+```
+
+### reblance table response
+```
+{
+    "status": 0,
+    "message": "ok"
+}
+```
+
+
+## 4 vectordb-cli commands:
 
 #### create table
 ```
