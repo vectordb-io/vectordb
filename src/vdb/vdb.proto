@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package vdb;
+
+message FlatParam {
+  int32 dim = 1;
+  int32 max_elements = 2;
+  int32 distance_type = 3;
+} 
+
+message HnswParam {
+  int32 dim = 1;
+  int32 max_elements = 2;
+  int32 M = 3;  // 每个节点的最大出度
+  int32 ef_construction = 4;  // 构建索引时的搜索深度参数
+  int32 distance_type = 5;
+}
+
+message IndexInfo {
+  int32 index_type = 1;
+  oneof param {
+    FlatParam flat_param = 2;
+    HnswParam hnsw_param = 3;
+  }
+}
+
+message IndexParam {
+  string path = 1;
+  int32 id = 2; 
+  int64 create_time = 3;
+  IndexInfo index_info = 4;
+}
+
+message TableInfo {
+  string name = 1;
+  IndexInfo default_index_info = 5;
+}
+
+message TableParam {
+  string path = 1;
+  string name = 2;
+  int64 create_time = 3;  
+  int32 dim = 4;
+  IndexInfo default_index_info = 5;
+  repeated IndexParam indexes = 6;
+}
+
+message DBParam {
+  string path = 1;
+  string name = 2;
+  int64 create_time = 3;
+  repeated TableParam tables = 4;
+}
+
+message Vec {
+  repeated float data = 1;
+}
+
+message Id {
+  int64 id = 1;
+}
