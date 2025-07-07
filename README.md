@@ -13,9 +13,9 @@ sh onekey.sh
 ### step 2. build
 ```
 # build test
-make format && make clean && make proto && make -j4
+make proto && make -j4
 
 # build asan test
-make format && make clean && make proto && make ASAN=yes -j4
+make proto && make ASAN=yes -j4
 ```
 
