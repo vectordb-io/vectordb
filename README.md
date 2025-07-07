@@ -14,7 +14,13 @@ cd third_party && sh onekey.sh
 # build test
 make proto && make -j4
 
+# run test
+make run
+
 # build asan test
 make proto && make ASAN=yes -j4
+
+# run asan test
+make run
 ```
 
