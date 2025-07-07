@@ -5,8 +5,7 @@
 ### step 1. build dependency
 ```
 git submodule update --init
-cd third_party
-sh onekey.sh 
+cd third_party && sh onekey.sh 
 
 ```
 
