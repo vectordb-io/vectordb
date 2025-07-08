@@ -13,6 +13,9 @@ ifeq ($(COV),yes)
     LDFLAGS += -fprofile-arcs -ftest-coverage
 endif
 
+# 获取CPU核心数用于并行编译
+CPU_CORES := $(shell nproc)
+
 INCLUDES = -I.
 INCLUDES += -I./src/common
 INCLUDES += -I./src/vdb 
@@ -129,7 +132,7 @@ VECTORDB_TEST = $(TEST_DIR)/vectordb_test
 PB2JSON_TEST = $(TEST_DIR)/pb2json_test
 
 # 默认目标
-all: prepare test
+all: clean prepare test
 
 # 准备目录
 prepare:
@@ -215,7 +218,8 @@ proto:
 	./third_party/protobuf/src/protoc --cpp_out=. src/vdb/vdb.proto
 
 # 编译测试
-test: prepare vdb_test retno_test json_test rocksdb_test table_test logger_test hnswlib_test protobuf_test vdb_proto_test vindex_test util_test distance_test vectordb_test pb2json_test
+test: prepare
+	$(MAKE) -j$(CPU_CORES) vdb_test retno_test json_test rocksdb_test table_test logger_test hnswlib_test protobuf_test vdb_proto_test vindex_test util_test distance_test vectordb_test pb2json_test
 
 # 运行测试
 run_test: 
@@ -252,7 +256,7 @@ COV_REPORT = $(COV_DIR)/report
 coverage: prepare
 	@mkdir -p $(COV_DIR)
 	$(MAKE) clean
-	$(MAKE) test COV=yes -j4
+	$(MAKE) test COV=yes -j$(CPU_CORES)
 	$(MAKE) run_test
 	lcov --capture --directory $(OBJ_DIR) --output-file $(COV_INFO) --ignore-errors mismatch --rc lcov_branch_coverage=1
 	lcov --remove $(COV_INFO) '/usr/include/*' '/usr/lib/gcc/x86_64-linux-gnu/13/include/*' '*/third_party/*' '*/src/*_test.cc' --output-file $(COV_INFO) --rc lcov_branch_coverage=1
