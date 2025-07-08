@@ -7,6 +7,12 @@ ifeq ($(ASAN),yes)
     LDFLAGS += -fsanitize=address
 endif
 
+COV = no
+ifeq ($(COV),yes)
+    CFLAGS += -fprofile-arcs -ftest-coverage
+    LDFLAGS += -fprofile-arcs -ftest-coverage
+endif
+
 INCLUDES = -I.
 INCLUDES += -I./src/common
 INCLUDES += -I./src/vdb 
@@ -123,7 +129,7 @@ VECTORDB_TEST = $(TEST_DIR)/vectordb_test
 PB2JSON_TEST = $(TEST_DIR)/pb2json_test
 
 # 默认目标
-all: prepare gtest test
+all: prepare test
 
 # 准备目录
 prepare:
@@ -189,16 +195,6 @@ $(VECTORDB_TEST): $(VECTORDB_TEST_OBJS) $(VECTORDB_OBJS) $(VDB_OBJS) $(TABLE_OBJ
 $(PB2JSON_TEST): $(PB2JSON_TEST_OBJS) $(VDB_PROTO_OBJS) $(PB2JSON_OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)
 
-# 编译googletest，如果third_party/googletest/build存在，则不编译
-gtest:
-	@if [ ! -d "third_party/googletest/build" ]; then \
-		echo "编译 Google Test 库..."; \
-		mkdir -p third_party/googletest/build; \
-		cd third_party/googletest/build && cmake .. -DCMAKE_CXX_STANDARD=17 && make; \
-	else \
-		echo "Google Test 库已存在，跳过编译"; \
-	fi
-
 vdb_test: prepare $(VDB_TEST)
 retno_test: prepare $(RETNO_TEST)
 json_test: prepare $(JSON_TEST)
@@ -243,7 +239,27 @@ run_test:
 clean:
 	rm -rf $(OBJ_DIR)/* $(TEST_DIR)/* 
 
-.PHONY: all prepare gtest test clean run_test
+.PHONY: all prepare test clean run_test
 
 format:
 	clang-format --style=Google -i `find ./src -type f \( -name "*.h" -o -name "*.c" -o -name "*.cc" -o -name "*.cpp" \) | grep -v "*.pb.*"`
+
+# 覆盖率测试
+COV_DIR = output/coverage
+COV_INFO = $(COV_DIR)/coverage.info
+COV_REPORT = $(COV_DIR)/report
+
+coverage: prepare
+	@mkdir -p $(COV_DIR)
+	$(MAKE) clean
+	$(MAKE) test COV=yes -j4
+	$(MAKE) run_test
+	lcov --capture --directory $(OBJ_DIR) --output-file $(COV_INFO) --ignore-errors mismatch --rc lcov_branch_coverage=1
+	lcov --remove $(COV_INFO) '/usr/include/*' '/usr/lib/gcc/x86_64-linux-gnu/13/include/*' '*/third_party/*' '*/src/*_test.cc' --output-file $(COV_INFO) --rc lcov_branch_coverage=1
+	genhtml $(COV_INFO) --output-directory $(COV_REPORT) --branch-coverage --function-coverage
+	@echo "覆盖率报告已生成在 $(COV_REPORT)/index.html"
+
+clean_coverage:
+	rm -rf $(COV_DIR)
+
+.PHONY: coverage clean_coverage
