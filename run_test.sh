@@ -28,11 +28,13 @@ if [ -z "$TOOL" ]; then
     exit 1
 fi
 
-# 在 ./test_result 目录下创建一个文件，文件名称为 result.yyyy-mm-dd-hh-mm-ss.txt
+timestamp=$(date +%Y-%m-%d-%H-%M-%S)
 mkdir -p ./test_result
-file_name=./test_result/result.$(date +%Y-%m-%d-%H-%M-%S).txt
+file_name=./test_result/result.$timestamp.txt
 touch $file_name
 
+echo "Test Time: $timestamp" >> $file_name
+echo "" >> $file_name
 echo "Model: $MODEL" >> $file_name
 echo "Tool: $TOOL" >> $file_name
 
