@@ -6,6 +6,11 @@
 
 ![Vector Database Library Architecture](imgs/library.svg)
 
+### single node
+![Vector Database Single-Node Architecture](imgs/single-node.svg)
+
+### cluster
+![Vector Database Cluster Architecture](imgs/cluster.svg)
 
 ## Build on "Ubuntu 24.04.2 LTS"
 
