@@ -1,6 +1,13 @@
 
 
-## build on "Ubuntu 24.04.2 LTS"
+## Architecture
+
+### library
+
+![Vector Database Library Architecture](imgs/library.svg)
+
+
+## Build on "Ubuntu 24.04.2 LTS"
 
 ### step 1. build dependency
 ```
@@ -9,7 +16,6 @@ sudo apt-get install libgflags-dev libsnappy-dev zlib1g-dev libbz2-dev liblz4-de
 
 git submodule update --init
 cd third_party && sh onekey.sh && cd -
-
 ```
 
 ### step 2. build
