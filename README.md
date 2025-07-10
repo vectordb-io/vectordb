@@ -4,7 +4,7 @@
 Over 95% of the work on the VectorDB project is completed by AI, including AI coding, AI testing, AI operation, and AI customer service.
 <br>
 <br>
-A simple demonstration: [searching for relevant images by text](http://115.190.11.65/album.html)
+A simple demonstration: [Searching for relevant images by text](http://115.190.11.65/album.html)
 <br>
 <br>
 Ask About VectorDB:
