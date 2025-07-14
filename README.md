@@ -11,8 +11,11 @@ Ask About VectorDB:
 [https://deepwiki.com/vectordb-io/vectordb](https://deepwiki.com/vectordb-io/vectordb)
 
 ## Testing
-### coverage rate
-[http://vectordb.io/coverage/report/index.html](coverage rate)
+### coverage
+[coverage](http://vectordb.io/coverage/report/index.html)
+
+### performance
+### to be completed
 
 ## Architecture
 
