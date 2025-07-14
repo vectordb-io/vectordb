@@ -15,7 +15,7 @@ Ask About VectorDB:
 [coverage](http://vectordb.io/coverage/report/index.html)
 
 ### performance
-### to be completed
+to be completed ...
 
 ## Architecture
 
