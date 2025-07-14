@@ -10,6 +10,10 @@ A simple demonstration: [Searching for relevant images by text](http://115.190.1
 Ask About VectorDB:
 [https://deepwiki.com/vectordb-io/vectordb](https://deepwiki.com/vectordb-io/vectordb)
 
+## Testing
+### coverage rate
+[http://vectordb.io/coverage/report/index.html](coverage rate)
+
 ## Architecture
 
 ### library
