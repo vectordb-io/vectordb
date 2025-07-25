@@ -9,6 +9,9 @@ A simple demonstration: [Searching for relevant images by text](http://115.190.1
 <br>
 Ask About VectorDB:
 [https://deepwiki.com/vectordb-io/vectordb](https://deepwiki.com/vectordb-io/vectordb)
+<br>
+<br>
+[data flow](https://github.com/vectordb-io/vectordb/wiki/%E6%95%B0%E6%8D%AE%E6%B5%81)
 
 ## Testing
 ### coverage
