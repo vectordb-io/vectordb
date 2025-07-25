@@ -30,7 +30,7 @@ to be completed ...
 ![Vector Database Single-Node Architecture](imgs/single-node.svg)
 
 ### cluster
-![Vector Database Cluster Architecture](imgs/cluster.svg)
+![Vector Database Cluster Architecture](imgs/cluster2.svg)
 
 ## Build on "Ubuntu 24.04.2 LTS"
 
