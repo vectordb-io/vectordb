@@ -3,10 +3,22 @@
 ## Brief 
 Over 95% of the work on the VectorDB project is completed by AI, including AI coding, AI testing, AI operation, and AI customer service.
 <br>
-A simple demonstration: [searching for relevant images by text](http://115.190.11.65/album.html)
+<br>
+A simple demonstration: [Searching for relevant images by text](http://115.190.11.65/album.html)
+<br>
 <br>
 Ask About VectorDB:
 [https://deepwiki.com/vectordb-io/vectordb](https://deepwiki.com/vectordb-io/vectordb)
+<br>
+<br>
+data flow: [data flow](https://github.com/vectordb-io/vectordb/wiki/%E6%95%B0%E6%8D%AE%E6%B5%81)
+
+## Testing
+### coverage
+[coverage](http://vectordb.io/coverage/report/index.html)
+
+### performance
+to be completed ...
 
 ## Architecture
 
@@ -18,7 +30,7 @@ Ask About VectorDB:
 ![Vector Database Single-Node Architecture](imgs/single-node.svg)
 
 ### cluster
-![Vector Database Cluster Architecture](imgs/cluster.svg)
+![Vector Database Cluster Architecture](imgs/cluster2.svg)
 
 ## Build on "Ubuntu 24.04.2 LTS"
 
