@@ -12,6 +12,12 @@ Ask About VectorDB:
 <br>
 <br>
 data flow: [data flow](https://github.com/vectordb-io/vectordb/wiki/%E6%95%B0%E6%8D%AE%E6%B5%81)
+<br>
+<br>
+vectordb-cli: [vectordb-cli](https://www.bilibili.com/video/BV1BNq1YoEf1/?vd_source=667dd64b8a907b2bb227ba72255947be)
+<br>
+<br>
+vectordb-distribute: [vectordb-distribute](https://www.bilibili.com/video/BV1EQqmYPE7W/?vd_source=667dd64b8a907b2bb227ba72255947be)
 
 ## Testing
 ### coverage
