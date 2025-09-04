@@ -28,6 +28,10 @@ to be completed ...
 
 ## Architecture
 
+### vindex
+
+![VIndex Architecture](imgs/vindex.svg)
+
 ### library
 
 ![Vector Database Library Architecture](imgs/library.svg)
