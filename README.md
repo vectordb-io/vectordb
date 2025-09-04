@@ -34,13 +34,13 @@ to be completed ...
 
 ### library
 
-![Vector Database Library Architecture](imgs/library.svg)
+![Vector Database Library Architecture](imgs/library2.svg)
 
 ### single node
 ![Vector Database Single-Node Architecture](imgs/single-node2.svg)
 
 ### cluster
-![Vector Database Cluster Architecture](imgs/cluster2.svg)
+![Vector Database Cluster Architecture](imgs/cluster3.svg)
 
 ## Build on "Ubuntu 24.04.2 LTS"
 
