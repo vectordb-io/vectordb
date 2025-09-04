@@ -33,7 +33,7 @@ to be completed ...
 ![Vector Database Library Architecture](imgs/library.svg)
 
 ### single node
-![Vector Database Single-Node Architecture](imgs/single-node.svg)
+![Vector Database Single-Node Architecture](imgs/single-node2.svg)
 
 ### cluster
 ![Vector Database Cluster Architecture](imgs/cluster2.svg)
