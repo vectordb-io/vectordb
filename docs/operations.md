@@ -43,7 +43,7 @@ docker run --rm -p 127.0.0.1:19530:19530 \
   -v vectordb-data:/data vectordb:local
 ```
 
-镜像构建自本仓库，未假设任何已发布 Docker Hub 镜像。容器内监听 `0.0.0.0:19530`，上述命令仅将宿主机回环端口映射出去。默认使用 uid 10001；使用宿主目录 bind mount 时需提前为该 uid 配置读写权限。
+镜像构建自本仓库，未假设任何已发布 Docker Hub 镜像。构建后可运行 `python3 scripts/container_smoke.py` 验证非 root 运行、HTTP 和容器强制退出后的持久化；脚本创建并清理专用临时容器与匿名卷。容器内监听 `0.0.0.0:19530`，上述命令仅将宿主机回环端口映射出去。默认使用 uid 10001；使用宿主目录 bind mount 时需提前为该 uid 配置读写权限。
 
 ## 验证与容量边界
 
