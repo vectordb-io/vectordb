@@ -1,0 +1,30 @@
+name: Rust checks
+on:
+  push:
+    paths: ['Cargo.toml', 'Cargo.lock', 'crates/**', 'scripts/**', 'examples/**', 'docs/**', 'README.md', 'website/**', '.github/workflows/**']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy && rustup default stable
+      - name: Format
+        run: cargo fmt --all --check
+      - name: Test
+        run: cargo test --workspace --locked
+      - name: Lint
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Build
+        run: cargo build --workspace --locked
+      - name: Process recovery and examples
+        run: python3 scripts/smoke.py
+      - name: Website structure and links
+        run: python3 scripts/check_website.py

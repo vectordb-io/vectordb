@@ -1,2 +1,7 @@
-.vscode
-output
+/target/
+/data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite.lock
+.DS_Store

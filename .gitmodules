@@ -1,3 +1,0 @@
-[submodule "third_party"]
-	path = third_party
-	url = https://github.com/vectordb-io/third_party.git

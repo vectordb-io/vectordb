@@ -1,0 +1,5 @@
+.git
+target
+data
+website
+*.sqlite*

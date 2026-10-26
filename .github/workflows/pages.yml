@@ -6,6 +6,7 @@ on:
     paths:
       - 'website/**'
       - '.github/workflows/pages.yml'
+      - 'scripts/check_website.py'
   workflow_dispatch:
 
 permissions:
@@ -28,6 +29,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - name: Validate website and domain configuration
+        run: python3 scripts/check_website.py
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Package static website
