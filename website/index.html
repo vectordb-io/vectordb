@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f4ef">
+  <meta name="description" content="VectorDB：探索向量检索的底层实现。基于 C++、HNSW 与 RocksDB，阅读源码、了解架构并开始构建。">
+  <meta property="og:title" content="VectorDB — Find meaning in vectors.">
+  <meta property="og:description" content="探索向量检索的底层实现。C++ · HNSW · RocksDB · Raft">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://vectordb.io/">
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./app.js" defer></script>
+  <title>VectorDB — Find meaning in vectors.</title>
+</head>
+<body>
+  <a class="skip-link" href="#main" data-zh="跳转到正文" data-en="Skip to content">跳转到正文</a>
+  <header class="site-header wrap">
+    <a class="brand" href="#" aria-label="VectorDB home"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 7 16 26 27 7M10 7l6 10 6-10"/><circle cx="5" cy="7" r="3"/><circle cx="27" cy="7" r="3"/><circle cx="16" cy="26" r="3"/></svg>VectorDB<span class="brand-dot">.</span></a>
+    <nav aria-label="Main navigation">
+      <a href="#explore" data-zh="探索" data-en="Explore">探索</a>
+      <a href="#architecture" data-zh="架构" data-en="Architecture">架构</a>
+      <a href="#start" data-zh="开始构建" data-en="Get started">开始构建</a>
+    </nav>
+    <div class="header-actions"><button id="language" type="button" aria-label="Switch to English">EN</button><a class="github-link" href="https://github.com/vectordb-io/vectordb">GitHub <span aria-hidden="true">↗</span></a></div>
+  </header>
+  <main id="main">
+    <section class="hero wrap">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="status-dot"></span> VECTOR DATABASE, FROM THE INSIDE OUT</p>
+        <h1 data-zh="让相似，<br>彼此发现。" data-en="Find meaning.<br>Connect vectors.">让相似，<br>彼此发现。</h1>
+        <p class="hero-description" data-zh="从一个向量，到一组有意义的关联。<br>用 C++ 探索向量检索、持久化存储与分布式系统的底层实现。" data-en="From a single vector to meaningful connections.<br>Explore vector search, persistent storage, and distributed systems through C++.">从一个向量，到一组有意义的关联。<br>用 C++ 探索向量检索、持久化存储与分布式系统的底层实现。</p>
+        <div class="hero-actions"><a class="button primary" href="#start"><span data-zh="开始构建" data-en="Start building">开始构建</span><span aria-hidden="true">↗</span></a><a class="text-link" href="https://github.com/vectordb-io/vectordb"><span data-zh="阅读源码" data-en="Explore the code">阅读源码</span><span aria-hidden="true">→</span></a></div>
+        <div class="hero-note"><span class="mini-mark">&lt;/&gt;</span><span data-zh="代码公开 · AI 参与开发 · 持续探索" data-en="Public source · AI-assisted development · Work in progress">代码公开 · AI 参与开发 · 持续探索</span></div>
+      </div>
+      <div class="vector-lab" id="explore">
+        <div class="lab-top"><span><span class="status-dot"></span> VECTOR SPACE</span><span>01 / INTERACTIVE</span></div>
+        <svg id="vector-map" viewBox="0 0 540 350" role="img" aria-labelledby="map-title map-description"><title id="map-title">二维向量近邻示意</title><desc id="map-description">选择查询点，查看二维空间中距离最近的示例向量。</desc><defs><pattern id="grid" width="27" height="27" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#d9d9d1"/></pattern></defs><rect width="540" height="350" fill="url(#grid)"/><path d="M25 320H515M30 325V25" stroke="#d8d9d0" stroke-width="1"/><text x="512" y="337" class="axis-label">x</text><text x="15" y="27" class="axis-label">y</text><g id="map-content"></g></svg>
+        <div class="lab-controls"><div><span class="control-label" data-zh="查询点" data-en="Query">查询点</span><div class="query-buttons"><button type="button" data-query="0" aria-pressed="true">A</button><button type="button" data-query="1" aria-pressed="false">B</button><button type="button" data-query="2" aria-pressed="false">C</button></div></div><label class="neighbors-label" for="neighbors">TOP K <select id="neighbors"><option value="3">3</option><option value="5">5</option><option value="8">8</option></select></label></div>
+        <div class="lab-result" aria-live="polite"><span id="result-label">已找到 3 个近邻</span><span class="legend"><i></i><span data-zh="查询" data-en="Query">查询</span><i></i><span data-zh="近邻" data-en="Neighbors">近邻</span></span></div>
+        <p class="lab-caption" data-zh="交互示意 · 浏览器内二维距离计算，非数据库性能演示" data-en="Interactive illustration · 2D distances in your browser, not a database benchmark">交互示意 · 浏览器内二维距离计算，非数据库性能演示</p>
+      </div>
+    </section>
+    <div class="stack-band"><div class="wrap stack-inner"><span data-zh="从底层构建" data-en="BUILT FROM THE FOUNDATIONS">从底层构建</span><span>C++</span><span>HNSW</span><span>RocksDB</span><span>Protocol Buffers</span><span>Raft</span></div></div>
+    <section class="section wrap" id="capabilities">
+      <div class="section-heading"><div><p class="eyebrow">01 / THE BUILDING BLOCKS</p><h2 data-zh="从存储到检索，<br>看清每一层。" data-en="Understand every layer.<br>From storage to search.">从存储到检索，<br>看清每一层。</h2></div><p data-zh="围绕向量数据组织能力，<br>沿着真实代码理解系统如何工作。" data-en="Follow the data through the system.<br>Understand the implementation in real code.">围绕向量数据组织能力，<br>沿着真实代码理解系统如何工作。</p></div>
+      <div class="features">
+        <article><div class="feature-icon" aria-hidden="true">⌁</div><span class="feature-number">01</span><h3 data-zh="找到相似向量" data-en="Search by similarity">找到相似向量</h3><p data-zh="通过 HNSW 或 Flat 索引进行向量检索，支持按查询向量或已有 ID 查找近邻。" data-en="Search with HNSW or Flat indexes. Find neighboring vectors using a query vector or an existing ID.">通过 HNSW 或 Flat 索引进行向量检索，支持按查询向量或已有 ID 查找近邻。</p><a class="text-link" href="https://github.com/vectordb-io/vectordb/blob/main/src/vdb/vindex.h">VIndex <span aria-hidden="true">↗</span></a></article>
+        <article><div class="feature-icon" aria-hidden="true">▤</div><span class="feature-number">02</span><h3 data-zh="组织向量与数据" data-en="Keep your data together">组织向量与数据</h3><p data-zh="以表管理向量及其标量数据，通过 RocksDB 和索引持久化机制保存数据与检索状态。" data-en="Organize vectors and scalar data in tables, with RocksDB storage and index persistence.">以表管理向量及其标量数据，通过 RocksDB 和索引持久化机制保存数据与检索状态。</p><a class="text-link" href="https://github.com/vectordb-io/vectordb/blob/main/src/vdb/table.h">Table <span aria-hidden="true">↗</span></a></article>
+        <article><div class="feature-icon" aria-hidden="true">⋈</div><span class="feature-number">03</span><h3 data-zh="深入分布式系统" data-en="Explore distributed systems">深入分布式系统</h3><p data-zh="从单节点架构走向集群设计，研究项目中的 Raft 日志复制、快照与节点协作实现。" data-en="Go from single-node architecture to cluster design. Explore Raft replication, snapshots, and node coordination.">从单节点架构走向集群设计，研究项目中的 Raft 日志复制、快照与节点协作实现。</p><a class="text-link" href="https://github.com/vectordb-io/vectordb/tree/main/src/raft">Raft <span aria-hidden="true">↗</span></a></article>
+      </div>
+    </section>
+    <section class="architecture-section" id="architecture"><div class="wrap architecture-grid">
+      <div><p class="eyebrow">02 / UNDER THE HOOD</p><h2 data-zh="小处可读，<br>全局可见。" data-en="Readable in detail.<br>Connected by design.">小处可读，<br>全局可见。</h2><p class="section-description" data-zh="从 Vectordb 接口进入，逐层追踪表、索引和存储。架构图与实现一起阅读，让抽象回到具体。" data-en="Start at the Vectordb interface and trace tables, indexes, and storage. Read the architecture alongside its implementation.">从 Vectordb 接口进入，逐层追踪表、索引和存储。架构图与实现一起阅读，让抽象回到具体。</p><a class="text-link" href="https://github.com/vectordb-io/vectordb#architecture"><span data-zh="查看完整架构图" data-en="View the architecture diagrams">查看完整架构图</span><span aria-hidden="true">↗</span></a></div>
+      <div class="architecture-diagram" role="img" aria-label="Vectordb → Vdb → Table → VIndex (HNSW / Flat) and RocksDB"><div class="diagram-top"><span>LIBRARY ARCHITECTURE</span><span>↘</span></div><div class="diagram-node entry">Vectordb <small>PUBLIC INTERFACE</small></div><div class="connector"></div><div class="diagram-node">Vdb <span class="node-divider">/</span> Table <small>DATA & INDEX MANAGEMENT</small></div><div class="connector fork"></div><div class="diagram-bottom"><div class="diagram-node">VIndex<small>HNSW / FLAT</small></div><div class="diagram-node">RocksDB<small>PERSISTENT STORAGE</small></div></div><p data-zh="核心库结构简图 · 详细关系以源码为准" data-en="Simplified library structure · See source for details">核心库结构简图 · 详细关系以源码为准</p></div>
+    </div></section>
+    <section class="section wrap start-grid" id="start">
+      <div><p class="eyebrow">03 / MAKE IT YOURS</p><h2 data-zh="从一次构建开始。" data-en="Start with a build.">从一次构建开始。</h2><p class="section-description" data-zh="克隆仓库，安装依赖，运行测试。<br>这里是理解 VectorDB 的第一步。" data-en="Clone the repository, install dependencies, and run the tests.<br>Your first step into VectorDB.">克隆仓库，安装依赖，运行测试。<br>这里是理解 VectorDB 的第一步。</p><div class="environment-tag"><span class="status-dot"></span> Ubuntu 24.04.2 LTS</div><p class="build-note" data-zh="以下命令沿用项目 README 的构建流程。依赖安装需要 sudo，并会执行仓库的依赖脚本。" data-en="These commands follow the project README. Dependency installation requires sudo and runs the repository’s dependency script.">以下命令沿用项目 README 的构建流程。依赖安装需要 sudo，并会执行仓库的依赖脚本。</p><a class="text-link" href="https://github.com/vectordb-io/vectordb#build-on-ubuntu-24042-lts"><span data-zh="阅读构建说明" data-en="Read build instructions">阅读构建说明</span><span aria-hidden="true">↗</span></a></div>
+      <div class="terminal"><div class="terminal-top"><div class="terminal-dots" aria-hidden="true"><i></i><i></i><i></i></div><span>quickstart.sh</span><button type="button" id="copy-code" data-zh="复制命令" data-en="Copy commands">复制命令</button></div><pre tabindex="0"><code id="build-code"><span class="code-comment"># 01 — Clone</span>
+git clone https://github.com/vectordb-io/vectordb.git
+cd vectordb
+
+<span class="code-comment"># 02 — Install dependencies</span>
+sudo apt install autoconf automake libtool -y
+sudo apt-get install libgflags-dev libsnappy-dev \
+  zlib1g-dev libbz2-dev liblz4-dev libzstd-dev -y
+git submodule update --init
+cd third_party && sh onekey.sh && cd -
+
+<span class="code-comment"># 03 — Build & test</span>
+make proto && make -j4
+make run</code></pre><div class="terminal-bottom"><span>●</span> <span data-zh="在本地探索，在代码中理解。" data-en="Explore locally. Understand through code.">在本地探索，在代码中理解。</span></div><span class="sr-only" id="copy-status" role="status"></span></div>
+    </section>
+    <section class="resources-section wrap"><div class="resources-intro"><p class="eyebrow">KEEP EXPLORING</p><h2 data-zh="代码之外，继续探索。" data-en="Keep your curiosity going.">代码之外，继续探索。</h2></div><div class="resources"><a href="https://deepwiki.com/vectordb-io/vectordb"><span class="resource-label">01 / DEEPWIKI</span><h3 data-zh="向代码提问" data-en="Ask about the code">向代码提问</h3><p data-zh="借助 AI 文档了解项目结构与实现。" data-en="Explore the project through AI-generated documentation.">借助 AI 文档了解项目结构与实现。</p><span class="resource-arrow" aria-hidden="true">↗</span></a><a href="https://github.com/vectordb-io/vectordb/wiki"><span class="resource-label">02 / WIKI</span><h3 data-zh="沿着数据流阅读" data-en="Follow the data">沿着数据流阅读</h3><p data-zh="查看项目 Wiki，连接架构与数据流。" data-en="Connect the architecture and data flow in the project wiki.">查看项目 Wiki，连接架构与数据流。</p><span class="resource-arrow" aria-hidden="true">↗</span></a><a href="https://github.com/vectordb-io/vectordb/issues"><span class="resource-label">03 / GITHUB</span><h3 data-zh="一起推动下一步" data-en="Shape what comes next">一起推动下一步</h3><p data-zh="报告问题、交流想法，参与项目开发。" data-en="Report an issue, share an idea, or contribute to the project.">报告问题、交流想法，参与项目开发。</p><span class="resource-arrow" aria-hidden="true">↗</span></a></div></section>
+  </main>
+  <footer class="wrap"><a class="brand" href="#">VectorDB<span class="brand-dot">.</span></a><p data-zh="从向量出发，发现更多可能。" data-en="A starting point for meaningful connections.">从向量出发，发现更多可能。</p><a href="https://github.com/vectordb-io/vectordb">GitHub ↗</a><span>vectordb.io</span></footer>
+</body>
+</html>
