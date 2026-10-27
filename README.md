@@ -1,6 +1,6 @@
 # VectorDB · Rust
 
-**English | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)**
+**English | [简体中文](README.zh-CN.md) | [日本語](README.ja.md) | [Español](README.es.md) | [Português do Brasil](README.pt-BR.md)**
 
 A standalone vector database reimplemented in Rust, with an embeddable engine, an HTTP service, transactional persistence, and a separate static website.
 

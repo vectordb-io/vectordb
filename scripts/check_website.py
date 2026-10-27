@@ -11,7 +11,7 @@ SITE = ROOT / 'website'
 translations = json.JSONDecoder().raw_decode(
     (SITE / 'i18n.js').read_text().split('const messages = ', 1)[1]
 )[0]
-assert set(translations) == {'en', 'zh-CN', 'ja'}
+assert set(translations) == {'en', 'zh-CN', 'ja', 'es', 'pt-BR'}
 for language, messages in translations.items():
     assert messages.keys() == translations['en'].keys(), f'incomplete locale: {language}'
     assert all(isinstance(value, str) and value.strip() for value in messages.values())
@@ -20,10 +20,14 @@ class Page(HTMLParser):
         super().__init__()
         self.ids = set()
         self.refs = []
+        self.languages = []
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
         if tag == 'html':
             assert attrs.get('lang') == 'en', 'static pages must default to English'
+        if tag == 'option' and 'lang' in attrs:
+            assert attrs.get('value') == attrs['lang'], 'language option mismatch'
+            self.languages.append(attrs['lang'])
         for attribute, key in attrs.items():
             if attribute.startswith('data-i18n'):
                 assert key in translations['en'], f'missing translation: {key}'
@@ -36,6 +40,7 @@ class Page(HTMLParser):
 for file in SITE.glob('*.html'):
     page = Page()
     page.feed(file.read_text())
+    assert sorted(page.languages) == sorted(translations), f'{file.name}: incomplete language picker'
     for ref in page.refs:
         url = urlsplit(ref)
         if not url.scheme and not url.netloc:
@@ -51,7 +56,7 @@ for file in SITE.glob('*.html'):
 assert (SITE / 'CNAME').read_text().strip() == 'vectordb.io'
 assert (SITE / '.nojekyll').is_file()
 assert 'path: website' in (ROOT / '.github/workflows/pages.yml').read_text()
-for file in [ROOT/'README.md', *ROOT.glob('docs/*.md')]:
+for file in [*ROOT.glob('README*.md'), *ROOT.glob('docs/*.md')]:
     for target in re.findall(r'\]\(([^)]+)\)',file.read_text()):
         if not urlsplit(target).scheme and not target.startswith('#'):
             assert (file.parent / target.split('#')[0]).exists(), f'{file.name}: missing {target}'

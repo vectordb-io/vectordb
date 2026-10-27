@@ -1,6 +1,6 @@
 # VectorDB · Rust
 
-**[English](README.md) | [简体中文](README.zh-CN.md) | 日本語**
+**[English](README.md) | [简体中文](README.zh-CN.md) | 日本語 | [Español](README.es.md) | [Português do Brasil](README.pt-BR.md)**
 
 Rust で再実装した単一ノードのベクトルデータベースです。組み込み可能なエンジン、HTTP サービス、トランザクションによる永続化、独立した静的な公式サイトを提供します。
 

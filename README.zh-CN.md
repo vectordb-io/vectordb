@@ -1,6 +1,6 @@
 # VectorDB · Rust
 
-**[English](README.md) | 简体中文 | [日本語](README.ja.md)**
+**[English](README.md) | 简体中文 | [日本語](README.ja.md) | [Español](README.es.md) | [Português do Brasil](README.pt-BR.md)**
 
 使用 Rust 重新实现的单机向量数据库。提供可嵌入引擎、HTTP 服务、事务持久化和独立静态官网。
 
