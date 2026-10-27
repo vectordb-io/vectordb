@@ -1,0 +1,22 @@
+[package]
+name = "vectordb-python"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "_native"
+crate-type = ["cdylib"]
+# Exercise this Python extension through the installed-wheel integration suite.
+test = false
+doctest = false
+
+[features]
+extension-module = ["pyo3/extension-module"]
+
+[dependencies]
+vectordb-engine = { path = "../engine" }
+pyo3 = { version = "0.27.2", features = ["abi3-py39"] }
+serde_json.workspace = true

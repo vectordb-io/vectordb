@@ -1,7 +1,7 @@
 name: Rust checks
 on:
   push:
-    paths: ['Cargo.toml', 'Cargo.lock', 'Dockerfile', '.dockerignore', 'crates/**', 'scripts/**', 'examples/**', 'docs/**', 'README.md', 'website/**', '.github/workflows/**']
+    paths: ['Cargo.toml', 'Cargo.lock', 'pyproject.toml', 'Dockerfile', '.dockerignore', 'crates/**', 'python/**', 'tests/**', 'scripts/**', 'examples/**', 'docs/**', 'README*', 'website/**', '.github/workflows/**']
   pull_request:
   workflow_dispatch:
 permissions:
@@ -14,6 +14,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
       - name: Install Rust
         run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy && rustup default stable
       - name: Format
@@ -32,10 +35,36 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
       - name: Test minimum supported Rust version
         run: |
           rustup toolchain install 1.89 --profile minimal
           cargo +1.89 test --workspace --locked
+  python:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ['3.9', '3.13']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal && rustup default stable
+      - name: Build wheel
+        run: python -m pip wheel . --no-deps --wheel-dir dist
+      - name: Install wheel into a clean environment
+        run: |
+          python -m venv .venv-wheel
+          .venv-wheel/bin/python -m pip install --no-index --only-binary=:all: --find-links dist vectordb-embedded
+      - name: Test installed package
+        run: |
+          .venv-wheel/bin/python -m unittest discover -s tests/python -v
+          .venv-wheel/bin/python examples/embedded.py
   container:
     runs-on: ubuntu-latest
     steps:

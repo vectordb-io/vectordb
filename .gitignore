@@ -5,3 +5,9 @@
 *.sqlite-wal
 *.sqlite.lock
 .DS_Store
+.venv*/
+__pycache__/
+*.py[cod]
+/dist/
+/python/vectordb/*.so
+/python/vectordb/*.pyd

@@ -58,6 +58,36 @@ curl -sS localhost:19530/v2/vectordb/entities/search \
 
 Response: `{"code":0,"data":[{"id":1,"title":"Rust","distance":1.0}]}`.
 
+## Embedded Python (Alpha)
+
+From the repository root, install with CPython 3.9+ and the Rust/C toolchain
+described above. A matching precompiled wheel needs no Rust/C compiler. This
+package is currently built locally and has not been published to PyPI.
+
+```sh
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install .
+python examples/embedded.py
+python -m unittest discover -s tests/python -v
+```
+
+```python
+from vectordb import VectorDB
+
+with VectorDB("./data/python-demo.sqlite") as db:
+    db.create_collection("demo", dimension=3)
+    db.insert("demo", [{"id": 1, "vector": [1, 0, 0]}])
+    print(db.search("demo", [[1, 0, 0]], limit=1))
+```
+
+Supports file and memory databases, CRUD, search, full-entity upsert, snapshots,
+and raw `execute()` operations. Writes commit before returning; the context
+manager closes the database and releases its file lock. Use a new collection
+name or drop the existing collection before rerunning. See the
+[Python guide](docs/python.md) for installation, API and concurrency details.
+
 ## Embedded Rust
 
 ```rust

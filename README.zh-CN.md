@@ -58,6 +58,30 @@ curl -sS localhost:19530/v2/vectordb/entities/search \
 
 返回：`{"code":0,"data":[{"id":1,"title":"Rust","distance":1.0}]}`。
 
+## 嵌入式 Python（Alpha）
+
+在仓库根目录执行以下命令，即可将数据库直接嵌入 Python 进程。源码安装需要 Python 3.9+ 及上述 Rust / C 编译工具链；安装匹配平台的预编译 wheel 则不需要编译工具链。当前仅提供本地构建，尚未发布到 PyPI。
+
+```sh
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install .
+python examples/embedded.py
+python -m unittest discover -s tests/python -v
+```
+
+```python
+from vectordb import VectorDB
+
+with VectorDB("./data/python-demo.sqlite") as db:
+    db.create_collection("demo", dimension=3)
+    db.insert("demo", [{"id": 1, "vector": [1, 0, 0]}])
+    print(db.search("demo", [[1, 0, 0]], limit=1))
+```
+
+支持文件 / 内存模式、增删查搜、完整实体 upsert、快照备份和原始 `execute()` 接口。成功写入在返回前已提交；`with` 结束会关闭数据库并释放排他文件锁。重复运行前需换集合名或删除已有集合。安装、API 和并发约定见 [Python 使用文档](docs/python.md)。
+
 ## 嵌入式 Rust
 
 ```rust
