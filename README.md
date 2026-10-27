@@ -1,41 +1,43 @@
 # VectorDB · Rust
 
-使用 Rust 重新实现的单机向量数据库。提供可嵌入引擎、HTTP 服务、事务持久化和独立静态官网。
+**English | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)**
 
-**状态：0.1.0 Alpha。** 参考 Milvus 的数据模型与 REST v2 请求风格，已实现一组可用的单机功能；尚未实现 Milvus 的大部分分布式基础设施，也不是 Milvus / PyMilvus 的直接替代品。具体边界见 [功能对照](docs/compatibility.md)。旧 C++ 实现、旧文档与旧官网已移除。
+A standalone vector database reimplemented in Rust, with an embeddable engine, an HTTP service, transactional persistence, and a separate static website.
 
-## 快速启动
+**Status: 0.1.0 Alpha.** Inspired by the Milvus data model and REST v2 request style, VectorDB implements a usable set of standalone features. Most of the distributed infrastructure in Milvus is not implemented, and VectorDB is not a drop-in replacement for Milvus / PyMilvus. See the [feature comparison](docs/compatibility.md) for the exact scope. The previous C++ implementation, documentation, and website have been removed.
 
-要求 Rust 1.89+、Cargo、C 编译工具链（用于编译内嵌 SQLite）。macOS 使用 Xcode Command Line Tools；Linux 使用系统 C 编译器。无外部数据库服务依赖。
+## Quick start
+
+Requires Rust 1.89+, Cargo, and a C compiler toolchain (to compile the bundled SQLite). Use Xcode Command Line Tools on macOS or the system C compiler on Linux. No external database service is required.
 
 ```sh
 cargo build --release --locked
 ./target/release/vectordb serve
 ```
 
-默认监听 `127.0.0.1:19530`，数据保存在 `data/vectordb.sqlite`。另开终端：
+The server listens on `127.0.0.1:19530` by default and stores data in `data/vectordb.sqlite`. In another terminal:
 
 ```sh
 curl http://127.0.0.1:19530/healthz
 bash examples/quickstart.sh
 ```
 
-示例创建 `demo` 集合、写入两条实体、搜索相似向量并执行标量过滤。再次执行前需删除 `demo` 或换一个集合名。
+The example creates a `demo` collection, inserts two entities, searches for similar vectors, and applies scalar filters. Before running it again, delete `demo` or use a different collection name.
 
-## 当前能力
+## Current capabilities
 
-- 多数据库、集合、显式 Schema / 快速建表、分区、集合别名、重命名、加载与释放。
-- Int64 / VarChar 主键，自动 ID；标量字段、JSON、Array、可空字段、默认值、动态字段。
-- 批量 insert / 完整实体 upsert、query / get / delete、计数、排序、分页。
-- FloatVector、SparseFloatVector、BinaryVector；COSINE、IP、L2（平方距离）、HAMMING、JACCARD。
-- FLAT 精确检索、IVF_FLAT、HNSW；标量预筛选、范围检索、分组检索、多查询向量。
-- 多向量检索融合：RRF 与归一化加权排名。
-- SQLite WAL 与 FULL 同步级别；批量事务、崩溃恢复、排他进程锁、快照备份、JSONL 流式导入导出。
-- Bearer Token、请求大小与并发队列限制、健康检查、Prometheus 请求 / 错误计数器、优雅关闭。
+- Multiple databases, collections, explicit schemas / quick collection creation, partitions, collection aliases, renaming, loading, and releasing.
+- Int64 / VarChar primary keys and automatic IDs; scalar fields, JSON, Array, nullable fields, default values, and dynamic fields.
+- Batch insert / full-entity upsert, query / get / delete, counting, sorting, and pagination.
+- FloatVector, SparseFloatVector, BinaryVector; COSINE, IP, L2 (squared distance), HAMMING, and JACCARD.
+- FLAT exact search, IVF_FLAT, HNSW; scalar pre-filtering, range search, grouping search, and multiple query vectors.
+- Multi-vector search fusion: RRF and normalized weighted ranking.
+- SQLite WAL with FULL synchronization; batch transactions, crash recovery, an exclusive process lock, snapshot backups, and streaming JSONL import / export.
+- Bearer tokens, request size and concurrency queue limits, health checks, Prometheus request / error counters, and graceful shutdown.
 
-没有自动生成 embedding；向量由应用生成并提交。自有数据库逻辑、过滤器、索引算法和 HTTP 服务使用 Rust；SQLite 是 C 实现的内嵌持久化依赖。
+Embeddings are not generated automatically; applications must generate and submit vectors. The database logic, filters, index algorithms, and HTTP service are written in Rust. SQLite, implemented in C, is the embedded persistence dependency.
 
-## 请求示例
+## Request examples
 
 ```sh
 curl -sS localhost:19530/v2/vectordb/collections/create \
@@ -54,9 +56,9 @@ curl -sS localhost:19530/v2/vectordb/entities/search \
   -d '{"collectionName":"demo","data":[[1,0,0]],"limit":1,"outputFields":["title"]}'
 ```
 
-返回：`{"code":0,"data":[{"id":1,"title":"Rust","distance":1.0}]}`。
+Response: `{"code":0,"data":[{"id":1,"title":"Rust","distance":1.0}]}`.
 
-## 嵌入式 Rust
+## Embedded Rust
 
 ```rust
 use serde_json::json;
@@ -76,9 +78,9 @@ fn main() -> vectordb_engine::Result<()> {
 }
 ```
 
-运行仓库中的完整版本：`cargo run -p vectordb-engine --example embedded`。
+Run the complete example included in the repository: `cargo run -p vectordb-engine --example embedded`.
 
-## 验证
+## Validation
 
 ```sh
 cargo fmt --all --check
@@ -89,15 +91,15 @@ python3 scripts/smoke.py
 python3 scripts/check_website.py
 ```
 
-测试覆盖事务回滚、Schema 校验、过滤、主键精度、加载状态、数据库 / 分区隔离、索引刷新、ANN 对照、混合检索、快照、排他锁、损坏数据库、HTTP 鉴权与并发写入。`smoke.py` 使用临时数据库启动真实进程，验证 SIGKILL 后已确认写入可恢复。它不会使用 `data/` 中的实际数据。
+Tests cover transaction rollback, schema validation, filtering, primary key precision, load state, database / partition isolation, index refresh, ANN comparisons, hybrid search, snapshots, exclusive locking, database corruption, HTTP authentication, and concurrent writes. `smoke.py` starts a real process with a temporary database to verify that acknowledged writes can be recovered after SIGKILL. It does not use actual data in `data/`.
 
-## 文档
+## Documentation
 
-- [API 与请求契约](docs/api.md)
-- [架构、数据可靠性和性能边界](docs/architecture.md)
-- [Milvus 功能对照与后续路线](docs/compatibility.md)
-- [部署、鉴权、备份恢复](docs/operations.md)
-- [验证记录](docs/validation.md)
-- [官网与域名发布](website/README.md)
+- [API and request contracts](docs/api.md)
+- [Architecture, data reliability, and performance limits](docs/architecture.md)
+- [Milvus feature comparison and roadmap](docs/compatibility.md)
+- [Deployment, authentication, backup, and recovery](docs/operations.md)
+- [Validation records](docs/validation.md)
+- [Website and domain publishing](website/README.md)
 
-目录：`crates/engine` 数据库引擎；`crates/server` HTTP / CLI；`docs` 文档；`examples` 示例；`website` 官网。官网独立部署到 GitHub Pages，域名为 [vectordb.io](https://vectordb.io/)。
+Directories: `crates/engine` — database engine; `crates/server` — HTTP / CLI; `docs` — documentation; `examples` — examples; `website` — website. The website is deployed separately to GitHub Pages at [vectordb.io](https://vectordb.io/).
