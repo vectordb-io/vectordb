@@ -4,9 +4,17 @@ from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlsplit, unquote
 import re
+import json
 import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 SITE = ROOT / 'website'
+translations = json.JSONDecoder().raw_decode(
+    (SITE / 'i18n.js').read_text().split('const messages = ', 1)[1]
+)[0]
+assert set(translations) == {'en', 'zh-CN', 'ja'}
+for language, messages in translations.items():
+    assert messages.keys() == translations['en'].keys(), f'incomplete locale: {language}'
+    assert all(isinstance(value, str) and value.strip() for value in messages.values())
 class Page(HTMLParser):
     def __init__(self):
         super().__init__()
@@ -14,6 +22,11 @@ class Page(HTMLParser):
         self.refs = []
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
+        if tag == 'html':
+            assert attrs.get('lang') == 'en', 'static pages must default to English'
+        for attribute, key in attrs.items():
+            if attribute.startswith('data-i18n'):
+                assert key in translations['en'], f'missing translation: {key}'
         if 'id' in attrs:
             assert attrs['id'] not in self.ids, f'duplicate id {attrs["id"]}'
             self.ids.add(attrs['id'])
@@ -27,7 +40,7 @@ for file in SITE.glob('*.html'):
         url = urlsplit(ref)
         if not url.scheme and not url.netloc:
             if url.path:
-                path = (file.parent / unquote(url.path)).resolve()
+                path = ((SITE / unquote(url.path).lstrip('/')) if url.path.startswith('/') else (file.parent / unquote(url.path))).resolve()
                 assert path == SITE or SITE in path.parents, f'outside site: {ref}'
                 assert path.exists(), f'missing asset {ref}'
             elif url.fragment:
@@ -42,5 +55,6 @@ for file in [ROOT/'README.md', *ROOT.glob('docs/*.md')]:
     for target in re.findall(r'\]\(([^)]+)\)',file.read_text()):
         if not urlsplit(target).scheme and not target.startswith('#'):
             assert (file.parent / target.split('#')[0]).exists(), f'{file.name}: missing {target}'
-subprocess.run(['node','--check',str(SITE/'app.js')],check=True)
-print('PASS: website assets, anchors, repository documentation links, domain and Pages deployment path')
+for script in SITE.glob('*.js'):
+    subprocess.run(['node','--check',str(script)],check=True)
+print('PASS: website assets, anchors, translations, English defaults, repository documentation links, domain and Pages deployment path')
