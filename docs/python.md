@@ -78,6 +78,8 @@ with `--release --locked --strip`; on macOS it sets the deployment target to
 enabled. CI builds, installs, tests, and saves these wheels as downloadable
 artifacts. Upload both platform wheels under the same package version when
 publishing to PyPI; pip selects the wheel matching the user's platform.
+Account permissions and the Trusted Publishing workflow are documented in the
+[publishing guide](python-publishing.md).
 
 ## Quick start
 

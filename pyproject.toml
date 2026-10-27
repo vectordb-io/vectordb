@@ -8,6 +8,8 @@ dynamic = ["version"]
 description = "Embedded VectorDB: a transactional Rust vector database for Python"
 readme = "docs/python.md"
 requires-python = ">=3.9"
+license = "MIT"
+license-files = ["LICENSE", "THIRD_PARTY_LICENSES.txt"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3",
@@ -15,9 +17,17 @@ classifiers = [
     "Topic :: Database",
 ]
 
+[project.urls]
+Homepage = "https://vectordb.io/"
+Repository = "https://github.com/vectordb-io/vectordb"
+Issues = "https://github.com/vectordb-io/vectordb/issues"
+Documentation = "https://github.com/vectordb-io/vectordb/blob/main/docs/python.md"
+
 [tool.maturin]
 manifest-path = "crates/python/Cargo.toml"
 python-source = "python"
 module-name = "vectordb_io._native"
 features = ["extension-module"]
 locked = true
+# Preserve the full workspace alongside its lockfile in source distributions.
+sdist-generator = "git"

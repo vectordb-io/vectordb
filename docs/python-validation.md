@@ -9,7 +9,7 @@
 | macOS 11+ / arm64（M 系列） | Apple Silicon，Rust 1.99.1，maturin 1.15.0 | CPython 3.9.6、3.14.6 | 两个解释器各通过 14 项集成测试 |
 | manylinux2014 / x86_64（glibc 2.17+） | Ubuntu 24.04 x86_64，Rust 1.89.0，maturin 1.15.0，Zig 0.13.0 | CPython 3.12.3，宿主 glibc 2.39 | 全新虚拟环境安装 wheel 后通过 14 项集成测试 |
 
-两平台使用同一份引擎与 Python API 源码；基于提交 `df9c887`，附加本次构建脚本、CI 和文档改动。构建入口为 `scripts/build_python_wheel.sh`。Linux 的 Rust 依赖从 Cargo.lock 对应的本机缓存经 `cargo vendor --locked --offline` 导出，在服务器上离线编译；SQLite 随扩展一起编译。
+两平台使用同一份引擎与 Python API 源码，基于提交 `df9c887`，附加打包配置、MIT 许可证、CI 和文档改动。构建入口为 `scripts/build_python_wheel.sh`。Linux 的 Rust 依赖从 Cargo.lock 对应的本机缓存经 `cargo vendor --locked --offline` 导出，在服务器上离线编译；SQLite 随扩展一起编译。
 
 ## 已验证的行为
 
@@ -23,6 +23,7 @@
 - 多线程访问与并发关闭、fork 后拒绝使用继承的句柄。
 - 安装元数据、类型提示、异常模块名及异常 pickle 往返。
 - 两个 wheel 均通过 `twine check --strict`；pip 的平台选择检查分别选中 macOS arm64 与 Linux x86_64 wheel。
+- 源码分发包保留完整 Git workspace 与原始锁文件；Linux 上从 `.tar.gz` 安装后通过全部 14 项集成测试。源码包及两个 wheel 都带有 MIT 声明、项目链接和依赖许可证文件，并通过发布工作流的产物检查。
 
 ## Linux 二进制兼容性
 
@@ -36,9 +37,9 @@ auditwheel 检测到的系统库为 `libc.so.6`、`libm.so.6`、`libpthread.so.0
 
 | 文件 | SHA-256 |
 | --- | --- |
-| `vectordb_io-0.1.0-cp39-abi3-macosx_11_0_arm64.whl` | `7c78ec3d1108460d0411141131babafe11085ed45434bdd2c7e831d3677eb8fc` |
-| `vectordb_io-0.1.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl` | `872af9494228d008ee59696df389d3f40d3bd1f3e35ba6ceaa20dcb9f1974f97` |
+| `vectordb_io-0.1.0-cp39-abi3-macosx_11_0_arm64.whl` | `bb362b1ccb3901eea92fee57f07ecf12eb66b26e75684aae19c9ae368e0edfc4` |
+| `vectordb_io-0.1.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl` | `7440deb4e41950e7f34d2133139f48ab0644cf77a99c7f32f6d2815b2ed153ea` |
 
 `cp39-abi3` 面向标准 CPython 3.9+，不包含 PyPy 或 free-threaded Python。未提供 Linux ARM64、Alpine/musl、Intel Mac 或 Windows wheel。
 
-发布时应上传这两个同版本 wheel。PyPI 账号/Trusted Publisher、许可证及实际上传仍属于后续发布准备；本次未执行上传。
+发布时应上传这两个同版本 wheel 及 `vectordb_io-0.1.0.tar.gz`。项目已按维护者选择采用 MIT；PyPI 账号/Trusted Publisher 及实际上传仍属于后续发布准备。本次未执行上传，账号配置见 [发布说明](python-publishing.md)。

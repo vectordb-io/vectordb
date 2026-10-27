@@ -1,0 +1,139 @@
+name: Publish Python package
+
+on:
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: Package index to publish to
+        type: choice
+        required: true
+        default: testpypi
+        options: [testpypi, pypi]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-python-${{ inputs.repository }}
+  cancel-in-progress: false
+
+jobs:
+  wheels:
+    name: Build and test ${{ matrix.os }} wheel
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install Rust and build tools
+        run: |
+          rustup toolchain install 1.89.0 --profile minimal
+          rustup default 1.89.0
+          python -m pip install "maturin==1.15.0" twine
+          if [ "$RUNNER_OS" = Linux ]; then
+            python -m pip install "maturin[zig]==1.15.0" "ziglang==0.13.0"
+          fi
+      - name: Build release wheel
+        run: PYTHON="$(command -v python)" bash scripts/build_python_wheel.sh wheelhouse
+      - name: Check metadata and install without compilation
+        run: |
+          python -m twine check --strict wheelhouse/*.whl
+          python -m venv .venv-release
+          .venv-release/bin/python -m pip install --no-index --only-binary=:all: --find-links wheelhouse vectordb_io
+      - name: Test installed wheel
+        run: |
+          .venv-release/bin/python -m unittest discover -s tests/python -v
+          .venv-release/bin/python examples/embedded.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pypi-wheel-${{ runner.os }}
+          path: wheelhouse/*.whl
+          if-no-files-found: error
+
+  sdist:
+    name: Build and test source distribution
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install Rust and build tools
+        run: |
+          rustup toolchain install 1.89.0 --profile minimal
+          rustup default 1.89.0
+          python -m pip install "maturin==1.15.0" twine
+      - name: Build source distribution
+        run: |
+          python -m maturin sdist --out wheelhouse
+          python -m twine check --strict wheelhouse/*.tar.gz
+      - name: Build and test from source distribution
+        run: |
+          python -m venv .venv-sdist
+          .venv-sdist/bin/python -m pip install wheelhouse/*.tar.gz
+          .venv-sdist/bin/python -m unittest discover -s tests/python -v
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pypi-sdist
+          path: wheelhouse/*.tar.gz
+          if-no-files-found: error
+
+  publish:
+    name: Publish to ${{ inputs.repository }}
+    needs: [wheels, sdist]
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.repository }}
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: pypi-*
+          merge-multiple: true
+          path: dist
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Require both platforms and one matching version
+        run: |
+          python - <<'PY'
+          from email.parser import BytesParser
+          from pathlib import Path
+          import tarfile
+          from zipfile import ZipFile
+
+          wheels = sorted(Path('dist').glob('*.whl'))
+          sources = list(Path('dist').glob('*.tar.gz'))
+          assert len(wheels) == 2 and len(sources) == 1, 'Expected two wheels and one sdist'
+          assert any(w.name.endswith('-macosx_11_0_arm64.whl') for w in wheels)
+          assert any(w.name.endswith('-manylinux_2_17_x86_64.manylinux2014_x86_64.whl') for w in wheels)
+          metadata = []
+          for wheel in wheels:
+              assert '-cp39-abi3-' in wheel.name
+              with ZipFile(wheel) as archive:
+                  name = next(n for n in archive.namelist() if n.endswith('.dist-info/METADATA'))
+                  metadata.append(BytesParser().parsebytes(archive.read(name)))
+                  for license_file in ('LICENSE', 'THIRD_PARTY_LICENSES.txt'):
+                      assert any(n.endswith('.dist-info/licenses/' + license_file) for n in archive.namelist())
+          with tarfile.open(sources[0]) as archive:
+              info = next(m for m in archive.getmembers() if m.name.count('/') == 1 and m.name.endswith('/PKG-INFO'))
+              metadata.append(BytesParser().parsebytes(archive.extractfile(info).read()))
+          assert all(m['Name'].replace('-', '_') == 'vectordb_io' for m in metadata)
+          assert all(m['License-Expression'] == 'MIT' for m in metadata)
+          assert len({m['Version'] for m in metadata}) == 1, 'Distribution versions differ'
+          print('Publishing vectordb_io', metadata[0]['Version'])
+          PY
+      - name: Publish to TestPyPI using Trusted Publishing
+        if: inputs.repository == 'testpypi'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+      - name: Publish to PyPI using Trusted Publishing
+        if: inputs.repository == 'pypi'
+        uses: pypa/gh-action-pypi-publish@release/v1
