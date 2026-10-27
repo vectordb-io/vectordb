@@ -63,6 +63,7 @@ curl -sS localhost:19530/v2/vectordb/entities/search \
 在仓库根目录执行以下命令，即可将数据库直接嵌入 Python 进程。源码安装需要 Python 3.9+ 及上述 Rust / C 编译工具链；安装匹配平台的预编译 wheel 则不需要编译工具链。当前仅提供本地构建，尚未发布到 PyPI。
 
 发布包名和导入名统一为 `vectordb_io`；发布后可使用 `pip install vectordb_io` 安装。
+发布用 wheel 覆盖 Apple Silicon（M 系列芯片，macOS 11+）和 Linux x86_64（glibc 2.17+），见 [平台验证记录](docs/python-validation.md)。
 
 ```sh
 python3 -m venv .venv

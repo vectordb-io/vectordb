@@ -65,6 +65,8 @@ described above. A matching precompiled wheel needs no Rust/C compiler. This
 package is currently built locally and has not been published to PyPI.
 The distribution and import name are both `vectordb_io`; after publication,
 install with `pip install vectordb_io`.
+Release wheels target Apple Silicon Macs (macOS 11+) and Linux x86_64
+(glibc 2.17+). See the [platform validation record](docs/python-validation.md).
 
 ```sh
 python3 -m venv .venv

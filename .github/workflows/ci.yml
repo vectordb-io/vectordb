@@ -55,8 +55,16 @@ jobs:
           python-version: ${{ matrix.python }}
       - name: Install Rust
         run: rustup toolchain install stable --profile minimal && rustup default stable
+      - name: Install wheel build tools
+        run: |
+          python -m pip install "maturin==1.15.0" twine
+          if [ "$RUNNER_OS" = Linux ]; then
+            python -m pip install "maturin[zig]==1.15.0" "ziglang==0.13.0"
+          fi
       - name: Build wheel
-        run: python -m pip wheel . --no-deps --wheel-dir dist
+        run: PYTHON="$(command -v python)" bash scripts/build_python_wheel.sh
+      - name: Validate package metadata
+        run: python -m twine check --strict dist/*.whl
       - name: Install wheel into a clean environment
         run: |
           python -m venv .venv-wheel
@@ -65,6 +73,11 @@ jobs:
         run: |
           .venv-wheel/bin/python -m unittest discover -s tests/python -v
           .venv-wheel/bin/python examples/embedded.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-wheel-${{ runner.os }}-${{ matrix.python }}
+          path: dist/*.whl
+          if-no-files-found: error
   container:
     runs-on: ubuntu-latest
     steps:

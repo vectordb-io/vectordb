@@ -53,6 +53,32 @@ runtime. Wheels are specific to the OS and CPU architecture; the `abi3-py39`
 build targets standard CPython 3.9+ (not free-threaded Python or PyPy).
 Do not assume a locally built wheel works on other operating systems.
 
+## Release wheel targets
+
+The initial release targets are macOS 11+ on Apple Silicon (M-series, arm64)
+and Linux x86_64 with glibc 2.17+. Each OS needs its own wheel. Linux ARM64,
+Alpine/musl, Intel macOS, Windows, and free-threaded Python are outside this
+wheel matrix. The Linux build uses Zig and checks manylinux2014 compatibility
+instead of inheriting the build host's glibc requirement.
+
+In an activated build virtual environment with Rust 1.89+ and a C toolchain:
+
+```sh
+python -m pip install "maturin==1.15.0" twine
+# Linux build hosts also need:
+python -m pip install "maturin[zig]==1.15.0" "ziglang==0.13.0"
+
+PYTHON="$(command -v python)" bash scripts/build_python_wheel.sh
+python -m twine check --strict dist/vectordb_io-*.whl
+```
+
+The script accepts an optional output directory. It builds the native target
+with `--release --locked --strip`; on macOS it sets the deployment target to
+11.0, and on Linux it enforces manylinux2014 with the compatibility audit
+enabled. CI builds, installs, tests, and saves these wheels as downloadable
+artifacts. Upload both platform wheels under the same package version when
+publishing to PyPI; pip selects the wheel matching the user's platform.
+
 ## Quick start
 
 ```python
