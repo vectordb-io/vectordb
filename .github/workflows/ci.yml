@@ -1,7 +1,7 @@
 name: Rust checks
 on:
   push:
-    paths: ['Cargo.toml', 'Cargo.lock', 'crates/**', 'scripts/**', 'examples/**', 'docs/**', 'README.md', 'website/**', '.github/workflows/**']
+    paths: ['Cargo.toml', 'Cargo.lock', 'Dockerfile', '.dockerignore', 'crates/**', 'scripts/**', 'examples/**', 'docs/**', 'README.md', 'website/**', '.github/workflows/**']
   pull_request:
   workflow_dispatch:
 permissions:
@@ -28,3 +28,19 @@ jobs:
         run: python3 scripts/smoke.py
       - name: Website structure and links
         run: python3 scripts/check_website.py
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Test minimum supported Rust version
+        run: |
+          rustup toolchain install 1.89 --profile minimal
+          cargo +1.89 test --workspace --locked
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build release image
+        run: docker build -t vectordb:local .
+      - name: Container startup and crash recovery
+        run: python3 scripts/container_smoke.py

@@ -1,6 +1,6 @@
 # 验证记录
 
-日期：2026-10-26。此记录说明已执行的验证及边界，不是生产性能认证。
+日期：2026-10-26；容器与最低 Rust 版本验证更新于 2026-10-27。此记录说明已执行的验证及边界，不是生产性能认证。
 
 ## 本地环境
 
@@ -11,6 +11,9 @@ macOS / Apple Silicon，Rust 1.99.1，Cargo 1.99.1。依赖已锁定在 Cargo.lo
 当前 Rust 集成测试共 25 项（23 引擎 + 2 HTTP），全部通过。
 
 - Rust workspace 编译、格式检查和严格 Clippy。
+- Rust 1.89 / Linux ARM64：官方容器中离线执行 `cargo test --offline --workspace --locked -j 4`，25 项集成测试全部通过。测试设置 `CARGO_PROFILE_DEV_DEBUG=0`、`CARGO_INCREMENTAL=0` 以减少构建占用。
+- 标准 Dockerfile：执行 `docker build --no-cache -t vectordb:rust-rewrite .`，完成联网依赖下载、多阶段 Release 构建和镜像生成。
+- 容器：`VECTORDB_DOCKER_IMAGE=vectordb:rust-rewrite python3 scripts/container_smoke.py` 通过；验证 uid/gid 10001、HTTP 建表 / 写入 / 检索、SIGKILL 后重启时匿名卷中的已确认数据仍可查询。测试容器与匿名卷已清理。
 - 引擎集成测试：CRUD、Schema、动态字段、默认值、可空字段、主键精度、Int64 自动 ID 回滚及重启、分区与数据库隔离、别名与级联删除。
 - 过滤：比较、布尔优先级、JSON 路径、IN / NOT IN、NULL 三值逻辑、LIKE、数组包含、无效表达式拒绝。
 - 检索：三种稠密度量、稀疏 IP、二进制 HAMMING、范围 / 分组、多查询向量、RRF / weighted。
@@ -28,10 +31,10 @@ macOS / Apple Silicon，Rust 1.99.1，Cargo 1.99.1。依赖已锁定在 Cargo.lo
 - 分布式功能、Milvus gRPC / SDK 兼容性、RBAC、BM25、GPU 索引。
 - 大数据量压测、长时间稳定性、真实断电、磁盘满及网络分区测试。
 
-## 容器验证的环境限制
+## 容器验证环境恢复记录
 
-标准多阶段 Docker 构建在容器内更新 crates.io 索引时停滞，已取消。改用缓存依赖离线编译后，Rust 1.89 的 Linux Release 二进制构建成功，并根据 Dockerfile 相同的运行阶段生成了本地镜像。
+2026-10-26 的多阶段构建曾因依赖网络停滞而取消；离线 Release 构建成功，但后续测试遇到宿主磁盘写满和 Docker 元数据 I/O 错误。当时未完成容器运行及最低 Rust 版本的完整测试。
 
-附加 Rust 1.89 测试编译期间宿主磁盘空间不足，随后 Docker 元数据出现 I/O 错误。已清理本次生成的宿主构建缓存并保留本机可执行文件；没有清理其他项目数据。由于恢复 Docker 会影响其他在运行的工作负载，未擅自重启。
+2026-10-27 清理磁盘并经授权重启 Docker Desktop 后，元数据恢复可用。旧镜像缓存层中的 `/usr/local/bin/vectordb` 实际为零字节，启动报 `exec format error`；使用 `--no-cache` 完整重建后解决。随后完成上述 Rust 1.89 测试和标准镜像运行 / 重启验证。遗留测试容器已消失，其他原运行的数据库容器恢复健康。
 
-因此，**最低版本的 Release 编译已验证，但该版本的完整测试和容器运行 / 重启测试尚未验证通过**。恢复环境后可运行 `VECTORDB_DOCKER_IMAGE=vectordb:rust-rewrite python3 scripts/container_smoke.py` 补充检查。测试容器 `vectordb-tests-e0baaf9` 的清理也被 Docker 元数据错误阻止，需要在恢复 Docker 后移除。
+CI 新增 Rust 1.89 测试和标准 Docker 镜像构建 / 重启验证任务，Dockerfile 与 .dockerignore 变更也会触发检查。容器测试启动失败时会输出容器状态及日志，避免将进程退出误报为端口映射问题。此环境恢复记录不代表数据库已通过磁盘满故障测试。

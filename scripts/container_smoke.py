@@ -13,9 +13,17 @@ name = 'vectordb-smoke-' + uuid.uuid4().hex[:10]
 def docker(*args):
     return subprocess.check_output(['docker', *args], text=True).strip()
 def ready():
-    address = docker('port',name,'19530/tcp').splitlines()[0]
-    base = 'http://' + address
     for _ in range(100):
+        state = json.loads(docker('inspect','--format','{{json .State}}',name))
+        if not state['Running']:
+            logs = docker('logs','--tail','50',name)
+            raise AssertionError(f"container exited ({state['ExitCode']}): {logs}")
+        ports = json.loads(docker('inspect','--format','{{json .NetworkSettings.Ports}}',name))
+        bindings = (ports or {}).get('19530/tcp')
+        if not bindings:
+            time.sleep(.1)
+            continue
+        base = 'http://127.0.0.1:' + bindings[0]['HostPort']
         try:
             with urllib.request.urlopen(base + '/healthz',timeout=1) as response:
                 assert json.load(response)['status'] == 'ok'
@@ -40,6 +48,9 @@ try:
     base=ready()
     result=post(base,'entities/search',{'collectionName':'container_check','data':[[1,0]],'limit':1})
     assert result[0]['id']==1 and result[0]['distance']==1.0,result
-    print('PASS: non-root container, HTTP CRUD/search, anonymous-volume persistence across SIGKILL/restart')
+    print('PASS: non-root container, HTTP create/insert/search, anonymous-volume persistence across SIGKILL/restart')
+except Exception:
+    subprocess.run(['docker','logs','--tail','50',name],check=False)
+    raise
 finally:
     subprocess.run(['docker','rm','--force','--volumes',name],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=False)
