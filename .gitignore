@@ -9,5 +9,5 @@
 __pycache__/
 *.py[cod]
 /dist/
-/python/vectordb/*.so
-/python/vectordb/*.pyd
+/python/vectordb_io/*.so
+/python/vectordb_io/*.pyd

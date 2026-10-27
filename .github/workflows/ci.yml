@@ -60,7 +60,7 @@ jobs:
       - name: Install wheel into a clean environment
         run: |
           python -m venv .venv-wheel
-          .venv-wheel/bin/python -m pip install --no-index --only-binary=:all: --find-links dist vectordb-embedded
+          .venv-wheel/bin/python -m pip install --no-index --only-binary=:all: --find-links dist vectordb_io
       - name: Test installed package
         run: |
           .venv-wheel/bin/python -m unittest discover -s tests/python -v

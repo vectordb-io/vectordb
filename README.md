@@ -63,6 +63,8 @@ Response: `{"code":0,"data":[{"id":1,"title":"Rust","distance":1.0}]}`.
 From the repository root, install with CPython 3.9+ and the Rust/C toolchain
 described above. A matching precompiled wheel needs no Rust/C compiler. This
 package is currently built locally and has not been published to PyPI.
+The distribution and import name are both `vectordb_io`; after publication,
+install with `pip install vectordb_io`.
 
 ```sh
 python3 -m venv .venv
@@ -74,7 +76,7 @@ python -m unittest discover -s tests/python -v
 ```
 
 ```python
-from vectordb import VectorDB
+from vectordb_io import VectorDB
 
 with VectorDB("./data/python-demo.sqlite") as db:
     db.create_collection("demo", dimension=3)

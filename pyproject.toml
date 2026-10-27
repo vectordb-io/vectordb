@@ -3,7 +3,7 @@ requires = ["maturin>=1.9,<2"]
 build-backend = "maturin"
 
 [project]
-name = "vectordb-embedded"
+name = "vectordb_io"
 dynamic = ["version"]
 description = "Embedded VectorDB: a transactional Rust vector database for Python"
 readme = "docs/python.md"
@@ -18,6 +18,6 @@ classifiers = [
 [tool.maturin]
 manifest-path = "crates/python/Cargo.toml"
 python-source = "python"
-module-name = "vectordb._native"
+module-name = "vectordb_io._native"
 features = ["extension-module"]
 locked = true

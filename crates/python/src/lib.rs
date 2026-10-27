@@ -3,13 +3,13 @@ use pyo3::{create_exception, exceptions::PyException, prelude::*};
 use std::sync::{Mutex, MutexGuard};
 use vectordb_engine::{Engine, Error};
 
-create_exception!(vectordb, VectorDBError, PyException);
-create_exception!(vectordb, InvalidArgumentError, VectorDBError);
-create_exception!(vectordb, NotFoundError, VectorDBError);
-create_exception!(vectordb, ConflictError, VectorDBError);
-create_exception!(vectordb, UnsupportedError, VectorDBError);
-create_exception!(vectordb, StorageError, VectorDBError);
-create_exception!(vectordb, ClosedError, VectorDBError);
+create_exception!(vectordb_io, VectorDBError, PyException);
+create_exception!(vectordb_io, InvalidArgumentError, VectorDBError);
+create_exception!(vectordb_io, NotFoundError, VectorDBError);
+create_exception!(vectordb_io, ConflictError, VectorDBError);
+create_exception!(vectordb_io, UnsupportedError, VectorDBError);
+create_exception!(vectordb_io, StorageError, VectorDBError);
+create_exception!(vectordb_io, ClosedError, VectorDBError);
 
 fn python_error(error: Error) -> PyErr {
     let message = error.to_string();
@@ -22,7 +22,7 @@ fn python_error(error: Error) -> PyErr {
     }
 }
 
-#[pyclass(frozen, module = "vectordb._native")]
+#[pyclass(frozen, module = "vectordb_io._native")]
 struct NativeEngine {
     engine: Mutex<Option<Engine>>,
     pid: u32,

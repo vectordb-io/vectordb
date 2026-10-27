@@ -2,8 +2,24 @@
 
 VectorDB runs inside your Python process using the existing Rust engine and
 bundled SQLite. No HTTP server or external database is needed. The local
-distribution name is `vectordb-embedded`; the Python import is `vectordb`.
+distribution name is `vectordb_io`; the Python import is `vectordb_io`.
 This package has not been published to PyPI.
+
+Once published, install and import it with the same name:
+
+```sh
+pip install vectordb_io
+```
+
+```python
+from vectordb_io import VectorDB
+```
+
+For now, use the local source or wheel installation below. The package owns
+only the `vectordb_io` import namespace, so it does not overwrite another
+project's `vectordb` module. If you installed the earlier local prototype,
+uninstall `vectordb-embedded` before installing this renamed package and update
+your imports to `vectordb_io`.
 
 ## Local installation
 
@@ -28,7 +44,7 @@ To build a reusable wheel and install it into another environment:
 ```sh
 python -m pip wheel . --no-deps --wheel-dir dist
 python3 -m venv .venv-wheel
-.venv-wheel/bin/python -m pip install --no-index --find-links dist vectordb-embedded
+.venv-wheel/bin/python -m pip install --no-index --find-links dist vectordb_io
 .venv-wheel/bin/python -m unittest discover -s tests/python -v
 ```
 
@@ -40,7 +56,7 @@ Do not assume a locally built wheel works on other operating systems.
 ## Quick start
 
 ```python
-from vectordb import VectorDB
+from vectordb_io import VectorDB
 
 with VectorDB("./data/demo.sqlite") as db:
     db.create_collection("demo", dimension=3)

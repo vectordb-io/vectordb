@@ -2,7 +2,7 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from vectordb import VectorDB
+from vectordb_io import VectorDB
 
 
 with TemporaryDirectory() as directory:

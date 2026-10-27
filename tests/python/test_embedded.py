@@ -1,16 +1,18 @@
 """Integration tests against the installed wheel, using only the standard library."""
 import gc
+from importlib import metadata
 import os
 from pathlib import Path
+import pickle
 import subprocess
 import sys
 import tempfile
 import textwrap
 import unittest
 
-from vectordb import (
+from vectordb_io import (
     ClosedError, ConflictError, InvalidArgumentError, NotFoundError,
-    StorageError, UnsupportedError, VectorDB, VectorDBError,
+    StorageError, UnsupportedError, VectorDB, VectorDBError, __version__,
 )
 
 
@@ -27,6 +29,31 @@ class EmbeddedTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
         return result
+
+    def test_installed_name_and_namespace(self):
+        distribution = metadata.distribution("vectordb_io")
+        self.assertEqual(distribution.version, __version__)
+        files = [str(file) for file in distribution.files]
+        self.assertIn("vectordb_io/__init__.py", files)
+        self.assertFalse(any(file.startswith("vectordb/") for file in files))
+        for error in (VectorDBError, ClosedError, ConflictError, InvalidArgumentError,
+                      NotFoundError, StorageError, UnsupportedError):
+            self.assertEqual(error.__module__, "vectordb_io")
+            restored = pickle.loads(pickle.dumps(error("round trip")))
+            self.assertIs(type(restored), error)
+            self.assertEqual(str(restored), "round trip")
+        # An unrelated vectordb module must not be imported by this package.
+        (Path(self.temp.name) / "vectordb.py").write_text(
+            'raise AssertionError("unexpected import of vectordb")\n'
+        )
+        self.child('''
+            from vectordb_io import VectorDB
+            from vectordb_io._native import NativeEngine
+            assert NativeEngine.__module__ == "vectordb_io._native"
+            with VectorDB() as db:
+                db.create_collection("demo", 2)
+                assert db.list_collections() == ["demo"]
+        ''')
 
     def test_crud_search_and_reopen(self):
         big_id = 2**63 - 1
@@ -91,7 +118,7 @@ class EmbeddedTests(unittest.TestCase):
                 VectorDB(self.path)
             self.child('''
                 import sys
-                from vectordb import VectorDB, ConflictError
+                from vectordb_io import VectorDB, ConflictError
                 try:
                     VectorDB(sys.argv[1])
                 except ConflictError:
@@ -101,7 +128,7 @@ class EmbeddedTests(unittest.TestCase):
             ''', self.path)
         self.child('''
             import sys
-            from vectordb import VectorDB
+            from vectordb_io import VectorDB
             with VectorDB(sys.argv[1]) as db:
                 assert db.list_collections() == []
         ''', self.path)
@@ -109,7 +136,7 @@ class EmbeddedTests(unittest.TestCase):
     def test_committed_data_survives_abrupt_process_exit(self):
         self.child('''
             import os, sys
-            from vectordb import VectorDB
+            from vectordb_io import VectorDB
             db = VectorDB(sys.argv[1])
             db.create_collection("demo", 2)
             db.insert("demo", [{"id": 7, "vector": [1, 0]}])
@@ -194,7 +221,7 @@ class EmbeddedTests(unittest.TestCase):
         # A subprocess timeout turns a GIL/mutex deadlock into a bounded failure.
         self.child('''
             from concurrent.futures import ThreadPoolExecutor
-            from vectordb import VectorDB, ClosedError
+            from vectordb_io import VectorDB, ClosedError
             db = VectorDB()
             db.create_collection("demo", 2)
             def write(i):
@@ -217,7 +244,7 @@ class EmbeddedTests(unittest.TestCase):
     def test_inherited_handle_is_rejected(self):
         self.child('''
             import os
-            from vectordb import VectorDB, ConflictError
+            from vectordb_io import VectorDB, ConflictError
             db = VectorDB()
             pid = os.fork()
             if pid == 0:
