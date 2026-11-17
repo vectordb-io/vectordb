@@ -51,6 +51,16 @@ impl Engine {
     pub fn memory() -> Result<Self> {
         Self::init(Connection::open_in_memory()?, None)
     }
+    /// An isolated in-memory copy for speculative validation. Changes to the copy
+    /// never modify the source. Derived indexes are rebuilt on demand.
+    pub fn fork_memory(&self) -> Result<Self> {
+        let mut copy = Connection::open_in_memory()?;
+        {
+            let backup = rusqlite::backup::Backup::new(&self.conn, &mut copy)?;
+            backup.run_to_completion(128, Duration::from_millis(1), None)?;
+        }
+        Self::init(copy, None)
+    }
     fn init(conn: Connection, lock: Option<File>) -> Result<Self> {
         conn.busy_timeout(Duration::from_secs(5))?;
         conn.execute_batch(

@@ -1,7 +1,7 @@
 name: Rust checks
 on:
   push:
-    paths: ['Cargo.toml', 'Cargo.lock', 'pyproject.toml', 'Dockerfile', '.dockerignore', 'crates/**', 'python/**', 'tests/**', 'scripts/**', 'examples/**', 'docs/**', 'README*', 'website/**', '.github/workflows/**']
+    paths: ['Cargo.toml', 'Cargo.lock', 'pyproject.toml', 'Dockerfile', '.dockerignore', 'crates/**', 'deployments/**', 'python/**', 'tests/**', 'scripts/**', 'examples/**', 'docs/**', 'README*', 'website/**', '.github/workflows/**']
   pull_request:
   workflow_dispatch:
 permissions:
@@ -19,6 +19,12 @@ jobs:
           python-version: '3.13'
       - name: Install Rust
         run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy && rustup default stable
+      - name: Ensure CMake for librdkafka
+        shell: bash
+        run: |
+          if ! command -v cmake >/dev/null; then
+            if [ "$RUNNER_OS" = macOS ]; then brew install cmake; else sudo apt-get update && sudo apt-get install -y cmake; fi
+          fi
       - name: Format
         run: cargo fmt --all --check
       - name: Test
@@ -86,3 +92,30 @@ jobs:
         run: docker build -t vectordb:local .
       - name: Container startup and crash recovery
         run: python3 scripts/container_smoke.py
+
+  cluster:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake build-essential pkg-config zlib1g-dev
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal && rustup default stable
+      - name: Build experimental cluster runtime
+        run: cargo build -p vectordb-cluster --locked
+      - name: Start isolated dependencies
+        run: docker compose -p vectordb-cluster-test -f deployments/cluster/compose.yaml up -d
+      - name: Real Kafka etcd and S3 recovery test
+        run: python3 scripts/cluster_smoke.py
+      - name: Catalog and immutable object contracts
+        run: cargo test -p vectordb-cluster --test backends --locked -- --ignored
+      - name: Dependency logs on failure
+        if: failure()
+        run: docker compose -p vectordb-cluster-test -f deployments/cluster/compose.yaml logs --tail 100
+      - name: Remove isolated dependency volumes
+        if: always()
+        run: docker compose -p vectordb-cluster-test -f deployments/cluster/compose.yaml down -v

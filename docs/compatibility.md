@@ -27,8 +27,8 @@
 | gRPC / SDK | 未实现 | PyMilvus / Milvus Go / Java SDK 尚不可直接使用 |
 | 认证 | 单个 Bearer Token | 无 users / roles / grants / RBAC |
 | 运维 | healthz、请求 / 错误计数器、优雅退出 | 无完整 tracing、查询画像、分布式指标 |
-| 分布式 | 未实现 | Coordinator、sharding、replication、failover、CDC、消息队列 |
-| 存储分离 | 未实现 | S3 / 对象存储、tiering、冷热分层 |
+| 分布式 | 实验性 P1：集合 WAL、完整查询副本、手动接管 | 尚无自动 Coordinator、sharding、自动 failover、CDC；见 [P1 边界](distributed-p1.md) |
+| 存储分离 | 实验性 P1：S3 命令历史检查点与 Kafka 尾部恢复 | 尚无列式段、持久化索引、tiering、冷热分层 |
 | 文本能力 | 未实现 | tokenizer、全文索引、BM25、文本函数 |
 | 生产性能 | 未完成验证 | 仅小数据正确性 / ANN 回归测试，无规模性能承诺 |
 
