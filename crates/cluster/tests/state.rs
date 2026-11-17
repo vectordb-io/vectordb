@@ -1,5 +1,20 @@
+static ISSUED: std::sync::OnceLock<i64> = std::sync::OnceLock::new();
+fn key(s: &str) -> String {
+    idempotency_key(*std::sync::OnceLock::get_or_init(&ISSUED, now_ms), s)
+}
+fn restore(snapshot: Snapshot) -> vectordb_cluster::Result<Replica> {
+    let objects: std::collections::BTreeMap<_, _> = snapshot.sealed.objects.into_iter().collect();
+    Replica::restore(snapshot.checkpoint, &scope(), |key| {
+        objects
+            .get(key)
+            .cloned()
+            .ok_or_else(|| vectordb_engine::Error::Invalid("missing file".into()))
+    })
+}
 use serde_json::{Value, json};
-use vectordb_cluster::state::{Entry, FORMAT, Record, Replica, Scope};
+use vectordb_cluster::state::{
+    Entry, FORMAT, Record, Replica, Scope, Snapshot, idempotency_key, now_ms,
+};
 
 fn scope() -> Scope {
     Scope {
@@ -30,19 +45,19 @@ fn replica() -> Replica {
 }
 fn write(replica: &mut Replica, id: &str, operation: &str, request: Value) -> Value {
     let record = replica
-        .prepare(replica.epoch, id, operation, request)
+        .prepare(replica.epoch, &key(id), operation, request)
         .unwrap()
         .unwrap();
     // Kafka transaction markers and aborted records can leave offset gaps.
     replica.apply(replica.offset + 3, record).unwrap();
-    replica.result(id).unwrap().data
+    replica.result(&key(id)).unwrap().data
 }
 #[test]
 fn uncommitted_preview_is_invisible_and_does_not_consume_ids() {
     let mut replica = replica();
     let request = json!({"collectionName":"items","data":[{"vector":[1,0]}]});
     let _uncommitted = replica
-        .prepare(10, "lost", "entities/insert", request.clone())
+        .prepare(10, &key("lost"), "entities/insert", request.clone())
         .unwrap()
         .unwrap();
     assert_eq!(
@@ -60,24 +75,24 @@ fn failed_batch_rolls_back_and_retry_recovers_original_ids() {
     let invalid = json!({"collectionName":"items","data":[{"vector":[1,0]},{"vector":[1]}]});
     assert!(
         replica
-            .prepare(10, "bad", "entities/insert", invalid)
+            .prepare(10, &key("bad"), "entities/insert", invalid)
             .is_err()
     );
     let request = json!({"collectionName":"items","data":[{"vector":[1,0]},{"vector":[0,1]}]});
     let result = write(&mut replica, "good", "entities/insert", request.clone());
     assert_eq!(result["insertIds"], json!([1, 2]));
-    let recovered = Replica::restore(replica.checkpoint(), &scope()).unwrap();
+    let recovered = restore(replica.checkpoint().unwrap()).unwrap();
     let retry = recovered
-        .prepare(10, "good", "entities/insert", request.clone())
+        .prepare(10, &key("good"), "entities/insert", request.clone())
         .unwrap()
         .unwrap_err();
     assert_eq!(retry.data, result);
-    assert_eq!(retry.token, replica.result("good").unwrap().token);
+    assert_eq!(retry.token, replica.result(&key("good")).unwrap().token);
     assert!(
         recovered
             .prepare(
                 10,
-                "good",
+                &key("good"),
                 "entities/insert",
                 json!({"collectionName":"items","data":[{"vector":[9,9]}]})
             )
@@ -99,9 +114,13 @@ fn checkpoint_replay_preserves_search_and_partition_state() {
         "entities/insert",
         json!({"collectionName":"items","partitionName":"other","data":[{"vector":[1,0]},{"vector":[0,1]}]}),
     );
-    let bytes = serde_json::to_vec(&original.checkpoint()).unwrap();
-    let mut recovered =
-        Replica::restore(serde_json::from_slice(&bytes).unwrap(), &scope()).unwrap();
+    let snapshot = original.checkpoint().unwrap();
+    let bytes = serde_json::to_vec(&snapshot.checkpoint).unwrap();
+    let mut recovered = restore(Snapshot {
+        checkpoint: serde_json::from_slice(&bytes).unwrap(),
+        sealed: snapshot.sealed,
+    })
+    .unwrap();
     let request = json!({"collectionName":"items","data":[[1,0]],"limit":2});
     assert_eq!(
         original.query("entities/search", request.clone()).unwrap(),
@@ -154,7 +173,7 @@ fn stale_epoch_foreign_scope_and_corruption_fail_closed() {
     let mut prepared = replica
         .prepare(
             10,
-            "insert",
+            &key("insert"),
             "entities/insert",
             json!({"collectionName":"items","data":[{"vector":[1,0]}]}),
         )
@@ -185,7 +204,7 @@ fn stale_epoch_foreign_scope_and_corruption_fail_closed() {
         replica
             .prepare(
                 10,
-                "insert",
+                &key("insert"),
                 "entities/insert",
                 json!({"collectionName":"items","data":[]})
             )
@@ -195,12 +214,12 @@ fn stale_epoch_foreign_scope_and_corruption_fail_closed() {
 #[test]
 fn snapshot_truncation_and_unknown_formats_are_rejected() {
     let replica = replica();
-    let mut checkpoint = replica.checkpoint();
-    checkpoint.records.pop();
-    assert!(Replica::restore(checkpoint, &scope()).is_err());
-    let mut checkpoint = replica.checkpoint();
-    checkpoint.format = FORMAT + 1;
-    assert!(Replica::restore(checkpoint, &scope()).is_err());
+    let mut checkpoint = replica.checkpoint().unwrap();
+    checkpoint.checkpoint.state.revision = checkpoint.checkpoint.offset + 1;
+    assert!(restore(checkpoint).is_err());
+    let mut checkpoint = replica.checkpoint().unwrap();
+    checkpoint.checkpoint.format = FORMAT + 1;
+    assert!(restore(checkpoint).is_err());
 }
 #[test]
 fn read_path_cannot_mutate_and_scope_cannot_escape() {
@@ -219,7 +238,7 @@ fn read_path_cannot_mutate_and_scope_cannot_escape() {
         replica
             .prepare(
                 10,
-                "id",
+                &key("id"),
                 "entities/delete",
                 json!({"collectionName":"items","filter":"id > 0"})
             )
@@ -228,4 +247,104 @@ fn read_path_cannot_mutate_and_scope_cannot_escape() {
     let mut invalid = scope();
     invalid.generation = "../../escape".into();
     assert!(Replica::empty(invalid).is_err());
+}
+#[test]
+fn expired_idempotency_keys_never_reexecute_after_reclamation() {
+    use vectordb_cluster::state::{IDEMPOTENCY_WINDOW_MS, idempotency_key};
+    let mut r = Replica::empty(scope()).unwrap();
+    r.apply(
+        0,
+        Record {
+            format: FORMAT,
+            scope: scope(),
+            entry: Entry::Activate { epoch: 10 },
+        },
+    )
+    .unwrap();
+    let first = idempotency_key(1_000_000, "create");
+    let record = r
+        .prepare_at(
+            10,
+            &first,
+            "collections/create",
+            json!({"collectionName":"items","dimension":2}),
+            1_000_000,
+        )
+        .unwrap()
+        .unwrap();
+    r.apply(1, record).unwrap();
+    let request = json!({"collectionName":"items","data":[{"id":1,"vector":[1,2]}]});
+    let id = idempotency_key(1_000_000, "write");
+    let record = r
+        .prepare_at(10, &id, "entities/upsert", request.clone(), 1_000_000)
+        .unwrap()
+        .unwrap();
+    r.apply(2, record).unwrap();
+    let later = 1_000_000 + IDEMPOTENCY_WINDOW_MS;
+    let new = idempotency_key(later, "write");
+    let record = r
+        .prepare_at(10, &new, "entities/upsert", request.clone(), later)
+        .unwrap()
+        .unwrap();
+    r.apply(3, record).unwrap();
+    assert!(r.result(&id).is_none());
+    assert!(
+        r.prepare_at(10, &id, "entities/upsert", request.clone(), later)
+            .is_err()
+    );
+    let recovered = restore(r.checkpoint().unwrap()).unwrap();
+    assert!(
+        recovered
+            .prepare_at(10, &id, "entities/upsert", request.clone(), later)
+            .is_err()
+    );
+    assert!(
+        recovered
+            .prepare_at(10, &new, "entities/upsert", request, later)
+            .unwrap()
+            .is_err()
+    );
+}
+#[test]
+fn checkpoint_and_bounded_tail_restore_deletes_autoids_and_dedup() {
+    let mut r = replica();
+    write(
+        &mut r,
+        "first",
+        "entities/insert",
+        json!({"collectionName":"items","data":[{"vector":[1,2]},{"vector":[2,3]}]}),
+    );
+    let snapshot = r.checkpoint().unwrap();
+    let deletion = r
+        .prepare(
+            10,
+            &key("delete"),
+            "entities/delete",
+            json!({"collectionName":"items","ids":[1]}),
+        )
+        .unwrap()
+        .unwrap();
+    let offset = r.offset + 2;
+    r.apply(offset, deletion.clone()).unwrap();
+    let mut recovered = restore(snapshot).unwrap();
+    recovered.apply(offset, deletion).unwrap();
+    assert_eq!(
+        recovered
+            .query("collections/get_stats", json!({"collectionName":"items"}))
+            .unwrap()["rowCount"],
+        1
+    );
+    let data = write(
+        &mut recovered,
+        "next",
+        "entities/insert",
+        json!({"collectionName":"items","data":[{"vector":[4,5]}]}),
+    );
+    assert_eq!(data["insertIds"], json!([3]));
+    let snapshot = recovered.checkpoint().unwrap();
+    assert!(
+        !serde_json::to_string(&snapshot.checkpoint)
+            .unwrap()
+            .contains("records")
+    );
 }

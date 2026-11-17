@@ -20,6 +20,7 @@ import uuid
 ROOT = Path(__file__).resolve().parents[1]
 COMPOSE = ["docker", "compose", "-p", "vectordb-cluster-test", "-f", str(ROOT / "deployments/cluster/compose.yaml")]
 TOKEN = "development-integration-token"
+KEY_ISSUED = int(time.time() * 1000)
 GENERATION = "test" + uuid.uuid4().hex
 ENV = {
     **os.environ,
@@ -47,7 +48,7 @@ def api(port, path, body=None, key=None, token=TOKEN):
         data = json.dumps(body).encode()
         headers["Content-Type"] = "application/json"
     if key:
-        headers["Idempotency-Key"] = key
+        headers["Idempotency-Key"] = f"v2-{KEY_ISSUED}-{key}"
     req = urllib.request.Request(f"http://127.0.0.1:{port}{path}", data=data, headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=50) as response:
@@ -149,6 +150,8 @@ def main():
             search = {"collectionName": "items", "data": [[1, 0]], "limit": 3}
             expected = request(qp1, "entities/search", search)["data"]
             assert request(qp2, "entities/search", search)["data"] == expected
+            request(qp1, "entities/delete", {"collectionName": "items", "ids": [2]}, "delete-two")
+            request(qp1, "entities/upsert", {"collectionName": "items", "data": [{"id": 1, "vector": [3, 4]}]}, "update-one")
             print("Publishing and verifying an S3 checkpoint", flush=True)
             completed = subprocess.run([str(BINARY), "--role", "checkpoint"], env=ENV, check=True, capture_output=True, text=True, timeout=90)
             manifest = json.loads(completed.stdout)["manifest"]
@@ -170,7 +173,19 @@ def main():
             q1, qp1 = start("query")
             assert request(qp1, "entities/insert", tail, "tail") == tail_result
             assert request(qp1, "entities/insert", body, "first") == accepted
-            assert request(qp1, "collections/get_stats", {"collectionName": "items"})["data"]["rowCount"] == 11
+            assert request(qp1, "collections/get_stats", {"collectionName": "items"})["data"]["rowCount"] == 10
+            assert request(qp1, "entities/get", {"collectionName": "items", "id": 2})["data"] == []
+            assert request(qp1, "entities/get", {"collectionName": "items", "id": 1, "outputFields": ["vector"]})["data"][0]["vector"] == [3, 4]
+            next_row = request(wp, "entities/insert", tail, "after-restart")
+            assert next_row["data"]["insertIds"] == [12]
+            request(wp, "entities/delete", {"collectionName": "items", "ids": [12]}, "delete-twelve")
+            print("Exercising automatic flush, WAL reclamation and lagging query reload", flush=True)
+            for i in range(150):
+                request(wp, "entities/upsert", {"collectionName": "items", "data": [{"id": 1, "vector": [i, 4]}]}, f"repeated-{i}")
+            assert request(qp1, "entities/get", {"collectionName": "items", "id": 1, "outputFields": ["vector"]})["data"][0]["vector"] == [149, 4]
+            # The old manifest namespace must be reclaimed after its pin is released.
+            old_stat = subprocess.run([*COMPOSE, "exec", "-T", "minio", "mcli", "stat", "test/vectordb/" + manifest["key"]], capture_output=True, timeout=20)
+            assert old_stat.returncode != 0, "retired checkpoint was not reclaimed"
             print("Checking that an active writer cannot be replaced", flush=True)
             duplicate = subprocess.run([str(BINARY), "--role", "writer", "--advertise", "http://127.0.0.1:1"], env=ENV, capture_output=True, text=True, timeout=20)
             assert duplicate.returncode != 0
@@ -185,7 +200,7 @@ def main():
                 os.kill(old_writer.pid, signal.SIGCONT)
             status, _ = api(old_port, "/v2/vectordb/entities/insert", tail, "stale-owner")
             assert status == 503
-            assert request(qp1, "collections/get_stats", {"collectionName": "items"})["data"]["rowCount"] == 11
+            assert request(qp1, "collections/get_stats", {"collectionName": "items"})["data"]["rowCount"] == 10
             stop(old_writer)
             # No dependency = no successful Strong read or acknowledged write.
             command("stop", "kafka")
@@ -194,7 +209,7 @@ def main():
                 assert status == 503, (status, result)
             finally:
                 command("start", "kafka")
-            print("PASS: batch rollback, idempotency, replicas, checkpoint, SIGKILL recovery, ownership, Kafka outage", flush=True)
+            print("PASS: atomic batches, dedup, deletes, native checkpoints, automatic flush/GC, lagging reload, SIGKILL recovery, fencing, Kafka outage", flush=True)
         except BaseException:
             for log in logs:
                 log.flush()

@@ -2,11 +2,50 @@ use crate::{Error, Result, digest, identifier};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
-use vectordb_engine::Engine;
+use vectordb_engine::{
+    segment::SegmentEngine,
+    segment_storage::{SealedState, StateManifest},
+};
 
-pub const FORMAT: u32 = 1;
-// Bound the experimental replay checkpoint until compact segment snapshots exist.
-pub const MAX_HISTORY_BYTES: usize = 48 * 1024 * 1024;
+pub const FORMAT: u32 = 2;
+pub const IDEMPOTENCY_WINDOW_MS: i64 = 24 * 60 * 60 * 1000;
+pub const MAX_DEDUP_BYTES: usize = 16 * 1024 * 1024;
+pub fn now_ms() -> i64 {
+    chrono::Utc::now().timestamp_millis()
+}
+/// Expiry is part of the key identity; changing it creates a new request.
+pub fn idempotency_key(issued_ms: i64, nonce: &str) -> String {
+    format!("v2-{issued_ms}-{nonce}")
+}
+fn expiry(id: &str, now: i64) -> Result<i64> {
+    identifier(id)?;
+    let mut parts = id.splitn(3, '-');
+    if parts.next() != Some("v2") {
+        return Err(Error::Invalid(
+            "idempotency key must be v2-<issuedUnixMs>-<nonce>".into(),
+        ));
+    }
+    let issued: i64 = parts
+        .next()
+        .and_then(|s| s.parse().ok())
+        .filter(|n| *n >= 0)
+        .ok_or_else(|| Error::Invalid("invalid idempotency timestamp".into()))?;
+    if parts.next().is_none_or(str::is_empty) {
+        return Err(Error::Invalid("idempotency nonce required".into()));
+    }
+    let expires = issued
+        .checked_add(IDEMPOTENCY_WINDOW_MS)
+        .ok_or_else(|| Error::Invalid("invalid idempotency timestamp".into()))?;
+    if issued > now.saturating_add(60_000) {
+        return Err(Error::Invalid(
+            "idempotency timestamp is in the future".into(),
+        ));
+    }
+    if now >= expires {
+        return Err(Error::Conflict("idempotency key expired; do not retry as a new request without reconciling its outcome".into()));
+    }
+    Ok(expires)
+}
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Scope {
@@ -40,6 +79,7 @@ pub enum Entry {
         epoch: i64,
     },
     Mutation {
+        accepted_ms: i64,
         epoch: i64,
         request_id: String,
         operation: String,
@@ -56,17 +96,19 @@ pub struct Record {
     pub entry: Entry,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct SavedRecord {
-    pub offset: i64,
-    pub record: Record,
-}
-#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Checkpoint {
     pub format: u32,
     pub scope: Scope,
     pub offset: i64,
-    pub records: Vec<SavedRecord>,
+    pub epoch: i64,
+    pub clock_ms: i64,
+    pub state: StateManifest,
+    pub results: BTreeMap<String, (String, WriteResult)>,
+}
+pub struct Snapshot {
+    pub checkpoint: Checkpoint,
+    pub sealed: SealedState,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Token {
@@ -82,10 +124,11 @@ pub struct Replica {
     pub scope: Scope,
     pub offset: i64,
     pub epoch: i64,
-    engine: Engine,
-    records: Vec<SavedRecord>,
+    engine: SegmentEngine,
+    clock_ms: i64,
     results: BTreeMap<String, (String, WriteResult)>,
-    history_bytes: usize,
+    dedup_bytes: usize,
+    expirations: BTreeMap<(i64, String), usize>,
 }
 impl Replica {
     pub fn empty(scope: Scope) -> Result<Self> {
@@ -94,36 +137,80 @@ impl Replica {
             scope,
             offset: -1,
             epoch: 0,
-            engine: Engine::memory()?,
-            records: vec![],
+            engine: SegmentEngine::new(),
+            clock_ms: 0,
             results: BTreeMap::new(),
-            history_bytes: 0,
+            dedup_bytes: 0,
+            expirations: BTreeMap::new(),
         })
     }
-    pub fn restore(checkpoint: Checkpoint, scope: &Scope) -> Result<Self> {
-        if checkpoint.format != FORMAT || &checkpoint.scope != scope {
+    pub fn restore(
+        checkpoint: Checkpoint,
+        scope: &Scope,
+        get: impl FnMut(&str) -> vectordb_engine::Result<Vec<u8>>,
+    ) -> Result<Self> {
+        if checkpoint.format != FORMAT
+            || &checkpoint.scope != scope
+            || checkpoint.offset < 0
+            || checkpoint.epoch <= 0
+            || checkpoint.clock_ms < 0
+            || checkpoint.state.revision > checkpoint.offset
+        {
             return Err(Error::Integrity(
-                "checkpoint scope or format mismatch".into(),
+                "checkpoint scope, format or watermark mismatch".into(),
             ));
         }
         let mut replica = Self::empty(scope.clone())?;
-        for saved in checkpoint.records {
-            replica.apply(saved.offset, saved.record)?;
+        replica.engine = SegmentEngine::load(checkpoint.state, get)?;
+        replica.offset = checkpoint.offset;
+        replica.epoch = checkpoint.epoch;
+        replica.clock_ms = checkpoint.clock_ms;
+        for (id, (hash, result)) in &checkpoint.results {
+            expiry(id, checkpoint.clock_ms)?;
+            if hash.len() != 64
+                || !hash.bytes().all(|b| b.is_ascii_hexdigit())
+                || result.token.scope != *scope
+                || result.token.offset < 0
+                || result.token.offset > checkpoint.offset
+            {
+                return Err(Error::Integrity("invalid dedup result".into()));
+            }
         }
-        if replica.offset != checkpoint.offset {
-            return Err(Error::Integrity(
-                "checkpoint offset does not match its contents".into(),
-            ));
+        replica.results = checkpoint.results;
+        for (id, value) in &replica.results {
+            let bytes = id.len() + serde_json::to_vec(value)?.len() + 8;
+            replica
+                .expirations
+                .insert((expiry(id, replica.clock_ms)?, id.clone()), bytes);
+            replica.dedup_bytes += bytes;
+        }
+        if replica.dedup_bytes > MAX_DEDUP_BYTES {
+            return Err(Error::Integrity("dedup quota exceeded".into()));
         }
         Ok(replica)
     }
-    pub fn checkpoint(&self) -> Checkpoint {
-        Checkpoint {
+    pub fn checkpoint(&self) -> Result<Snapshot> {
+        let sealed = self.engine.seal()?;
+        let clock = self.clock_ms;
+        let results = self
+            .results
+            .iter()
+            .filter(|(id, _)| expiry(id, clock).is_ok())
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        let checkpoint = Checkpoint {
             format: FORMAT,
             scope: self.scope.clone(),
             offset: self.offset,
-            records: self.records.clone(),
-        }
+            epoch: self.epoch,
+            clock_ms: clock,
+            state: sealed.manifest.clone(),
+            results,
+        };
+        Ok(Snapshot { checkpoint, sealed })
+    }
+    pub fn reclaim(&mut self) {
+        self.engine.reclaim_tombstones();
     }
     pub fn result(&self, id: &str) -> Option<WriteResult> {
         self.results.get(id).map(|(_, result)| result.clone())
@@ -135,6 +222,18 @@ impl Replica {
         operation: &str,
         request: Value,
     ) -> Result<std::result::Result<Record, WriteResult>> {
+        self.prepare_at(epoch, id, operation, request, now_ms())
+    }
+    pub fn prepare_at(
+        &self,
+        epoch: i64,
+        id: &str,
+        operation: &str,
+        request: Value,
+        now: i64,
+    ) -> Result<std::result::Result<Record, WriteResult>> {
+        let now = now.max(self.clock_ms);
+        expiry(id, now)?;
         if epoch != self.epoch || epoch <= 0 {
             return Err(Error::Conflict("stale owner epoch".into()));
         }
@@ -149,12 +248,18 @@ impl Replica {
             }
             return Ok(Err(result.clone()));
         }
-        let mut preview = self.engine.fork_memory()?;
-        let result = preview.execute(operation, request.clone())?;
+        let result = self.engine.prepare(operation, request.clone())?.result;
+        let retained = self.retained_bytes(now);
+        if retained + id.len() + serde_json::to_vec(&result)?.len() + 1024 > MAX_DEDUP_BYTES {
+            return Err(Error::Unavailable(
+                "idempotency state quota exhausted; wait for window expiry".into(),
+            ));
+        }
         Ok(Ok(Record {
             format: FORMAT,
             scope: self.scope.clone(),
             entry: Entry::Mutation {
+                accepted_ms: now,
                 epoch,
                 request_id: id.into(),
                 operation: operation.into(),
@@ -165,16 +270,13 @@ impl Replica {
         }))
     }
     pub fn check_capacity(&self, record: &Record) -> Result<()> {
-        if self.history_bytes + serde_json::to_vec(record)?.len() + 128 > MAX_HISTORY_BYTES {
-            return Err(Error::Unavailable(
-                "P1 replay history limit reached; migrate to a fresh generation".into(),
-            ));
+        if serde_json::to_vec(record)?.len() > 1024 * 1024 {
+            return Err(Error::Invalid("WAL entry exceeds 1 MiB".into()));
         }
         Ok(())
     }
     pub fn apply(&mut self, offset: i64, record: Record) -> Result<()> {
         self.check_capacity(&record)?;
-        let record_bytes = serde_json::to_vec(&record)?.len() + 128;
         if record.format != FORMAT || record.scope != self.scope || offset <= self.offset {
             return Err(Error::Integrity(
                 "invalid record scope, version or offset order".into(),
@@ -189,6 +291,7 @@ impl Replica {
             }
             Entry::Barrier { epoch } => self.check_epoch(*epoch)?,
             Entry::Mutation {
+                accepted_ms,
                 epoch,
                 request_id,
                 operation,
@@ -197,6 +300,10 @@ impl Replica {
                 digest: hash,
             } => {
                 self.check_epoch(*epoch)?;
+                if *accepted_ms < self.clock_ms {
+                    return Err(Error::Integrity("WAL clock regressed".into()));
+                }
+                expiry(request_id, *accepted_ms)?;
                 self.validate_request(operation, request, true)?;
                 identifier(request_id)?;
                 if &request_digest(operation, request)? != hash
@@ -207,31 +314,57 @@ impl Replica {
                     ));
                 }
                 // Publish state only after the persisted result has been verified.
-                let mut next = self.engine.fork_memory()?;
-                let actual = next.execute(operation, request.clone())?;
-                if &actual != result {
+                let batch = self.engine.prepare(operation, request.clone())?;
+                if &batch.result != result {
                     return Err(Error::Integrity("non-deterministic replay result".into()));
                 }
-                self.engine = next;
-                self.results.insert(
-                    request_id.clone(),
-                    (
-                        hash.clone(),
-                        WriteResult {
-                            data: result.clone(),
-                            token: Token {
-                                scope: self.scope.clone(),
-                                offset,
-                            },
+                let value = (
+                    hash.clone(),
+                    WriteResult {
+                        data: result.clone(),
+                        token: Token {
+                            scope: self.scope.clone(),
+                            offset,
                         },
-                    ),
+                    },
                 );
+                let bytes = request_id.len() + serde_json::to_vec(&value)?.len() + 8;
+                if self.retained_bytes(*accepted_ms) + bytes > MAX_DEDUP_BYTES {
+                    return Err(Error::Integrity(
+                        "committed dedup state exceeds quota".into(),
+                    ));
+                }
+                self.engine.commit(batch, offset)?;
+                self.clock_ms = *accepted_ms;
+                while self
+                    .expirations
+                    .first_key_value()
+                    .is_some_and(|((expires, _), _)| *expires <= *accepted_ms)
+                {
+                    let ((_, id), charge) = self.expirations.pop_first().unwrap();
+                    self.results.remove(&id);
+                    self.dedup_bytes -= charge;
+                }
+                self.expirations.insert(
+                    (expiry(request_id, *accepted_ms)?, request_id.clone()),
+                    bytes,
+                );
+                self.dedup_bytes += bytes;
+                self.results.insert(request_id.clone(), value);
             }
         }
         self.offset = offset;
-        self.history_bytes += record_bytes;
-        self.records.push(SavedRecord { offset, record });
+
         Ok(())
+    }
+    fn retained_bytes(&self, now: i64) -> usize {
+        self.dedup_bytes
+            - self
+                .expirations
+                .iter()
+                .take_while(|((expires, _), _)| *expires <= now)
+                .map(|(_, bytes)| bytes)
+                .sum::<usize>()
     }
     fn check_epoch(&self, epoch: i64) -> Result<()> {
         if epoch <= 0 || epoch != self.epoch {
@@ -257,6 +390,7 @@ impl Replica {
                 "collections/create"
                     | "entities/insert"
                     | "entities/upsert"
+                    | "entities/delete"
                     | "indexes/create"
                     | "indexes/drop"
                     | "partitions/create"
@@ -280,7 +414,7 @@ impl Replica {
         };
         if !allowed {
             return Err(Error::Unsupported(format!(
-                "{operation} is not enabled in P1 cluster mode"
+                "{operation} is not enabled in M1 cluster mode"
             )));
         }
         Ok(())

@@ -30,6 +30,8 @@ pub struct Manifest {
     pub key: String,
     pub sha256: String,
     pub bytes: usize,
+    #[serde(default)]
+    pub objects: Vec<String>,
 }
 impl Catalog {
     pub fn new(endpoint: String, scope: &Scope) -> Result<Self> {
@@ -141,6 +143,32 @@ impl Catalog {
             .transpose()
     }
     pub fn publish(&self, manifest: &Manifest) -> Result<bool> {
+        let parent = manifest
+            .key
+            .rsplit_once('/')
+            .map(|(p, _)| p)
+            .ok_or_else(|| Error::Invalid("checkpoint key requires a namespace".into()))?;
+        let required = format!(
+            "{}checkpoints/",
+            self.prefix.trim_start_matches("/vectordb/")
+        );
+        let namespace = parent.strip_prefix(&required).unwrap_or_default();
+        let prefix = format!("{}-", manifest.offset);
+        if manifest.offset < 0
+            || format!("/vectordb/{}/", manifest.scope.prefix()) != self.prefix
+            || namespace
+                .strip_prefix(&prefix)
+                .is_none_or(|nonce| crate::identifier(nonce).is_err())
+            || !parent.starts_with(&required)
+            || manifest
+                .objects
+                .iter()
+                .any(|k| k.rsplit_once('/').map(|(p, _)| p) != Some(parent))
+        {
+            return Err(Error::Invalid(
+                "checkpoint objects must use a unique collection namespace".into(),
+            ));
+        }
         let old = self.get("manifest")?;
         if let Some((_, bytes)) = &old {
             let previous: Manifest = serde_json::from_slice(bytes)?;
@@ -150,7 +178,16 @@ impl Catalog {
             if previous.offset >= manifest.offset {
                 return Ok(false);
             }
+            if previous.key.rsplit_once('/').map(|(p, _)| p) == Some(parent) {
+                return Err(Error::Conflict(
+                    "checkpoint namespace cannot be reused".into(),
+                ));
+            }
         }
+        let retired = old
+            .as_ref()
+            .map(|(_, bytes)| serde_json::from_slice::<Manifest>(bytes))
+            .transpose()?;
         let compare = match old {
             None => {
                 json!({"key":self.key("manifest"),"target":"VERSION","version":"0","result":"EQUAL"})
@@ -159,7 +196,97 @@ impl Catalog {
                 json!({"key":self.key("manifest"),"target":"MOD","mod_revision":revision,"result":"EQUAL"})
             }
         };
-        let result = self.post("/v3/kv/txn", json!({"compare":[compare],"success":[{"request_put":{"key":self.key("manifest"),"value":STANDARD.encode(serde_json::to_vec(manifest)?)}}],"failure":[]}))?;
+        let mut success = vec![
+            json!({"request_put":{"key":self.key("manifest"),"value":STANDARD.encode(serde_json::to_vec(manifest)?)}}),
+        ];
+        if let Some(old) = retired {
+            success.push(json!({"request_put":{"key":self.key(&format!("retired/{}",crate::digest(old.key.as_bytes()))),"value":STANDARD.encode(serde_json::to_vec(&old)?)}}));
+        }
+        let result = self.post(
+            "/v3/kv/txn",
+            json!({"compare":[compare],"success":success,"failure":[]}),
+        )?;
         Ok(result["succeeded"] == true)
+    }
+    fn range(&self, name: &str) -> Result<Vec<(String, Vec<u8>)>> {
+        let prefix = format!("{}{name}", self.prefix);
+        let mut end = prefix.as_bytes().to_vec();
+        let last = end
+            .last_mut()
+            .ok_or_else(|| Error::Invalid("empty prefix".into()))?;
+        *last += 1;
+        let response=self.post("/v3/kv/range",json!({"key":STANDARD.encode(prefix),"range_end":STANDARD.encode(end),"serializable":false}))?;
+        response["kvs"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|kv| {
+                let decode = |field: &str| -> Result<Vec<u8>> {
+                    STANDARD
+                        .decode(kv[field].as_str().unwrap_or_default())
+                        .map_err(|_| Error::Integrity("invalid catalog value".into()))
+                };
+                let key = String::from_utf8(decode("key")?)
+                    .map_err(|_| Error::Integrity("invalid key".into()))?;
+                Ok((key, decode("value")?))
+            })
+            .collect()
+    }
+    /// Pin registration and manifest revision check are atomic with publication.
+    pub fn pin_latest(&self) -> Result<Option<(Manifest, String, String)>> {
+        for _ in 0..8 {
+            let Some((revision, bytes)) = self.get("manifest")? else {
+                return Ok(None);
+            };
+            let manifest: Manifest = serde_json::from_slice(&bytes)?;
+            let grant = self.post("/v3/lease/grant", json!({"TTL":30}))?;
+            let lease = grant["ID"]
+                .as_str()
+                .ok_or_else(|| Error::Integrity("missing pin lease".into()))?
+                .to_string();
+            let key = format!(
+                "pins/{}/{}",
+                crate::digest(manifest.key.as_bytes()),
+                uuid::Uuid::new_v4()
+            );
+            let result=self.post("/v3/kv/txn",json!({"compare":[{"key":self.key("manifest"),"target":"MOD","mod_revision":revision,"result":"EQUAL"}],"success":[{"request_put":{"key":self.key(&key),"value":STANDARD.encode(&manifest.key),"lease":lease}}],"failure":[]}))?;
+            if result["succeeded"] == true {
+                return Ok(Some((manifest, key, lease)));
+            }
+            self.revoke(&lease)?;
+        }
+        Err(Error::Unavailable(
+            "checkpoint changed repeatedly during pin acquisition".into(),
+        ))
+    }
+    pub fn verify_pin(&self, key: &str) -> Result<()> {
+        if self.get(key)?.is_none() {
+            Err(Error::Unavailable(
+                "snapshot pin expired; reload latest checkpoint".into(),
+            ))
+        } else {
+            Ok(())
+        }
+    }
+    pub fn collect_retired(&self, mut delete: impl FnMut(&str) -> Result<()>) -> Result<usize> {
+        let mut count = 0;
+        for (key, bytes) in self.range("retired/")? {
+            let manifest: Manifest = serde_json::from_slice(&bytes)?;
+            // A retired manifest can never become current again (offsets increase),
+            // hence no new pin can register after the linearizable empty read.
+            if !self
+                .range(&format!("pins/{}/", crate::digest(manifest.key.as_bytes())))?
+                .is_empty()
+            {
+                continue;
+            }
+            for object in &manifest.objects {
+                delete(object)?;
+            }
+            delete(&manifest.key)?;
+            self.post("/v3/kv/deleterange", json!({"key":STANDARD.encode(key)}))?;
+            count += 1;
+        }
+        Ok(count)
     }
 }

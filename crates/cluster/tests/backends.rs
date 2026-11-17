@@ -27,11 +27,12 @@ fn real_catalog_ownership_cas_and_immutable_objects() {
         "development-only-password".into(),
     )
     .unwrap();
-    let key = format!("{}/checkpoints/object.json", scope.prefix());
+    let key = format!("{}/checkpoints/10-first/object.json", scope.prefix());
     let bytes = b"immutable test object".to_vec();
-    objects.put(&key, bytes.clone()).unwrap();
-    assert_eq!(objects.get(&key).unwrap(), bytes);
-    assert!(objects.put(&key, b"overwrite".to_vec()).is_err());
+    let store: &dyn vectordb_cluster::contracts::ObjectStore = &objects;
+    store.put_new(&key, bytes.clone()).unwrap();
+    assert_eq!(store.get(&key).unwrap(), bytes);
+    assert!(store.put_new(&key, b"overwrite".to_vec()).is_err());
     assert_eq!(objects.get(&key).unwrap(), bytes);
     assert!(objects.get("../escape").is_err());
     let mut manifest = Manifest {
@@ -40,17 +41,114 @@ fn real_catalog_ownership_cas_and_immutable_objects() {
         key,
         sha256: digest(&bytes),
         bytes: bytes.len(),
+        objects: vec![],
     };
-    assert!(catalog.publish(&manifest).unwrap());
+    let boundary: &dyn vectordb_cluster::contracts::Catalog = &catalog;
+    assert!(boundary.publish(&manifest).unwrap());
+    assert_eq!(boundary.latest().unwrap().unwrap().offset, 10);
+    let mut foreign = manifest.clone();
+    foreign.scope.generation = "foreign".into();
+    assert!(boundary.publish(&foreign).is_err());
     manifest.offset = 9;
+    let original_key = manifest.key.clone();
+    manifest.key = format!(
+        "{}/checkpoints/9-stale/object.json",
+        manifest.scope.prefix()
+    );
     assert!(!catalog.publish(&manifest).unwrap());
+    manifest.key = original_key;
     assert_eq!(catalog.manifest().unwrap().unwrap().offset, 10);
+    let (pinned, pin, pin_lease) = catalog.pin_latest().unwrap().unwrap();
+    catalog.verify_pin(&pin).unwrap();
     manifest.offset = 11;
+    manifest.key = format!("{}/checkpoints/11-second/new.json", manifest.scope.prefix());
+    objects.put(&manifest.key, bytes.clone()).unwrap();
     assert!(catalog.publish(&manifest).unwrap());
+    assert_eq!(
+        catalog.collect_retired(|key| objects.delete(key)).unwrap(),
+        0
+    );
+    assert!(objects.get(&pinned.key).is_ok());
+    catalog.revoke(&pin_lease).unwrap();
+    assert!(catalog.verify_pin(&pin).is_err());
+    assert_eq!(
+        catalog.collect_retired(|key| objects.delete(key)).unwrap(),
+        1
+    );
+    assert!(objects.get(&pinned.key).is_err());
+    assert!(objects.get(&manifest.key).is_ok());
     catalog.revoke(&lease.id).unwrap();
     assert!(catalog.verify(&lease).is_err());
     let next = catalog.acquire("http://127.0.0.1:19532".into()).unwrap();
     assert!(next.epoch > lease.epoch);
     assert!(catalog.verify(&lease).is_err());
     catalog.revoke(&next.id).unwrap();
+}
+#[test]
+#[ignore = "requires isolated Kafka from deployments/cluster/compose.yaml"]
+fn real_log_committed_prefix_and_broker_producer_fencing() {
+    use rdkafka::{
+        ClientConfig,
+        admin::{AdminClient, AdminOptions, NewTopic, TopicReplication},
+        client::DefaultClientContext,
+    };
+    use vectordb_cluster::{
+        contracts::DurableLog,
+        kafka::Log,
+        state::{Entry, FORMAT, Record},
+    };
+    let scope = Scope {
+        cluster: "contract".into(),
+        collection: "items".into(),
+        generation: uuid::Uuid::new_v4().to_string(),
+    };
+    let topic = scope.topic();
+    let admin: AdminClient<DefaultClientContext> = ClientConfig::new()
+        .set("bootstrap.servers", "127.0.0.1:19092")
+        .create()
+        .unwrap();
+    let created = futures::executor::block_on(admin.create_topics(
+        &[NewTopic::new(&topic, 1, TopicReplication::Fixed(1))],
+        &AdminOptions::new(),
+    ))
+    .unwrap();
+    assert!(created[0].is_ok());
+    let mut old = Log::reader("127.0.0.1:19092".into(), &scope);
+    old.initialize_writer().unwrap();
+    let first = Record {
+        format: FORMAT,
+        scope: scope.clone(),
+        entry: Entry::Activate { epoch: 1 },
+    };
+    let offset = DurableLog::append(&old, &first).unwrap();
+    let mut next = Log::reader("127.0.0.1:19092".into(), &scope);
+    next.initialize_writer().unwrap();
+    assert!(
+        DurableLog::append(&old, &first).is_err(),
+        "broker must fence the old producer independently of etcd checks"
+    );
+    let through = DurableLog::append(
+        &next,
+        &Record {
+            format: FORMAT,
+            scope: scope.clone(),
+            entry: Entry::Activate { epoch: 2 },
+        },
+    )
+    .unwrap();
+    let mut seen = vec![];
+    DurableLog::replay(&next, -1, through, &mut |offset, _| {
+        seen.push(offset);
+        Ok(())
+    })
+    .unwrap();
+    assert_eq!(seen, vec![offset, through]);
+    DurableLog::trim(&next, offset).unwrap();
+    assert!(matches!(
+        DurableLog::replay(&next, -1, through, &mut |_, _| Ok(())),
+        Err(vectordb_cluster::Error::CheckpointRequired)
+    ));
+    let deleted =
+        futures::executor::block_on(admin.delete_topics(&[&topic], &AdminOptions::new())).unwrap();
+    assert!(deleted[0].is_ok());
 }

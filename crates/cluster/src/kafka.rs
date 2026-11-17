@@ -61,12 +61,34 @@ impl Log {
         producer.commit_transaction(TIMEOUT)?;
         Ok(delivery.offset)
     }
-    pub fn read(&self, after: i64, through: i64) -> Result<Vec<(i64, Record)>> {
+    /// Call only after an immutable, verified state checkpoint is published.
+    pub fn trim(&self, through: i64) -> Result<()> {
+        use rdkafka::admin::{AdminClient, AdminOptions};
+        let admin: AdminClient<_> = ClientConfig::new()
+            .set("bootstrap.servers", &self.brokers)
+            .create::<AdminClient<rdkafka::client::DefaultClientContext>>()?;
+        let mut offsets = TopicPartitionList::new();
+        offsets.add_partition_offset(&self.topic, 0, Offset::Offset(through + 1))?;
+        let result = futures::executor::block_on(admin.delete_records(
+            &offsets,
+            &AdminOptions::new().operation_timeout(Some(TIMEOUT)),
+        ))?;
+        for element in result.elements() {
+            element.error()?;
+        }
+        Ok(())
+    }
+    pub fn replay(
+        &self,
+        after: i64,
+        through: i64,
+        mut apply: impl FnMut(i64, Record) -> Result<()>,
+    ) -> Result<()> {
         if through < after {
             return Err(Error::Conflict("snapshot is older than replica".into()));
         }
         if through == after {
-            return Ok(vec![]);
+            return Ok(());
         }
         let consumer: BaseConsumer = ClientConfig::new()
             .set("bootstrap.servers", &self.brokers)
@@ -89,16 +111,13 @@ impl Log {
         }
         let (low, _) = consumer.fetch_watermarks(&self.topic, 0, TIMEOUT)?;
         if after + 1 < low {
-            return Err(Error::Integrity(
-                "WAL prefix missing; a newer checkpoint is required".into(),
-            ));
+            return Err(Error::CheckpointRequired);
         }
         let mut assignment = TopicPartitionList::new();
         assignment.add_partition_offset(&self.topic, 0, Offset::Offset(after + 1))?;
         consumer.assign(&assignment)?;
         let deadline = Instant::now() + TIMEOUT;
-        let mut records = vec![];
-        let mut bytes_read = 0usize;
+
         while Instant::now() < deadline {
             if let Some(message) = consumer.poll(Duration::from_millis(100)) {
                 let message = message?;
@@ -109,13 +128,12 @@ impl Log {
                 let bytes = message
                     .payload()
                     .ok_or_else(|| Error::Integrity("empty WAL record".into()))?;
-                bytes_read += bytes.len();
-                if bytes_read > crate::state::MAX_HISTORY_BYTES {
-                    return Err(Error::Unavailable("replay exceeds P1 memory limit".into()));
+                if bytes.len() > 1024 * 1024 {
+                    return Err(Error::Integrity("oversized WAL entry".into()));
                 }
-                records.push((offset, serde_json::from_slice(bytes)?));
+                apply(offset, serde_json::from_slice(bytes)?)?;
                 if offset == through {
-                    return Ok(records);
+                    return Ok(());
                 }
             }
         }

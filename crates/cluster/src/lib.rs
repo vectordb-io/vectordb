@@ -1,5 +1,5 @@
 //! Experimental collection-scoped log replication and shared checkpoints.
-//! This is the P1 implementation, not the production P3 architecture.
+//! M0/M1 state segments and recovery; later production milestones remain open.
 pub mod catalog;
 pub mod kafka;
 pub mod object;
@@ -9,6 +9,8 @@ use thiserror::Error;
 pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Error)]
 pub enum Error {
+    #[error("WAL prefix reclaimed; reload checkpoint")]
+    CheckpointRequired,
     #[error("invalid request: {0}")]
     Invalid(String),
     #[error("conflict: {0}")]
@@ -47,3 +49,5 @@ pub fn identifier(value: &str) -> Result<()> {
     }
     Ok(())
 }
+
+pub mod contracts;

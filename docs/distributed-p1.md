@@ -1,26 +1,30 @@
-# 分布式 P1 原型运行与验证
+# 分布式 M1 运行与验证
 
-`vectordb-cluster` 实现了设计中的集合级日志读写与共享恢复链路：独立 writer、多个完整 query 副本、独立 checkpoint 任务，连接真实 etcd、Kafka 和 S3。它是实验性 P1 原型，尚未完成 P2 分片查询和 P3 生产高可用；不能替代完整的 Milvus 集群。
+`vectordb-cluster` 实现了设计中的集合级日志读写与共享恢复链路：独立 writer、多个完整 query 副本、独立 checkpoint 任务，连接真实 etcd、Kafka 和 S3。当前为实验性 M1 运行时，尚未完成分片查询和生产高可用；不能替代完整的 Milvus 集群。
+
+后续范围、协议和实施顺序以 [Rust 核心架构与实施计划](implementation-plan.md) 为准。本文仅记录运行与验证方法；唯一实施计划仍为上述文档。
 
 ## 已实现的契约
 
 - 每个进程绑定一个 cluster、collection、generation，数据库固定为 default。同一 generation 只能有一个 writer。
 - etcd 30 秒所有权租约，每 5 秒续租；Kafka 固定 transactional.id 隔离旧 producer。失去所有权或提交结果不确定后，writer 停止服务，必须重启恢复。
-- mutation 通过内存副本校验，以一个 Kafka 事务写入请求、幂等键、摘要和结果。提交后才修改可见状态并返回。批次失败不污染原状态或消耗自动 ID。
-- 幂等结果随日志和检查点恢复；同一键不同内容返回 409。超时或 503 后必须使用原键重试。
+- mutation 通过原生主键状态表和批次暂存校验，以一个 Kafka 事务写入请求、幂等键、摘要和结果。提交后才修改可见状态并返回。批次失败不污染原状态或消耗自动 ID。
+- 幂等结果随日志和检查点恢复；同一键不同内容返回 409。键格式为 `v2-<issuedUnixMs>-<nonce>`，24 小时到期，时间最多允许领先 60 秒。超时或 503 后在有效期内使用原键重试；过期返回 409，先核对结果，不得换时间戳重发同一未知结果的请求。
 - query 先向 writer 获取已提交 barrier，再回放到该位置并在进程锁内执行查询。各 query 是完整集合副本，可以独立运行在不同主机；它们尚不拆分集合数据。
 - checkpoint 先上传不可变对象、下载校验，再通过 etcd CAS 发布 manifest。重启从共享检查点与 Kafka 尾部恢复，无需计算节点本地持久卷。
 - readiness 会执行完整读屏障；healthz 仅表示 HTTP 进程存活。所有数据请求要求 Bearer Token，写请求还要求 Idempotency-Key。
 
 ## 与目标设计的阶段性差异
 
-当前检查点是版本化命令历史，查询执行器使用独立的内存 SQLite Engine；没有上传 SQLite 数据文件，也不共享运行中的数据库文件。下一阶段需要替换为列式段、持久化索引和 MVCC 段视图。
+当前集群使用原生段引擎，检查点为当前状态的 Parquet 标量列/主键版本列及二进制向量文件；新集合 dense 默认 Float32，`vectorDtype: "Float64"` 可显式保留双精度。writer 每 128 条提交记录同步检查点化，发布成功后截断 Kafka 前缀，并通过 etcd pin 协议回收旧检查点对象；落后副本重新加载状态。没有整库复制和 48 MiB 累计历史上限。
 
-当前内部通信使用受认证 HTTP，尚未实现目标 gRPC/mTLS 协议。Coordinator 自动调度、热备自动接管、分片 fan-out、后台持续检查点、WAL 截断、对象 GC、compaction、完整备份迁移工具和 Helm 生产拓扑尚未实现。Kafka 和对象均保留，不自动删除。
+当前行状态的编码与行开销预算为 256 MiB，集合元数据 1 MiB，24 小时幂等结果 16 MiB；请求体上限 512 KiB，日志记录 1 MiB，单对象 64 MiB，每进程最多 32 个运行或排队请求。这些不等于 RSS 上限，查询和 seal 仍有额外缓冲。记录未过期时幂等额度耗尽会拒绝新请求。
 
-每次校验和回放都会复制内存引擎，历史检查点随操作增长，因此仅用于小数据正确性验证。请求体上限 512 KiB，日志记录 1 MiB，回放历史预算 48 MiB，对象下载上限 64 MiB，每进程最多 32 个运行或排队请求。达到历史预算会拒绝操作，需迁移到新 generation；不能靠重启绕过预算。
+查询仍为完整集合副本，ANN 索引重启后重建；内部运行通信仍是受认证 HTTP。M0 已固定 Protobuf envelope，但 gRPC/mTLS、持久化索引、查询并发、分片、自动 Coordinator 和生产 HA 尚未完成。上传后未发布即崩溃的孤儿对象保守保留，后台孤儿 GC 和完整备份迁移属于 M6。
 
-支持 create collection、insert、upsert、create partition、create/drop index，以及 describe、stats、get、query、search 和索引/分区查询。删除、drop/recreate、Schema 演进、别名、混合检索等未开放操作明确拒绝。通过 `/capabilities` 查看当前模式。
+支持 create collection、insert、upsert、显式 `entities/delete`（`ids` 数组）、create partition、create/drop index，以及 describe、stats、get、query、search 和索引/分区查询。过滤删除、drop/recreate、Schema 演进、别名、混合检索等未开放操作明确拒绝。通过 `/capabilities` 查看当前模式。
+
+**格式升级：** M1 使用 WAL/状态格式 2，不能原地读取或混写旧 P1 格式 1；请使用新 generation。旧数据需要保留旧 reader，并按统一计划中的 M6 离线迁移流程处理，不能删除旧数据后直接切换。
 
 ## 构建
 
@@ -48,7 +52,7 @@ MinIO 社区版已改为源码分发，原镜像仓库可能无法拉取。[MinI
 ```sh
 docker compose -p vectordb-cluster-test -f deployments/cluster/compose.yaml exec -T kafka \
   /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9094 --create --if-not-exists \
-  --topic vdb.development.items.g1 --partitions 1 --replication-factor 1 \
+  --topic vdb.development.items.g2 --partitions 1 --replication-factor 1 \
   --config retention.ms=-1 --config retention.bytes=-1 --config max.message.bytes=2097152
 
 docker compose -p vectordb-cluster-test -f deployments/cluster/compose.yaml exec -T minio \
@@ -64,7 +68,7 @@ docker compose -p vectordb-cluster-test -f deployments/cluster/compose.yaml exec
 ```sh
 export VECTORDB_CLUSTER=development
 export VECTORDB_COLLECTION=items
-export VECTORDB_GENERATION=g1
+export VECTORDB_GENERATION=g2
 export VECTORDB_ETCD=http://127.0.0.1:12379
 export VECTORDB_KAFKA=127.0.0.1:19092
 export VECTORDB_S3_ENDPOINT=http://127.0.0.1:19000
@@ -89,14 +93,19 @@ export VECTORDB_CLUSTER_TOKEN=development-integration-token
 同一个 query 可以继续添加更多完整副本。跨机器运行时，advertise 必须能从查询节点访问，Kafka advertised listeners 也必须使用可达地址。当前依赖适配器尚无完整的认证与加密配置，只在可信隔离网络中评估。
 
 ```sh
+# 生成一次后保留；重试时保持整个键不变，不重新计算时间戳。
+ISSUED_MS=$(python3 -c 'import time; print(int(time.time()*1000))')
+CREATE_KEY="v2-$ISSUED_MS-create-items"
+INSERT_KEY="v2-$ISSUED_MS-batch-1"
+
 curl --fail-with-body http://127.0.0.1:19532/v2/vectordb/collections/create \
   -H "Authorization: Bearer $VECTORDB_CLUSTER_TOKEN" \
-  -H 'Idempotency-Key: create-items' -H 'Content-Type: application/json' \
+  -H "Idempotency-Key: $CREATE_KEY" -H 'Content-Type: application/json' \
   -d '{"collectionName":"items","dimension":2,"autoID":true}'
 
 curl --fail-with-body http://127.0.0.1:19532/v2/vectordb/entities/insert \
   -H "Authorization: Bearer $VECTORDB_CLUSTER_TOKEN" \
-  -H 'Idempotency-Key: batch-1' -H 'Content-Type: application/json' \
+  -H "Idempotency-Key: $INSERT_KEY" -H 'Content-Type: application/json' \
   -d '{"collectionName":"items","data":[{"vector":[1,0]}]}'
 
 curl --fail-with-body http://127.0.0.1:19532/v2/vectordb/entities/search \
@@ -114,9 +123,10 @@ curl --fail-with-body http://127.0.0.1:19532/v2/vectordb/entities/search \
 ```sh
 cargo build -p vectordb-cluster --locked
 python3 scripts/cluster_smoke.py
+cargo test -p vectordb-cluster --test backends --locked -- --ignored
 ```
 
-脚本使用独立随机 generation，启动真实本机进程并连接 Compose 服务，覆盖：重复请求与冲突、失败批次回滚、自动 ID 连续性、并发写、两个查询副本、S3 检查点、所有计算进程 SIGKILL 并删除测试日志中已检查点化的前缀后恢复、拒绝第二个 writer、旧 writer 暂停到租约过期并接管后的隔离，以及 Kafka 不可用时拒绝确认新写入。脚本会短暂停止测试项目的 Kafka，结束时恢复它。
+脚本使用独立随机 generation，启动真实本机进程并连接 Compose 服务，覆盖：重复请求与冲突、失败批次回滚、自动 ID 连续性、并发写、两个查询副本、原生段与 S3 状态检查点、upsert/delete、自动 flush/WAL 截断/旧对象 GC、落后 query 重载、所有计算进程 SIGKILL 并删除测试日志中已检查点化的前缀后恢复、拒绝第二个 writer、旧 writer 暂停到租约过期并接管后的隔离，以及 Kafka 不可用时拒绝确认新写入。脚本会短暂停止测试项目的 Kafka，结束时恢复它。
 
 脚本删除自己的进程和 topic；测试 catalog 和对象保留在专用 Compose 卷内，可通过以下命令清理全部测试依赖。不要对业务部署执行此命令。
 
@@ -124,16 +134,10 @@ python3 scripts/cluster_smoke.py
 docker compose -p vectordb-cluster-test -f deployments/cluster/compose.yaml down -v
 ```
 
-尚未验证单故障域丢失、etcd 多数派丢失、持续网络分区、生产吞吐、百万级数据、跨区域恢复和完整多角色滚动升级；这些属于设计 P2/P3 的验收要求。
+尚未验证单故障域丢失、etcd 多数派丢失、持续网络分区、生产吞吐、百万级数据、跨区域恢复和完整多角色滚动升级；这些按 [统一实施计划](implementation-plan.md) 的 M4—M6 及后续扩展分别验收。
 
-## 2026 年 11 月 17 日验证记录
+## M0/M1 验收入口
 
-在 macOS arm64 上通过以下检查：
+类型、物理格式、错误语义、幂等期限、资源预算、回收协议和测试证据统一记录在 [实施计划第 12 节](implementation-plan.md)。原生基准记录见 [m1-baseline.json](benchmarks/m1-baseline.json)。CI 运行 workspace 测试、最低 Rust 版本、Clippy 和真实依赖测试。
 
-- Rust stable 和 Rust 1.89 的 workspace 测试：31 个非忽略测试通过。
-- `cargo fmt --all --check`、workspace Clippy（warnings as errors）和 workspace 构建通过。
-- 真实 etcd 3.5.21 与 Silo 2026-09-16 的租约、单 owner、manifest 单调 CAS、S3 签名读写和禁止覆盖测试通过。
-- 真实 Kafka 3.9.1 的完整 `cluster_smoke.py` 通过，包括已检查点化日志前缀的测试性删除、SIGKILL 恢复、暂停旧 writer 后接管与隔离、Kafka 停机拒写。
-- 原有 `scripts/smoke.py` 与 `scripts/check_website.py` 通过。
-
-这些结果验证单节点基础设施上的 P1 正确性链路；不等价于生产 HA、网络分区模型证明或性能验收。
+这些结果验证 M0/M1 的契约与可持续恢复链路，不代表 M2—M6 或生产 HA 已完成。

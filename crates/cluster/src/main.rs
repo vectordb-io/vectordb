@@ -31,7 +31,7 @@ enum Role {
     Checkpoint,
 }
 #[derive(Parser, Clone)]
-#[command(about = "Experimental P1 collection-scoped distributed VectorDB")]
+#[command(about = "Experimental M1 collection-scoped distributed VectorDB")]
 struct Config {
     #[arg(long, value_enum)]
     role: Role,
@@ -75,6 +75,7 @@ struct Runtime {
     lease: Option<Lease>,
     failed: Arc<AtomicBool>,
     client: reqwest::blocking::Client,
+    uncheckpointed_records: usize,
 }
 impl Runtime {
     fn open(config: Config) -> Result<Self> {
@@ -97,22 +98,11 @@ impl Runtime {
             config.access_key.clone(),
             config.secret_key.clone(),
         )?;
-        let mut replica = Replica::empty(scope.clone())?;
-        if let Some(manifest) = catalog.manifest()? {
-            if manifest.scope != scope {
-                return Err(Error::Integrity("foreign manifest".into()));
-            }
-            let bytes = objects.get(&manifest.key)?;
-            if bytes.len() != manifest.bytes || digest(&bytes) != manifest.sha256 {
-                return Err(Error::Integrity("checkpoint checksum mismatch".into()));
-            }
-            replica = Replica::restore(serde_json::from_slice(&bytes)?, &scope)?;
-            if replica.offset != manifest.offset {
-                return Err(Error::Integrity("manifest offset mismatch".into()));
-            }
-        }
+        let replica = Self::load_checkpoint(&catalog, &objects, &scope)?
+            .unwrap_or(Replica::empty(scope.clone())?);
         let mut runtime = Self {
             config,
+            uncheckpointed_records: 0,
             catalog,
             objects,
             log: Log::reader(String::new(), &scope),
@@ -187,11 +177,64 @@ impl Runtime {
         }
         Ok(())
     }
+    fn load_checkpoint(
+        catalog: &Catalog,
+        objects: &Objects,
+        scope: &Scope,
+    ) -> Result<Option<Replica>> {
+        let Some((manifest, pin, lease)) = catalog.pin_latest()? else {
+            return Ok(None);
+        };
+        let result = (|| {
+            if manifest.scope != *scope {
+                return Err(Error::Integrity("foreign manifest".into()));
+            }
+            let bytes = objects.get(&manifest.key)?;
+            if bytes.len() != manifest.bytes || digest(&bytes) != manifest.sha256 {
+                return Err(Error::Integrity("checkpoint checksum mismatch".into()));
+            }
+            let checkpoint: vectordb_cluster::state::Checkpoint = serde_json::from_slice(&bytes)?;
+            let prefix = manifest
+                .key
+                .rsplit_once('/')
+                .ok_or_else(|| Error::Integrity("invalid manifest path".into()))?
+                .0;
+            let replica = Replica::restore(checkpoint, scope, |key| {
+                if key.contains('/') || !manifest.objects.contains(&format!("{prefix}/{key}")) {
+                    return Err(vectordb_engine::Error::Invalid(
+                        "object not in published manifest".into(),
+                    ));
+                }
+                objects
+                    .get(&format!("{prefix}/{key}"))
+                    .map_err(|e| vectordb_engine::Error::Io(std::io::Error::other(e.to_string())))
+            })?;
+            catalog.verify_pin(&pin)?;
+            if replica.offset != manifest.offset {
+                return Err(Error::Integrity("manifest offset mismatch".into()));
+            }
+            Ok(Some(replica))
+        })();
+        let _ = catalog.revoke(&lease);
+        result
+    }
     fn catch_up(&mut self, offset: i64) -> Result<()> {
-        for (position, record) in self.log.read(self.replica.offset, offset)? {
-            self.replica.apply(position, record)?;
+        let result = self
+            .log
+            .replay(self.replica.offset, offset, |position, record| {
+                self.replica.apply(position, record)
+            });
+        if matches!(result, Err(Error::CheckpointRequired)) {
+            self.replica =
+                Self::load_checkpoint(&self.catalog, &self.objects, &self.replica.scope)?
+                    .ok_or(Error::CheckpointRequired)?;
+            return self
+                .log
+                .replay(self.replica.offset, offset, |position, record| {
+                    self.replica.apply(position, record)
+                });
         }
-        Ok(())
+        result
     }
     fn commit(&mut self, record: Record) -> Result<i64> {
         self.guard()?;
@@ -200,6 +243,10 @@ impl Runtime {
             let offset = self.log.append(&record)?;
             self.replica.apply(offset, record)?;
             self.guard()?;
+            self.uncheckpointed_records += 1;
+            if self.uncheckpointed_records >= 128 {
+                self.flush_state()?;
+            }
             Ok(offset)
         })();
         if result.is_err() {
@@ -252,6 +299,7 @@ impl Runtime {
             "collections/create"
                 | "entities/insert"
                 | "entities/upsert"
+                | "entities/delete"
                 | "indexes/create"
                 | "indexes/drop"
                 | "partitions/create"
@@ -283,27 +331,57 @@ impl Runtime {
         }
     }
     fn checkpoint(&mut self) -> Result<Value> {
-        let token = self.barrier()?;
-        let bytes = serde_json::to_vec(&self.replica.checkpoint())?;
+        self.barrier()?;
+        self.flush_state()
+    }
+    fn flush_state(&mut self) -> Result<Value> {
+        let snapshot = self.replica.checkpoint()?;
+        let prefix = format!(
+            "{}/checkpoints/{}-{}",
+            self.replica.scope.prefix(),
+            self.replica.offset,
+            uuid::Uuid::new_v4()
+        );
+        let mut keys = vec![];
+        for (key, bytes) in snapshot.sealed.objects {
+            let key = format!("{prefix}/{key}");
+            let hash = digest(&bytes);
+            self.objects.put(&key, bytes)?;
+            if digest(&self.objects.get(&key)?) != hash {
+                return Err(Error::Integrity(
+                    "uploaded segment verification failed".into(),
+                ));
+            }
+            keys.push(key);
+        }
+        let bytes = serde_json::to_vec(&snapshot.checkpoint)?;
         let manifest = Manifest {
             scope: self.replica.scope.clone(),
-            offset: token.offset,
-            key: format!(
-                "{}/checkpoints/{}.json",
-                self.replica.scope.prefix(),
-                uuid::Uuid::new_v4()
-            ),
+            offset: self.replica.offset,
+            key: format!("{prefix}/state.json"),
             sha256: digest(&bytes),
             bytes: bytes.len(),
+            objects: keys,
         };
         self.objects.put(&manifest.key, bytes)?;
-        let check = self.objects.get(&manifest.key)?;
-        if digest(&check) != manifest.sha256 {
+        if digest(&self.objects.get(&manifest.key)?) != manifest.sha256 {
             return Err(Error::Integrity(
                 "uploaded checkpoint verification failed".into(),
             ));
         }
         let published = self.catalog.publish(&manifest)?;
+        if published {
+            self.replica.reclaim();
+            self.log.trim(manifest.offset)?;
+            self.catalog
+                .collect_retired(|key| self.objects.delete(key))?;
+        } else {
+            for key in &manifest.objects {
+                self.objects.delete(key)?;
+            }
+            self.objects.delete(&manifest.key)?;
+        }
+        self.uncheckpointed_records = 0;
         Ok(json!({"published":published,"manifest":manifest}))
     }
 }
@@ -445,9 +523,9 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         slots: Arc::new(tokio::sync::Semaphore::new(32)),
     };
     let app = Router::new()
-        .route("/healthz", get(|| async { Json(json!({"status":"alive","mode":"cluster-p1"})) }))
+        .route("/healthz", get(|| async { Json(json!({"status":"alive","mode":"cluster-m1"})) }))
         .route("/readyz", get(ready))
-        .route("/capabilities", get(|| async { Json(json!({"mode":"cluster-p1","productionReady":false,"atomicScope":"collection","queryShards":1,"consistency":["Strong"],"checkpointFormat":"command-replay-v1","automaticFailover":false})) }))
+        .route("/capabilities", get(|| async { Json(json!({"mode":"cluster-m1","productionReady":false,"atomicScope":"collection","queryShards":1,"consistency":["Strong"],"checkpointFormat":"state-segments-v2","automaticFailover":false,"idempotencyWindowMs":86400000,"idempotencyKeyFormat":"v2-<issuedUnixMs>-<nonce>","defaultVectorDtype":"Float32","explicitPrimaryKeyDelete":true,"automaticCheckpointRecords":128})) }))
         .route("/internal/barrier", post(barrier))
         .route("/v2/vectordb/{category}/{action}", post(execute))
         .layer(DefaultBodyLimit::max(512 * 1024))

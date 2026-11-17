@@ -116,11 +116,13 @@ impl Objects {
     }
     pub fn put(&self, key: &str, bytes: Vec<u8>) -> Result<()> {
         if bytes.len() > MAX_CHECKPOINT_BYTES {
-            return Err(Error::Invalid(
-                "P1 checkpoint exceeds 64 MiB safety limit".into(),
-            ));
+            return Err(Error::Invalid("object exceeds 64 MiB quota".into()));
         }
         self.request(Method::PUT, key, bytes)?;
+        Ok(())
+    }
+    pub fn delete(&self, key: &str) -> Result<()> {
+        self.request(Method::DELETE, key, vec![])?;
         Ok(())
     }
     pub fn get(&self, key: &str) -> Result<Vec<u8>> {

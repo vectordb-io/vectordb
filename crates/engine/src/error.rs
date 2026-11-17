@@ -2,6 +2,8 @@ use thiserror::Error;
 pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Error)]
 pub enum Error {
+    #[error("segment integrity: {0}")]
+    Integrity(String),
     #[error("{0}")]
     Invalid(String),
     #[error("{0}")]

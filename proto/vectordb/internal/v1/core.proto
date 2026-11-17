@@ -1,0 +1,22 @@
+syntax = "proto3";
+package vectordb.internal.v1;
+// M0 transport envelope. The body is canonical UTF-8 JSON of the versioned
+// Rust contract named by kind. Service transport/authentication lands in M5.
+// Never reuse a field number. Additive fields are optional; semantic changes
+// require a new protocol_version and package. Unknown versions fail closed.
+message Envelope {
+  uint32 protocol_version = 1;
+  string collection_generation = 2;
+  Kind kind = 3;
+  bytes body = 4;
+  reserved 5 to 15;
+}
+enum Kind {
+  UNSPECIFIED = 0;
+  COLLECTION_SPEC = 1;
+  MUTATION_BATCH = 2;
+  COMMIT_TOKEN = 3;
+  READ_SNAPSHOT = 4;
+  SEGMENT_MANIFEST = 5;
+  TASK_SPEC = 6;
+}

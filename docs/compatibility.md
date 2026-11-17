@@ -1,8 +1,8 @@
-# Milvus 功能对照与路线
+# Milvus 功能对照
 
 参考代码：本工作区的 `reference-code/milvus/`，提交 `61de3a82cce970235f9ffb0c90b38749d0c3b196`。主要核对了 `internal/distributed/proxy/httpserver/handler_v2.go` 的操作列表，以及 `request_v2.go` 的 Schema / entity / search / hybrid / index 请求定义。未修改 Milvus 参考目录，未复制 Go / C++ 实现。
 
-这是独立实现的 **单机 Alpha**，不是完整移植。不能把 REST 路径相似理解为 Milvus 客户端协议兼容，也不能据此声称“大部分 Milvus 功能已经全部完成”。以下清单是后续持续推进的依据。
+这是独立实现的 **单机 Alpha**，不是完整移植。不能把 REST 路径相似理解为 Milvus 客户端协议兼容，也不能据此声称“大部分 Milvus 功能已经全部完成”。以下清单记录当前能力；未来范围和实施顺序以统一计划为准。
 
 | 功能族 | Rust 当前状态 | 差异 / 待办 |
 | --- | --- | --- |
@@ -27,16 +27,13 @@
 | gRPC / SDK | 未实现 | PyMilvus / Milvus Go / Java SDK 尚不可直接使用 |
 | 认证 | 单个 Bearer Token | 无 users / roles / grants / RBAC |
 | 运维 | healthz、请求 / 错误计数器、优雅退出 | 无完整 tracing、查询画像、分布式指标 |
-| 分布式 | 实验性 P1：集合 WAL、完整查询副本、手动接管 | 尚无自动 Coordinator、sharding、自动 failover、CDC；见 [P1 边界](distributed-p1.md) |
-| 存储分离 | 实验性 P1：S3 命令历史检查点与 Kafka 尾部恢复 | 尚无列式段、持久化索引、tiering、冷热分层 |
+| 分布式 | 实验性 M1：集合 WAL、完整查询副本、手动接管 | 尚无自动 Coordinator、sharding、自动 failover、CDC；见 [集群边界](distributed-p1.md) |
+| 存储分离 | 实验性 M1：Parquet/向量状态段、检查点与 Kafka 尾部恢复 | 已有基本 pin/GC；持久化索引、tiering、冷热分层未完成 |
 | 文本能力 | 未实现 | tokenizer、全文索引、BM25、文本函数 |
 | 生产性能 | 未完成验证 | 仅小数据正确性 / ANN 回归测试，无规模性能承诺 |
 
-## 优先级与验收要求
+## 实施计划
 
-1. **独立引擎能力与规模**：增量 HNSW / IVF、持久化索引、列式存储、并发查询、资源上限；必须测 recall / latency / memory 与重启一致性。
-2. **接口与检索覆盖**：Milvus protobuf / gRPC、SDK 契约测试、BM25 / 稀疏倒排、更多类型、schema 演进、导入导出；必须用真实客户端验证。
-3. **权限与运维**：用户 / 角色 / 授权、审计、TLS 接入、指标与恢复工具；必须做拒绝路径和权限隔离测试。
-4. **分布式基础设施**：一致性日志、复制、分片路由、元数据协调、对象存储；必须通过节点故障、网络分区、写重试、恢复与一致性测试。
+项目目标为 Rust 实现核心能力并提供自有 API。架构、范围、里程碑与验收统一见 [Rust 核心架构与实施计划](implementation-plan.md)；Milvus gRPC/SDK 兼容不是交付要求。上表中的接口差异仅作为现状记录。
 
 没有实现的操作和不认识的参数返回错误；不能用空响应或伪造的状态替代功能。

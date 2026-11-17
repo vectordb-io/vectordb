@@ -4,7 +4,7 @@
 
 A standalone vector database reimplemented in Rust, with an embeddable engine, an HTTP service, transactional persistence, and a separate static website.
 
-**Status: 0.1.0 Alpha.** Inspired by the Milvus data model and REST v2 request style, VectorDB implements a usable set of standalone features. An experimental [distributed P1 prototype](docs/distributed-p1.md) is available separately. Most of the distributed infrastructure in Milvus is not implemented, and VectorDB is not a drop-in replacement for Milvus / PyMilvus. See the [feature comparison](docs/compatibility.md) for the exact scope. The previous C++ implementation, documentation, and website have been removed.
+**Status: 0.1.0 Alpha.** Inspired by the Milvus data model and REST v2 request style, VectorDB implements a usable set of standalone features. An experimental [distributed M1 runtime](docs/distributed-p1.md) is available separately. Most of the distributed infrastructure in Milvus is not implemented, and VectorDB is not a drop-in replacement for Milvus / PyMilvus. See the [feature comparison](docs/compatibility.md) for the exact scope. The previous C++ implementation, documentation, and website have been removed.
 
 ## Quick start
 
@@ -131,6 +131,7 @@ Tests cover transaction rollback, schema validation, filtering, primary key prec
 
 - [API and request contracts](docs/api.md)
 - [Architecture, data reliability, and performance limits](docs/architecture.md)
+- [Rust core architecture and implementation plan](docs/implementation-plan.md)
 - [Milvus feature comparison and roadmap](docs/compatibility.md)
 - [Deployment, authentication, backup, and recovery](docs/operations.md)
 - [Validation records](docs/validation.md)

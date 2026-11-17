@@ -1,7 +1,7 @@
 name: Rust checks
 on:
   push:
-    paths: ['Cargo.toml', 'Cargo.lock', 'pyproject.toml', 'Dockerfile', '.dockerignore', 'crates/**', 'deployments/**', 'python/**', 'tests/**', 'scripts/**', 'examples/**', 'docs/**', 'README*', 'website/**', '.github/workflows/**']
+    paths: ['Cargo.toml', 'Cargo.lock', 'pyproject.toml', 'Dockerfile', '.dockerignore', 'crates/**', 'proto/**', 'deployments/**', 'python/**', 'tests/**', 'scripts/**', 'examples/**', 'docs/**', 'README*', 'website/**', '.github/workflows/**']
   pull_request:
   workflow_dispatch:
 permissions:
@@ -111,7 +111,7 @@ jobs:
         run: docker compose -p vectordb-cluster-test -f deployments/cluster/compose.yaml up -d
       - name: Real Kafka etcd and S3 recovery test
         run: python3 scripts/cluster_smoke.py
-      - name: Catalog and immutable object contracts
+      - name: Catalog, pin/GC, S3 and Kafka fencing contracts
         run: cargo test -p vectordb-cluster --test backends --locked -- --ignored
       - name: Dependency logs on failure
         if: failure()
