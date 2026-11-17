@@ -1,3 +1,4 @@
+mod node;
 use axum::{
     Json, Router,
     extract::{DefaultBodyLimit, Path, State},
@@ -17,7 +18,7 @@ use std::{
 };
 use vectordb_cluster::{
     Error, Result,
-    catalog::{Catalog, Lease, Manifest},
+    catalog::{Catalog, Lease, Manifest, OwnerPhase},
     digest,
     kafka::Log,
     object::Objects,
@@ -26,20 +27,21 @@ use vectordb_cluster::{
 
 #[derive(Clone, Debug, ValueEnum, PartialEq)]
 enum Role {
+    Node,
     Writer,
     Query,
     Checkpoint,
 }
 #[derive(Parser, Clone)]
-#[command(about = "Experimental M1 collection-scoped distributed VectorDB")]
+#[command(about = "Experimental M3 distributed VectorDB")]
 struct Config {
     #[arg(long, value_enum)]
     role: Role,
     #[arg(long, env = "VECTORDB_CLUSTER", default_value = "development")]
     cluster: String,
-    #[arg(long, env = "VECTORDB_COLLECTION")]
+    #[arg(long, env = "VECTORDB_COLLECTION", default_value = "")]
     collection: String,
-    #[arg(long, env = "VECTORDB_GENERATION")]
+    #[arg(long, env = "VECTORDB_GENERATION", default_value = "")]
     generation: String,
     #[arg(long, env = "VECTORDB_BIND", default_value = "127.0.0.1:19531")]
     bind: SocketAddr,
@@ -65,6 +67,26 @@ struct Config {
     secret_key: String,
     #[arg(long, env = "VECTORDB_CLUSTER_TOKEN", hide_env_values = true)]
     token: String,
+    #[arg(long, env = "VECTORDB_WAL_REPLICAS", default_value_t = 1)]
+    wal_replicas: i32,
+    #[arg(skip)]
+    managed: bool,
+}
+fn advertised_origin(address: Option<&str>) -> Result<String> {
+    let address =
+        address.ok_or_else(|| Error::Invalid("writer/node requires --advertise origin".into()))?;
+    let url =
+        reqwest::Url::parse(address).map_err(|_| Error::Invalid("invalid advertise URL".into()))?;
+    if !matches!(url.scheme(), "http" | "https")
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.query().is_some()
+        || url.fragment().is_some()
+        || url.path() != "/"
+    {
+        return Err(Error::Invalid("advertise must be an HTTP(S) origin".into()));
+    }
+    Ok(address.trim_end_matches('/').into())
 }
 enum Work {
     Ready(Value),
@@ -125,25 +147,17 @@ impl Runtime {
         };
         runtime.log = Log::reader(runtime.config.kafka.clone(), &scope);
         if runtime.config.role == Role::Writer {
-            let address = runtime.config.advertise.clone().ok_or_else(|| {
-                Error::Invalid(
-                    "writer requires --advertise URL reachable by query processes".into(),
+            let address = advertised_origin(runtime.config.advertise.as_deref())?;
+            let lease = runtime.catalog.acquire(if runtime.config.managed {
+                format!(
+                    "{}/internal/collections/{}/{}",
+                    address.trim_end_matches('/'),
+                    runtime.config.collection,
+                    runtime.config.generation
                 )
+            } else {
+                address.trim_end_matches('/').into()
             })?;
-            let url = reqwest::Url::parse(&address)
-                .map_err(|_| Error::Invalid("invalid advertise URL".into()))?;
-            if !matches!(url.scheme(), "http" | "https")
-                || !url.username().is_empty()
-                || url.password().is_some()
-                || url.query().is_some()
-                || url.fragment().is_some()
-                || url.path() != "/"
-            {
-                return Err(Error::Invalid("advertise must be an HTTP(S) origin".into()));
-            }
-            let lease = runtime
-                .catalog
-                .acquire(address.trim_end_matches('/').into())?;
             runtime.lease = Some(lease.clone());
             let catalog = runtime.catalog.clone();
             let failed = runtime.failed.clone();
@@ -157,6 +171,14 @@ impl Runtime {
                 }
             });
             runtime.guard()?;
+            node::failpoint("owner_assigned");
+            if runtime.config.managed {
+                runtime.log.ensure_topic(runtime.config.wal_replicas)?;
+            }
+            runtime
+                .catalog
+                .phase(runtime.lease.as_ref().unwrap(), OwnerPhase::Recovering)?;
+            node::failpoint("owner_recovering");
             runtime.log.initialize_writer()?;
             runtime.guard()?;
             let epoch = runtime.lease.as_ref().unwrap().epoch;
@@ -168,7 +190,12 @@ impl Runtime {
             runtime.replica.check_capacity(&record)?;
             let offset = runtime.log.append(&record)?;
             runtime.catch_up(offset)?;
+            node::failpoint("owner_activated");
             runtime.guard()?;
+            runtime
+                .catalog
+                .phase(runtime.lease.as_ref().unwrap(), OwnerPhase::Active)?;
+            node::failpoint("owner_ready");
         }
         Ok(runtime)
     }
@@ -250,6 +277,12 @@ impl Runtime {
         self.replica.check_capacity(&record)?;
         let result = (|| {
             let offset = self.log.append(&record)?;
+            if matches!(record.entry, Entry::Mutation { .. }) {
+                node::failpoint("mutation_committed");
+                if node::injected("mutation_unknown") {
+                    return Err(Error::Unavailable("injected unknown commit outcome".into()));
+                }
+            }
             self.replica.apply(offset, record)?;
             self.guard()?;
             self.uncheckpointed_records += 1;
@@ -285,7 +318,7 @@ impl Runtime {
         Ok(token)
     }
     fn forward(&self, path: &str, body: Value, id: Option<&str>) -> Result<Value> {
-        let owner = self.catalog.owner()?;
+        let owner = self.catalog.active_owner()?;
         let mut request = self
             .client
             .post(format!("{}{path}", owner.address))
@@ -303,9 +336,20 @@ impl Runtime {
         Ok(value)
     }
     fn execute(&mut self, operation: &str, request: Value, id: Option<&str>) -> Result<Work> {
+        if operation == "collections/drop" && !self.config.managed {
+            return Err(Error::Unsupported(
+                "collection lifecycle requires --role node".into(),
+            ));
+        }
+        if operation == "collections/flush" {
+            self.barrier()?;
+            self.replica.read_view("collections/describe", &request)?;
+            return Ok(Work::Ready(json!({"code":0,"data":self.checkpoint()?})));
+        }
         if let Some(action) = operation.strip_prefix("indexes/")
             && ["build", "retry", "cancel", "get_status"].contains(&action)
         {
+            self.barrier()?;
             let data = self.replica.index_control(
                 if action == "get_status" {
                     "status"
@@ -319,6 +363,8 @@ impl Runtime {
         let write = matches!(
             operation,
             "collections/create"
+                | "collections/drop"
+                | "partitions/drop"
                 | "entities/insert"
                 | "entities/upsert"
                 | "entities/delete"
@@ -559,6 +605,9 @@ async fn ready(State(app): State<App>, headers: HeaderMap) -> Response {
 #[tokio::main]
 async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let config = Config::parse();
+    if config.role == Role::Node {
+        return node::serve(config).await;
+    }
     let token = Arc::new(config.token.clone());
     let bind = config.bind;
     let checkpoint = config.role == Role::Checkpoint;

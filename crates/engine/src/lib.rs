@@ -13,3 +13,5 @@ pub use schema::{Field, Schema};
 pub mod segment_storage;
 
 pub mod query_index;
+
+pub use engine::validate_request;

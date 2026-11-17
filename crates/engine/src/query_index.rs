@@ -406,6 +406,13 @@ impl Default for Accelerator {
     }
 }
 impl Accelerator {
+    pub(crate) fn cancel_all(&self) {
+        let mut cache = self.cache.lock().unwrap();
+        cache.paused = true;
+        for task in cache.tasks.values() {
+            task.cancel.store(true, Ordering::Release);
+        }
+    }
     fn new(cache: usize, pins: usize, scratch: usize, builds: usize) -> Self {
         Self {
             cache: Mutex::new(Cache::default()),

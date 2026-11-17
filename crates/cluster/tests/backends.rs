@@ -152,3 +152,117 @@ fn real_log_committed_prefix_and_broker_producer_fencing() {
         futures::executor::block_on(admin.delete_topics(&[&topic], &AdminOptions::new())).unwrap();
     assert!(deleted[0].is_ok());
 }
+
+#[test]
+#[ignore = "requires isolated etcd from deployments/cluster/compose.yaml"]
+fn real_directory_receipts_cas_and_owner_recovery_phases() {
+    use serde_json::json;
+    use vectordb_cluster::{
+        catalog::OwnerPhase,
+        directory::{Directory, Lifecycle},
+        state::{idempotency_key, now_ms},
+    };
+    let cluster = format!("m3-{}", uuid::Uuid::new_v4().simple());
+    let d = Directory::new("http://127.0.0.1:12379".into(), &cluster).unwrap();
+    let request = json!({"collectionName":"items","dimension":2});
+    let key = idempotency_key(now_ms(), "create");
+    let a = d.begin("collections/create", &request, &key).unwrap();
+    let b = d.begin("collections/create", &request, &key).unwrap();
+    assert_eq!(a.target, b.target);
+    assert!(
+        d.begin(
+            "collections/create",
+            &json!({"collectionName":"items","dimension":3}),
+            &key
+        )
+        .is_err()
+    );
+    let scope = a.target.unwrap();
+    let snapshot = d.snapshot().unwrap();
+    d.finish(
+        &scope,
+        Lifecycle::Active,
+        snapshot.by_scope(&scope).unwrap().spec,
+        1,
+    )
+    .unwrap();
+    let alias = json!({"collectionName":"items","aliasName":"live"});
+    d.begin(
+        "aliases/create",
+        &alias,
+        &idempotency_key(now_ms(), "alias"),
+    )
+    .unwrap();
+    let request = json!({"collectionName":"live","data":[{"id":1,"vector":[1,0]}]});
+    let write_id = idempotency_key(now_ms(), "entity");
+    let binding = d.begin("entities/insert", &request, &write_id).unwrap();
+    let replacement = d
+        .begin(
+            "collections/create",
+            &json!({"collectionName":"second","dimension":2}),
+            &idempotency_key(now_ms(), "second"),
+        )
+        .unwrap()
+        .target
+        .unwrap();
+    d.finish(
+        &replacement,
+        Lifecycle::Active,
+        d.snapshot().unwrap().by_scope(&replacement).unwrap().spec,
+        1,
+    )
+    .unwrap();
+    d.begin(
+        "aliases/alter",
+        &json!({"collectionName":"second","aliasName":"live"}),
+        &idempotency_key(now_ms(), "switch"),
+    )
+    .unwrap();
+    assert_eq!(
+        d.begin("entities/insert", &request, &write_id)
+            .unwrap()
+            .target,
+        binding.target
+    );
+    let c = Catalog::new("http://127.0.0.1:12379".into(), &scope).unwrap();
+    let lease = c.acquire("http://127.0.0.1:1".into()).unwrap();
+    assert!(c.active_owner().is_err());
+    assert!(c.phase(&lease, OwnerPhase::Active).is_err());
+    c.phase(&lease, OwnerPhase::Recovering).unwrap();
+    assert!(c.active_owner().is_err());
+    c.phase(&lease, OwnerPhase::Active).unwrap();
+    assert_eq!(c.active_owner().unwrap().nonce, lease.owner.nonce);
+    c.revoke(&lease.id).unwrap();
+    assert!(c.phase(&lease, OwnerPhase::Recovering).is_err());
+    let concurrent = (0..8)
+        .map(|i| {
+            let d = d.clone();
+            std::thread::spawn(move || {
+                d.begin(
+                    "databases/create",
+                    &json!({"dbName":format!("db{i}")}),
+                    &idempotency_key(now_ms(), &format!("db{i}")),
+                )
+                .unwrap()
+            })
+        })
+        .collect::<Vec<_>>();
+    for t in concurrent {
+        t.join().unwrap();
+    }
+    assert_eq!(d.snapshot().unwrap().databases.len(), 9);
+    // Advance past the whole receipt bucket, then roll the clock back. Expired
+    // bindings have been GC'd, but may never silently bind to the switched alias.
+    let later = now_ms() + vectordb_cluster::state::IDEMPOTENCY_WINDOW_MS + 120_000;
+    d.begin_at(
+        "databases/create",
+        &json!({"dbName":"future"}),
+        &idempotency_key(later, "future"),
+        later,
+    )
+    .unwrap();
+    assert!(
+        d.begin_at("entities/insert", &request, &write_id, now_ms())
+            .is_err()
+    );
+}

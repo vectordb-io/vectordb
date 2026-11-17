@@ -15,6 +15,15 @@ pub struct Catalog {
 pub struct Owner {
     pub nonce: String,
     pub address: String,
+    #[serde(default)]
+    pub phase: OwnerPhase,
+}
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum OwnerPhase {
+    Assigning,
+    Recovering,
+    #[default]
+    Active,
 }
 #[derive(Clone, Debug)]
 pub struct Lease {
@@ -41,10 +50,10 @@ impl Catalog {
             prefix: format!("/vectordb/{}/", scope.prefix()),
         })
     }
-    fn key(&self, name: &str) -> String {
+    pub(crate) fn key(&self, name: &str) -> String {
         STANDARD.encode(format!("{}{name}", self.prefix))
     }
-    fn post(&self, path: &str, body: Value) -> Result<Value> {
+    pub(crate) fn post(&self, path: &str, body: Value) -> Result<Value> {
         let response: Value = self
             .client
             .post(format!("{}{path}", self.endpoint))
@@ -57,7 +66,7 @@ impl Catalog {
         }
         Ok(response)
     }
-    fn get(&self, name: &str) -> Result<Option<(String, Vec<u8>)>> {
+    pub(crate) fn get(&self, name: &str) -> Result<Option<(String, Vec<u8>)>> {
         let response = self.post(
             "/v3/kv/range",
             json!({"key":self.key(name),"serializable":false}),
@@ -86,6 +95,7 @@ impl Catalog {
         let owner = Owner {
             nonce: uuid::Uuid::new_v4().to_string(),
             address,
+            phase: OwnerPhase::Assigning,
         };
         let result = self.post("/v3/kv/txn", json!({
             "compare":[{"key":self.key("owner"),"target":"VERSION","version":"0","result":"EQUAL"}],
@@ -106,6 +116,34 @@ impl Catalog {
             .get("owner")?
             .ok_or_else(|| Error::Unavailable("collection has no writer".into()))?;
         Ok(serde_json::from_slice(&bytes)?)
+    }
+    pub fn active_owner(&self) -> Result<Owner> {
+        let owner = self.owner()?;
+        if owner.phase != OwnerPhase::Active {
+            return Err(Error::Unavailable("writer recovery is incomplete".into()));
+        }
+        Ok(owner)
+    }
+    pub fn phase(&self, lease: &Lease, next: OwnerPhase) -> Result<()> {
+        let (revision, bytes) = self
+            .get("owner")?
+            .ok_or_else(|| Error::Unavailable("ownership lost".into()))?;
+        let mut owner: Owner = serde_json::from_slice(&bytes)?;
+        if owner.nonce != lease.owner.nonce
+            || !matches!(
+                (owner.phase, next),
+                (OwnerPhase::Assigning, OwnerPhase::Recovering)
+                    | (OwnerPhase::Recovering, OwnerPhase::Active)
+            )
+        {
+            return Err(Error::Conflict("invalid owner transition".into()));
+        }
+        owner.phase = next;
+        let result = self.post("/v3/kv/txn", json!({"compare":[{"key":self.key("owner"),"target":"MOD","mod_revision":revision,"result":"EQUAL"}],"success":[{"request_put":{"key":self.key("owner"),"value":STANDARD.encode(serde_json::to_vec(&owner)?),"lease":lease.id}}],"failure":[]}))?;
+        if result["succeeded"] != true {
+            return Err(Error::Conflict("owner transition raced".into()));
+        }
+        Ok(())
     }
     pub fn verify(&self, lease: &Lease) -> Result<()> {
         if self.owner()?.nonce != lease.owner.nonce {

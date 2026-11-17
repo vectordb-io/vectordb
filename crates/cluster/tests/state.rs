@@ -348,3 +348,136 @@ fn checkpoint_and_bounded_tail_restore_deletes_autoids_and_dedup() {
             .contains("records")
     );
 }
+
+#[test]
+fn ordered_partition_drop_survives_checkpoint_and_does_not_resurrect() {
+    let mut r = replica();
+    write(
+        &mut r,
+        "partition",
+        "partitions/create",
+        json!({"collectionName":"items","partitionName":"p"}),
+    );
+    write(
+        &mut r,
+        "rows",
+        "entities/insert",
+        json!({"collectionName":"items","partitionName":"p","data":[{"vector":[1,0]},{"vector":[0,1]},{"vector":[1,1]}]}),
+    );
+    write(
+        &mut r,
+        "already-deleted",
+        "entities/delete",
+        json!({"collectionName":"items","ids":[3]}),
+    );
+    let old = r
+        .read_view("entities/count", &json!({"collectionName":"items"}))
+        .unwrap();
+    assert!(
+        r.prepare(
+            r.epoch,
+            &key("bad-drop"),
+            "partitions/drop",
+            json!({"collectionName":"items","partitionNames":["p","missing"]})
+        )
+        .is_err()
+    );
+    write(
+        &mut r,
+        "drop-p",
+        "partitions/drop",
+        json!({"collectionName":"items","partitionNames":["p"]}),
+    );
+    assert_eq!(
+        old.execute("entities/count", json!({"collectionName":"items"}))
+            .unwrap()["count"],
+        2
+    );
+    let mut recovered = restore(r.checkpoint().unwrap()).unwrap();
+    assert_eq!(
+        recovered
+            .query("entities/count", json!({"collectionName":"items"}))
+            .unwrap()["count"],
+        0
+    );
+    write(
+        &mut recovered,
+        "recreate-p",
+        "partitions/create",
+        json!({"collectionName":"items","partitionName":"p"}),
+    );
+    assert_eq!(
+        recovered
+            .query(
+                "entities/count",
+                json!({"collectionName":"items","partitionNames":["p"]})
+            )
+            .unwrap()["count"],
+        0
+    );
+    let retry = recovered
+        .prepare(
+            recovered.epoch,
+            &key("drop-p"),
+            "partitions/drop",
+            json!({"collectionName":"items","partitionNames":["p"]}),
+        )
+        .unwrap()
+        .unwrap_err();
+    assert_eq!(retry.data, json!({}));
+    assert_eq!(
+        recovered
+            .query(
+                "partitions/has",
+                json!({"collectionName":"items","partitionName":"p"})
+            )
+            .unwrap()["has"],
+        true
+    );
+}
+#[test]
+fn dropped_collection_preserves_results_and_rejects_new_mutations_after_recovery() {
+    let mut r = replica();
+    let request = json!({"collectionName":"items","data":[{"vector":[1,0]}]});
+    let result = write(&mut r, "entity", "entities/insert", request.clone());
+    write(
+        &mut r,
+        "drop",
+        "collections/drop",
+        json!({"collectionName":"items"}),
+    );
+    let mut recovered = restore(r.checkpoint().unwrap()).unwrap();
+    assert!(recovered.spec().is_none());
+    assert_eq!(
+        recovered
+            .prepare(
+                recovered.epoch,
+                &key("entity"),
+                "entities/insert",
+                request.clone()
+            )
+            .unwrap()
+            .unwrap_err()
+            .data,
+        result
+    );
+    assert!(
+        recovered
+            .prepare(recovered.epoch, &key("new"), "entities/insert", request)
+            .is_err()
+    );
+    assert_eq!(
+        recovered
+            .query("collections/has", json!({"collectionName":"items"}))
+            .unwrap()["has"],
+        false
+    );
+    let mut foreign = scope();
+    foreign.generation = "replacement".into();
+    let record = Record {
+        format: FORMAT,
+        scope: foreign,
+        entry: Entry::Activate { epoch: 999 },
+    };
+    assert!(recovered.apply(recovered.offset + 1, record).is_err());
+}

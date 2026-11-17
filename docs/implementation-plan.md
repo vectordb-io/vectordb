@@ -1,10 +1,10 @@
 # VectorDB Rust 核心架构与实施计划
 
-日期：2026-11-17。状态：M0—M2 已实现，其余里程碑待实施与验收。初始方案代码基线：`179e2d314b90077d81e4cd4b391dc1110c337d01`。
+日期：2026-11-17。状态：M0—M3 已实现，其余里程碑待实施与验收。初始方案代码基线：`179e2d314b90077d81e4cd4b391dc1110c337d01`。
 
 目标是使用 Rust 实现可持续运行、支持存算分离和分片扩展的向量数据库，提供自己的 API。验收依据是数据正确性、检索效果、扩展能力与故障恢复，不要求兼容 Milvus 的接口、SDK、错误码或磁盘格式。
 
-本文是核心功能范围、架构协议、实施顺序和验收要求的唯一权威计划。当前代码能力见 [功能对照](compatibility.md)，当前集群运行方法见 [集群运行与验证](distributed-p1.md)。P1 是早期原型的历史名称；M0—M2 的实现和验收依据记录在第 12 节。
+本文是核心功能范围、架构协议、实施顺序和验收要求的唯一权威计划。当前代码能力见 [功能对照](compatibility.md)，当前集群运行方法见 [集群运行与验证](distributed-p1.md)。P1 是早期原型的历史名称；M0—M3 的实现和验收依据记录在第 12 节。
 
 核心 V1 以 M0—M6 全部验收通过为完成条件。M7 单集合写入横向扩展以及文本检索等后续工作单独验收，不包含在 V1 完成声明中。
 
@@ -42,7 +42,7 @@ RAG 文本检索作为紧接 V1 的独立扩展：tokenizer、稀疏倒排、BM2
 
 ## 2 当前基线与统一决策
 
-当前单机入口仍使用 SQLite，保留基础 CRUD、过滤与向量检索。集群已切换到原生主键状态表、批次暂存、Parquet/向量段和状态检查点，移除了写入/回放的整库复制。集群原生引擎已支持持久化 HNSW/IVF_FLAT、后台构建、过滤索引和并发读视图。查询仍为完整集合副本；集合生命周期、分片查询、自动调度与生产高可用继续按 M3—M6 实现。
+当前单机入口仍使用 SQLite，保留基础 CRUD、过滤与向量检索。集群已切换到原生主键状态表、批次暂存、Parquet/向量段和状态检查点，移除了写入/回放的整库复制。集群原生引擎已支持持久化 HNSW/IVF_FLAT、后台构建、过滤索引和并发读视图。M3 已增加多集合目录、别名、可恢复的集合/分区生命周期及接管。查询仍为完整集合副本；分片查询、自动调度与生产高可用继续按 M4—M6 实现。
 
 | 决策 | 统一规定 |
 | --- | --- |
@@ -378,7 +378,7 @@ M2 reader 可加载 M1 的状态格式 2（无索引引用）并后台补建；W
 
 [原始 M2 基准](benchmarks/m2-baseline.json) 由 `query_bench` 和 `scripts/query_benchmark.py` 生成：Apple M5/24 GiB，release，seed=24301，10k × 32 Float32，50 个查询，top-k=10；HNSW `M=16, efConstruction=128, ef=64`，IVF `nlist=32, nprobe=16`。门槛为普通 recall@10 ≥ 0.95、1% 严格过滤与 FLAT 完全一致、加载不构建、一次更新不重建。本轮 HNSW recall=1.000、IVF recall=0.988，严格过滤均为 1.000。完整记录同时提供构建、P50/P99、对象体积、恢复、更新耗时和整个基准进程峰值 RSS；此小规模数据上的 ANN 延迟没有优于 FLAT，不据此宣称吞吐提升。`distanceEvaluations` 仅计最终候选评分，不能代替包含图遍历的实测延迟。
 
-### M3 完整集群数据操作与集合生命周期
+### M3 完整集群数据操作与集合生命周期（已实现）
 
 交付：
 
@@ -389,6 +389,22 @@ M2 reader 可加载 M1 的状态格式 2（无索引引用）并后台补建；W
 - writer 接管协议与事务提交不确定状态的恢复，不依赖人工修改元数据。
 
 验收：每个状态转换前后崩溃都能继续或明确失败；集合同名重建不接收旧 generation 的消息；别名切换时请求固定目标身份；批量错误全量回滚；已确认写入和删除在重启后保持相同结果。API 能力清单与实际开放操作一致。
+
+### M3 实现与验收记录
+
+**入口与身份。** 新增 `--role node`，一个入口管理多个命名空间和集合；不再由客户端指定 generation。`directory.rs` 在 etcd 的 `/vectordb/<cluster>/_catalog/v1/` 保存版本化目录，名字、别名、集合状态与操作绑定使用同一 revision CAS。每次创建分配不可复用的 `c<UUID>` collection_id 和 UUID generation；原生引擎、Kafka topic、owner 和对象路径使用该身份。对外保留用户的 dbName/collectionName。Schema 在创建时校验并固定；分区和索引变更通过集合有序日志提交。目录中的 `spec/spec_offset` 是可丢弃的版本化缓存，完整状态以 WAL/检查点为准；恢复 owner 后重新发布，缓存不足不丢失 Schema 或操作结果。
+
+**生命周期。** 创建先原子记录 `Creating` 意图和幂等请求，再建立专用单分区 topic、恢复 writer、提交 create 控制记录，最后 CAS 为 `Active`。删除先变为 `Dropping` 并移除指向该身份的别名，再提交 drop 控制记录，最后变为 `Dropped`。pending 意图由任意存活 node 定期恢复；请求重试也可驱动恢复。删除后保留精简身份记录和旧 generation 的去重结果，立即禁止按名字发起新请求；同名重建获得全新身份。分区删除先校验全部分区，再在一个 WAL 控制记录中删除分区和其可见行；默认分区不能删除。墓碑保留版本，重建同名分区不会复活旧行。物理删除旧 generation 的 topic/对象属于 M6，不能用逻辑删除提前清空恢复证据。
+
+**重试与别名。** 写请求首先原子固定 `(dbName, 请求使用的集合名或别名, request_id)` 对应的摘要和目标身份；路由记录不保存实体内容；过期记录清理、预算回收和持久化单调时钟推进在同一 etcd CAS 中完成，避免时钟回拨后旧键重新绑定。别名切换后，已解析的查询仍使用原身份，已绑定但尚未写入的请求重试也不会改投新集合。实体结果仍由 `(collection_id,generation,request_id)` 的 WAL/检查点去重返回；数据库和别名操作在 etcd 事务中保存结果，create/drop 的结果由保留的身份记录重建。窗口仍为 24 小时，过期明确拒绝。若内部生命周期意图超过窗口，先完成日志恢复确认控制操作尚未发生，才生成新的内部控制请求；不会给未知实体写入换键重发。
+
+**接管。** owner 明确经历 `Assigning → Recovering → Active`；阶段发布比较 lease owner 的 nonce 和 etcd revision。取得新租约后建立或确认 topic，初始化固定 transactional.id 以隔离旧 producer、解析未完成事务，提交 Activate 并回放到该位置，最后发布 Active。未 Active 的 owner 不对外提供屏障。提交结果不确定的 Runtime 永久标记失败，下一次请求丢弃旧 assignment、取得新租约和 epoch 后从共享状态恢复；不会在旧任务中重新初始化 producer。M3 是按请求竞争和 pending DDL 驱动的接管，不提供负载放置、主动迁移或故障域调度；后者仍由 M5 验收。
+
+**开放操作与资源。** node 提供 database create/list/describe/drop（仅允许删除空的非 default 命名空间），collection create/list/has/describe/stats/drop/flush，alias create/alter/drop/list/describe，partition create/drop/list/has/stats，index create/drop/list/describe/build/retry/cancel/status，以及 insert/upsert/显式 ID delete/get/query/count/search。`entities/count` 返回 `{count:N}`，与 query 的 `count(*)` 共用过滤/可见性逻辑。`/capabilities.operations` 与请求分发使用同一清单；不支持的操作返回 501。目录上限为 32 个命名空间、16 个活跃集合、256 个保留身份、1 MiB 元数据，创建定义至多 64 KiB；每 node 最多缓存 16 个集合，最多两个后台索引 worker。集群路由凭证最多 32,768 个，按 24 小时过期加不超过约一分钟保守余量释放预算；已有凭证的重试不占新额度。目录只保存有限元数据与摘要，不保存向量、实体行或逐条主键。各集合继承 M1/M2 的数据、去重和查询预算；这些是开发期明确限制，不是生产规模容量承诺。
+
+**验证。** 新增纯目录状态测试、路由凭证预算测试及集合/分区删除回放测试。真实 etcd 测试覆盖并发 CAS、请求身份绑定和 owner 阶段转换。`cluster_m3_smoke.py` 使用两个 node 和真实 etcd/Kafka/S3，覆盖多命名空间、别名切换、跨节点读写、自动 ID、失败批次回滚、显式删除、分区删除、S3 恢复和接管；在 Creating、owner 四个步骤、create commit、Active、Dropping、drop commit、Dropped 和 mutation commit 的 11 个边界分别强制终止进程，重启后用原键恢复结果；另在路由绑定后崩溃，再切换别名验证未知写入不会改投新集合。另外验证节点进程不重启时，对提交结果不确定返回 503 后仍能通过新 assignment 恢复原结果。分区删除测试包含之前已删除的墓碑，避免检查点引用已移除分区。故障钩子只在 debug 构建中生效。CI 保留 M0—M2 的契约、恢复和 fencing 回归，并运行新增 M3 验收脚本。
+
+本轮验证：Rust stable 1.99.1 与最低版本 1.89 的 workspace 各通过 58 个非忽略测试；3 个真实后端契约测试通过。M3 双节点操作、12 个崩溃场景和进程内未知提交恢复通过；M0—M2 的真实集群恢复、pin/GC、fencing、Kafka 故障，以及单机 HTTP/进程恢复回归通过。fmt、Clippy（`-D warnings`）、workspace 构建和网站/文档链接检查通过。
 
 ### M4 分片查询与查询副本
 
@@ -446,7 +462,9 @@ M2 reader 可加载 M1 的状态格式 2（无索引引用）并后台补建；W
 | `crates/engine/src/query_index.rs` | 本地段索引、标量 bitset、后台任务、读视图和资源准入 |
 | `crates/engine/src/engine.rs` | 保留旧存储适配器；提取查询规划与执行；退出集群热路径 |
 | `crates/cluster/src/state.rs` | 用主键状态、版本与段视图替换完整 Engine 副本和命令历史 |
-| `crates/cluster/src/catalog.rs` | 正式 catalog、generation、任务、路由、pin 和 CAS 状态机 |
+| `crates/cluster/src/directory.rs` | 多命名空间/集合/别名目录、生命周期意图、请求身份绑定和有界回收 |
+| `crates/cluster/src/catalog.rs` | owner 阶段、租约、manifest、pin 和 CAS 状态机 |
+| `crates/cluster/src/node.rs` | 多集合路由、恢复意图、按请求接管与能力清单 |
 | `crates/cluster/src/kafka.rs` | 协议化激活、提交结果恢复、流式回放、安全截断与认证配置 |
 | `crates/cluster/src/object.rs` | 对象能力接口、流式/范围读取、重试、校验、条件写、生产凭据 |
 | `crates/cluster/src/main.rs` | 拆出 Proxy、Coordinator、Streaming、Query、Data 角色与配置 |
@@ -512,7 +530,7 @@ V1 发布补充端到端门槛固定为：相同 100k × 128 数据，持久化�
 
 核心版本的交付件包括源代码、协议与格式说明、迁移工具、部署文件、测试与基准脚本、结果报告、运维手册和支持能力清单。缺少任一必需能力或验收证据时，保持开发中状态。
 
-M0—M2 已完成契约、原生段恢复、持久索引、过滤执行和并发读视图。下一步进入 M3：完善命名空间/多集合 catalog、集合与分区生命周期、别名、可恢复 DDL 和 writer 接管协议。M3—M6 的集合生命周期、分片和自动调度保持独立验收，不能把本轮完成等同于核心 V1 完成。
+M0—M3 已完成契约、原生段恢复、持久索引、并发读视图、多集合目录和可恢复生命周期。下一步进入 M4：固定逻辑分片、查询路由、统一快照与全局结果合并，使各 Query 节点只加载自己负责的数据。M4—M6 的分片、调度和发布能力保持独立验收，不能把本轮完成等同于核心 V1 完成。
 
 M7、BM25/稀疏倒排、量化/GPU、其他一致性模式各自维护验收结果；V1 完成不等于这些扩展已经实现。
 

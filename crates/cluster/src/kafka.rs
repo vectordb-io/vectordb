@@ -21,6 +21,28 @@ impl Log {
             producer: None,
         }
     }
+    pub fn ensure_topic(&self, replicas: i32) -> Result<()> {
+        use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication};
+        let admin: AdminClient<_> = ClientConfig::new()
+            .set("bootstrap.servers", &self.brokers)
+            .create::<AdminClient<rdkafka::client::DefaultClientContext>>()?;
+        let topic = NewTopic::new(&self.topic, 1, TopicReplication::Fixed(replicas))
+            .set("retention.ms", "-1")
+            .set("retention.bytes", "-1")
+            .set("cleanup.policy", "delete")
+            .set("max.message.bytes", "2097152");
+        for result in futures::executor::block_on(admin.create_topics(
+            &[topic],
+            &AdminOptions::new().operation_timeout(Some(TIMEOUT)),
+        ))? {
+            if let Err((_, code)) = result
+                && code != rdkafka::error::RDKafkaErrorCode::TopicAlreadyExists
+            {
+                return Err(Error::Unavailable(format!("create WAL topic: {code}")));
+            }
+        }
+        Ok(())
+    }
     /// Call only after acquiring a new catalog ownership lease. Never retry on
     /// the same owner after fencing or an uncertain transaction outcome.
     pub fn initialize_writer(&mut self) -> Result<()> {

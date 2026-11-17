@@ -50,7 +50,7 @@ impl VersionedRow {
 #[derive(Debug)]
 pub struct MutationBatch {
     base: i64,
-    spec: CollectionSpec,
+    spec: Option<CollectionSpec>,
     rows: Vec<VersionedRow>,
     pub result: Value,
 }
@@ -148,6 +148,39 @@ impl SegmentEngine {
         let mut result = json!({});
         match operation {
             "collections/create" => {}
+            "collections/drop" => {
+                return Ok(MutationBatch {
+                    base: self.revision,
+                    spec: None,
+                    rows: vec![],
+                    result,
+                });
+            }
+            "partitions/drop" => {
+                let names = strings(&r, "partitionNames")?;
+                if names.is_empty() || names.iter().any(|p| p == "_default") {
+                    return Err(invalid(
+                        "cannot drop default partition; provide partitionNames",
+                    ));
+                }
+                for p in &names {
+                    self.partition(&c, p)?;
+                }
+                for p in &names {
+                    c.partitions.remove(p);
+                }
+                rows.extend(
+                    self.rows
+                        .values()
+                        .filter(|row| names.contains(&row.partition))
+                        .map(|row| VersionedRow {
+                            key: row.key.clone(),
+                            partition: "_default".into(),
+                            version: 0,
+                            body: None,
+                        }),
+                );
+            }
             "partitions/create" => {
                 let p = text(&r, "partitionName")?;
                 name(p)?;
@@ -271,7 +304,7 @@ impl SegmentEngine {
         }
         Ok(MutationBatch {
             base: self.revision,
-            spec: c,
+            spec: Some(c),
             rows,
             result,
         })
@@ -280,7 +313,13 @@ impl SegmentEngine {
         if batch.base != self.revision || version <= self.revision {
             return Err(Error::Conflict("stale prepared batch or version".into()));
         }
-        self.spec = Some(batch.spec);
+        self.spec = batch.spec;
+        if self.spec.is_none() {
+            self.rows.clear();
+            self.bytes = 0;
+            self.accelerator.cancel_all();
+            self.accelerator = Arc::new(crate::query_index::Accelerator::default());
+        }
         for mut row in batch.rows {
             self.bytes = self
                 .bytes
@@ -349,6 +388,12 @@ impl SegmentEngine {
                     .ok_or_else(|| Error::NotFound(
                         "index not found".into()
                     ))?]))
+            }
+            "entities/count" => {
+                let mut request = r.clone();
+                request["outputFields"] = json!(["count(*)"]);
+                let result = self.query(&c, &request, false)?;
+                Ok(json!({"count":result[0]["count(*)"]}))
             }
             "entities/get" | "entities/query" => self.query(&c, &r, op.ends_with("get")),
             "entities/search" => self.search(&c, &r),

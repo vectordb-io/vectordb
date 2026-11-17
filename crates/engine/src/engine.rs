@@ -1161,7 +1161,7 @@ fn keys(v: &Value, allowed: &[&str], context: &str) -> Result<()> {
     }
     Ok(())
 }
-pub(crate) fn validate_request(op: &str, r: &Value) -> Result<()> {
+pub fn validate_request(op: &str, r: &Value) -> Result<()> {
     if !r.is_object() {
         return Err(invalid("request must be an object"));
     }
@@ -1251,6 +1251,7 @@ pub(crate) fn validate_request(op: &str, r: &Value) -> Result<()> {
         "indexes/describe" | "indexes/drop" => &["collectionName", "indexName"],
         "entities/insert" | "entities/upsert" => &["collectionName", "partitionName", "data"],
         "entities/delete" => &["collectionName", "partitionNames", "filter"],
+        "entities/count" => &["collectionName", "partitionNames", "filter"],
         "entities/query" => &[
             "collectionName",
             "partitionNames",

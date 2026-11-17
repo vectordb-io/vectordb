@@ -1,5 +1,5 @@
-//! Experimental collection-scoped log replication and shared checkpoints.
-//! M0/M1 state segments and recovery; later production milestones remain open.
+//! Experimental multi-collection catalog, ordered logs and shared checkpoints.
+//! M0-M3 lifecycle and recovery; sharding and production milestones remain open.
 pub mod catalog;
 pub mod kafka;
 pub mod object;
@@ -51,3 +51,5 @@ pub fn identifier(value: &str) -> Result<()> {
 }
 
 pub mod contracts;
+
+pub mod directory;

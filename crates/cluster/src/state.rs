@@ -17,7 +17,7 @@ pub fn now_ms() -> i64 {
 pub fn idempotency_key(issued_ms: i64, nonce: &str) -> String {
     format!("v2-{issued_ms}-{nonce}")
 }
-fn expiry(id: &str, now: i64) -> Result<i64> {
+pub fn expiry(id: &str, now: i64) -> Result<i64> {
     identifier(id)?;
     let mut parts = id.splitn(3, '-');
     if parts.next() != Some("v2") {
@@ -208,6 +208,9 @@ impl Replica {
             results,
         };
         Ok(Snapshot { checkpoint, sealed })
+    }
+    pub fn spec(&self) -> Option<&vectordb_engine::segment::CollectionSpec> {
+        self.engine.spec()
     }
     pub fn reclaim(&mut self) {
         self.engine.reclaim_tombstones();
@@ -417,6 +420,8 @@ impl Replica {
             matches!(
                 operation,
                 "collections/create"
+                    | "collections/drop"
+                    | "partitions/drop"
                     | "entities/insert"
                     | "entities/upsert"
                     | "entities/delete"
@@ -434,6 +439,7 @@ impl Replica {
                     | "entities/search"
                     | "entities/get"
                     | "entities/query"
+                    | "entities/count"
                     | "indexes/list"
                     | "indexes/describe"
                     | "partitions/list"
@@ -443,7 +449,7 @@ impl Replica {
         };
         if !allowed {
             return Err(Error::Unsupported(format!(
-                "{operation} is not enabled in M1 cluster mode"
+                "{operation} is not enabled in cluster mode"
             )));
         }
         Ok(())
