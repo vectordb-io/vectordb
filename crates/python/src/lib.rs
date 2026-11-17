@@ -18,7 +18,9 @@ fn python_error(error: Error) -> PyErr {
         Error::NotFound(_) => NotFoundError::new_err(message),
         Error::Conflict(_) => ConflictError::new_err(message),
         Error::Unsupported(_) => UnsupportedError::new_err(message),
-        Error::Integrity(_) | Error::Storage(_) | Error::Io(_) => StorageError::new_err(message),
+        Error::Capacity(_) | Error::Integrity(_) | Error::Storage(_) | Error::Io(_) => {
+            StorageError::new_err(message)
+        }
     }
 }
 

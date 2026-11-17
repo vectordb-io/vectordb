@@ -66,6 +66,15 @@ struct Config {
     #[arg(long, env = "VECTORDB_CLUSTER_TOKEN", hide_env_values = true)]
     token: String,
 }
+enum Work {
+    Ready(Value),
+    Read {
+        view: Box<vectordb_engine::query_index::ReadView>,
+        token: Token,
+        operation: String,
+        request: Value,
+    },
+}
 struct Runtime {
     config: Config,
     catalog: Catalog,
@@ -293,7 +302,20 @@ impl Runtime {
         }
         Ok(value)
     }
-    fn execute(&mut self, operation: &str, request: Value, id: Option<&str>) -> Result<Value> {
+    fn execute(&mut self, operation: &str, request: Value, id: Option<&str>) -> Result<Work> {
+        if let Some(action) = operation.strip_prefix("indexes/")
+            && ["build", "retry", "cancel", "get_status"].contains(&action)
+        {
+            let data = self.replica.index_control(
+                if action == "get_status" {
+                    "status"
+                } else {
+                    action
+                },
+                &request,
+            )?;
+            return Ok(Work::Ready(json!({"code":0,"data":data})));
+        }
         let write = matches!(
             operation,
             "collections/create"
@@ -307,31 +329,45 @@ impl Runtime {
         if write {
             let id = id.ok_or_else(|| Error::Invalid("Idempotency-Key header required".into()))?;
             if self.lease.is_none() {
-                return self.forward(&format!("/v2/vectordb/{operation}"), request, Some(id));
+                return self
+                    .forward(&format!("/v2/vectordb/{operation}"), request, Some(id))
+                    .map(Work::Ready);
             }
             self.guard()?;
             match self
                 .replica
                 .prepare(self.replica.epoch, id, operation, request)?
             {
-                Err(result) => Ok(json!({"code":0,"data":result.data,"commitToken":result.token})),
+                Err(result) => Ok(Work::Ready(
+                    json!({"code":0,"data":result.data,"commitToken":result.token}),
+                )),
                 Ok(record) => {
                     self.commit(record)?;
                     let result = self
                         .replica
                         .result(id)
                         .ok_or_else(|| Error::Integrity("committed result missing".into()))?;
-                    Ok(json!({"code":0,"data":result.data,"commitToken":result.token}))
+                    Ok(Work::Ready(
+                        json!({"code":0,"data":result.data,"commitToken":result.token}),
+                    ))
                 }
             }
         } else {
             let token = self.barrier()?;
-            let data = self.replica.query(operation, request)?;
-            Ok(json!({"code":0,"data":data,"readToken":token}))
+            let view = self.replica.read_view(operation, &request)?;
+            Ok(Work::Read {
+                view: Box::new(view),
+                token,
+                operation: operation.into(),
+                request,
+            })
         }
     }
     fn checkpoint(&mut self) -> Result<Value> {
         self.barrier()?;
+        if let Err(error) = self.replica.build_indexes() {
+            eprintln!("checkpoint retains FLAT fallback: {error}");
+        }
         self.flush_state()
     }
     fn flush_state(&mut self) -> Result<Value> {
@@ -388,6 +424,7 @@ impl Runtime {
 impl Drop for Runtime {
     fn drop(&mut self) {
         self.failed.store(true, Ordering::SeqCst);
+        self.replica.stop_index_jobs();
         if let Some(lease) = &self.lease {
             let _ = self.catalog.revoke(&lease.id);
         }
@@ -449,7 +486,7 @@ fn error_response(error: Error) -> Response {
 async fn run(
     app: App,
     headers: HeaderMap,
-    action: impl FnOnce(&mut Runtime) -> Result<Value> + Send + 'static,
+    action: impl FnOnce(&mut Runtime) -> Result<Work> + Send + 'static,
 ) -> Response {
     if !authorized(&headers, &app.token) {
         return (
@@ -464,11 +501,25 @@ async fn run(
     };
     match tokio::task::spawn_blocking(move || {
         let _permit = permit;
-        let mut runtime = app
-            .runtime
-            .lock()
-            .map_err(|_| Error::Unavailable("worker panicked".into()))?;
-        action(&mut runtime)
+        let work = {
+            let mut runtime = app
+                .runtime
+                .lock()
+                .map_err(|_| Error::Unavailable("worker panicked".into()))?;
+            action(&mut runtime)?
+        };
+        match work {
+            Work::Ready(value) => Ok(value),
+            Work::Read {
+                view,
+                token,
+                operation,
+                request,
+            } => {
+                let data = view.execute(&operation, request)?;
+                Ok(json!({"code":0,"data":data,"readToken":token}))
+            }
+        }
     })
     .await
     {
@@ -494,14 +545,14 @@ async fn execute(
 }
 async fn barrier(State(app): State<App>, headers: HeaderMap) -> Response {
     run(app, headers, |runtime| {
-        Ok(json!({"code":0,"data":runtime.barrier()?}))
+        Ok(Work::Ready(json!({"code":0,"data":runtime.barrier()?})))
     })
     .await
 }
 async fn ready(State(app): State<App>, headers: HeaderMap) -> Response {
     run(app, headers, |runtime| {
         runtime.barrier()?;
-        Ok(json!({"code":0,"ready":true}))
+        Ok(Work::Ready(json!({"code":0,"ready":true})))
     })
     .await
 }
@@ -522,10 +573,28 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         token,
         slots: Arc::new(tokio::sync::Semaphore::new(32)),
     };
+    let weak = Arc::downgrade(&state.runtime);
+    std::thread::spawn(move || {
+        loop {
+            let Some(runtime) = weak.upgrade() else { break };
+            let jobs = {
+                let Ok(runtime) = runtime.lock() else { break };
+                if runtime.failed.load(Ordering::Acquire) {
+                    break;
+                }
+                runtime.replica.index_jobs()
+            };
+            drop(runtime);
+            for job in jobs {
+                std::thread::spawn(move || job.run());
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    });
     let app = Router::new()
-        .route("/healthz", get(|| async { Json(json!({"status":"alive","mode":"cluster-m1"})) }))
+        .route("/healthz", get(|| async { Json(json!({"status":"alive","mode":"cluster-m2"})) }))
         .route("/readyz", get(ready))
-        .route("/capabilities", get(|| async { Json(json!({"mode":"cluster-m1","productionReady":false,"atomicScope":"collection","queryShards":1,"consistency":["Strong"],"checkpointFormat":"state-segments-v2","automaticFailover":false,"idempotencyWindowMs":86400000,"idempotencyKeyFormat":"v2-<issuedUnixMs>-<nonce>","defaultVectorDtype":"Float32","explicitPrimaryKeyDelete":true,"automaticCheckpointRecords":128})) }))
+        .route("/capabilities", get(|| async { Json(json!({"mode":"cluster-m2","productionReady":false,"atomicScope":"collection","queryShards":1,"consistency":["Strong"],"checkpointFormat":"state-segments-v3","persistentIndexes":true,"concurrentReads":true,"automaticFailover":false,"idempotencyWindowMs":86400000,"idempotencyKeyFormat":"v2-<issuedUnixMs>-<nonce>","defaultVectorDtype":"Float32","explicitPrimaryKeyDelete":true,"automaticCheckpointRecords":128})) }))
         .route("/internal/barrier", post(barrier))
         .route("/v2/vectordb/{category}/{action}", post(execute))
         .layer(DefaultBodyLimit::max(512 * 1024))

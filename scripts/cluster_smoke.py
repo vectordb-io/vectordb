@@ -124,7 +124,7 @@ def main():
             writer, wp = start("writer")
             q1, qp1 = start("query")
             q2, qp2 = start("query")
-            request(qp1, "collections/create", {"collectionName": "items", "dimension": 2, "autoID": True}, "create")
+            request(qp1, "collections/create", {"collectionName": "items", "dimension": 2, "autoID": True, "indexParams": [{"fieldName": "vector", "indexType": "HNSW", "metricType": "COSINE", "params": {"M": 8, "efConstruction": 64}}]}, "create")
             body = {"collectionName": "items", "data": [{"vector": [1, 0]}, {"vector": [0, 1]}]}
             accepted = request(qp1, "entities/insert", body, "first")
             assert accepted["data"]["insertIds"] == [1, 2]
@@ -156,6 +156,7 @@ def main():
             completed = subprocess.run([str(BINARY), "--role", "checkpoint"], env=ENV, check=True, capture_output=True, text=True, timeout=90)
             manifest = json.loads(completed.stdout)["manifest"]
             assert manifest["offset"] >= accepted["commitToken"]["offset"]
+            assert any("index-bucket-" in key for key in manifest["objects"]), "checkpoint must include built indexes"
             # This acknowledged mutation is deliberately newer than the checkpoint.
             tail = {"collectionName": "items", "data": [{"vector": [2, 2]}]}
             tail_result = request(qp1, "entities/insert", tail, "tail")
@@ -171,6 +172,8 @@ def main():
             time.sleep(32)
             writer, wp = start("writer")
             q1, qp1 = start("query")
+            status = request(qp1, "indexes/get_status", {"collectionName": "items"})["data"]
+            assert status["loadedSegments"] > 0, status
             assert request(qp1, "entities/insert", tail, "tail") == tail_result
             assert request(qp1, "entities/insert", body, "first") == accepted
             assert request(qp1, "collections/get_stats", {"collectionName": "items"})["data"]["rowCount"] == 10
@@ -186,6 +189,20 @@ def main():
             # The old manifest namespace must be reclaimed after its pin is released.
             old_stat = subprocess.run([*COMPOSE, "exec", "-T", "minio", "mcli", "stat", "test/vectordb/" + manifest["key"]], capture_output=True, timeout=20)
             assert old_stat.returncode != 0, "retired checkpoint was not reclaimed"
+            print("Checking concurrent Strong searches while writes continue", flush=True)
+            def concurrent_read(i):
+                hits = request(qp1, "entities/search", {"collectionName": "items", "data": [[1, 0]] * 32, "limit": 10})["data"]
+                assert len(hits) == 320
+                assert all(hit["id"] not in [2, 12] for hit in hits)
+                first = [{k: v for k, v in hit.items() if k != "queryIndex"} for hit in hits[:10]]
+                for n in range(1, 32):
+                    assert [{k: v for k, v in hit.items() if k != "queryIndex"} for hit in hits[n*10:(n+1)*10]] == first
+            with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+                readers = [executor.submit(concurrent_read, i) for i in range(16)]
+                for i in range(8):
+                    request(wp, "entities/upsert", {"collectionName": "items", "data": [{"id": 1, "vector": [i, 4]}]}, f"parallel-{i}")
+                for reader in readers:
+                    reader.result()
             print("Checking that an active writer cannot be replaced", flush=True)
             duplicate = subprocess.run([str(BINARY), "--role", "writer", "--advertise", "http://127.0.0.1:1"], env=ENV, capture_output=True, text=True, timeout=20)
             assert duplicate.returncode != 0

@@ -49,6 +49,8 @@ pub struct StateManifest {
     pub revision: i64,
     pub spec: Option<CollectionSpec>,
     pub segments: Vec<SegmentManifest>,
+    #[serde(default)]
+    pub indexes: Vec<ObjectRef>,
 }
 /// Sealing owns an immutable snapshot. Persist all objects before publishing the
 /// manifest; callers retain this object until publication succeeds or fails.
@@ -122,10 +124,11 @@ impl SegmentEngine {
     pub fn seal(&self) -> Result<SealedState> {
         let mut sealed = SealedState {
             manifest: StateManifest {
-                format: STATE_FORMAT,
+                format: 3,
                 revision: self.revision,
                 spec: self.spec.clone(),
                 segments: vec![],
+                indexes: vec![],
             },
             objects: vec![],
         };
@@ -263,19 +266,30 @@ impl SegmentEngine {
             });
             start = end;
         }
+        for (key, bytes) in self.persist_indexes()? {
+            sealed.manifest.indexes.push(ObjectRef {
+                key: key.clone(),
+                bytes: bytes.len(),
+                sha256: checksum(&bytes),
+            });
+            sealed.objects.push((key, bytes));
+        }
         Ok(sealed)
     }
     pub fn load(
         manifest: StateManifest,
         mut get: impl FnMut(&str) -> Result<Vec<u8>>,
     ) -> Result<Self> {
-        if manifest.format != STATE_FORMAT || manifest.revision < 0 {
+        if ![STATE_FORMAT, 3].contains(&manifest.format)
+            || (manifest.format == STATE_FORMAT && !manifest.indexes.is_empty())
+            || manifest.revision < 0
+        {
             return Err(storage("unsupported state format or revision"));
         }
         let mut engine = Self::new();
         engine.revision = manifest.revision;
         let Some(spec) = manifest.spec else {
-            if !manifest.segments.is_empty() {
+            if !manifest.segments.is_empty() || !manifest.indexes.is_empty() {
                 return Err(storage("segments without schema"));
             }
             return Ok(engine);
@@ -429,7 +443,7 @@ impl SegmentEngine {
                     version,
                     body: if tombstone { None } else { Some(row) },
                 };
-                if engine.rows.insert(key, r).is_some() {
+                if engine.rows.insert(key, Arc::new(r)).is_some() {
                     return Err(storage("duplicate snapshot PK"));
                 }
             }
@@ -438,6 +452,13 @@ impl SegmentEngine {
             }
         }
         engine.spec = Some(spec);
+        let mut index_keys = BTreeSet::new();
+        for reference in &manifest.indexes {
+            if !index_keys.insert(&reference.key) {
+                return Err(storage("duplicate index object"));
+            }
+            engine.load_index(reference, get(&reference.key)?)?;
+        }
         engine.recount_bytes();
         if engine.bytes > MAX_STATE_BYTES {
             return Err(storage("state exceeds quota"));

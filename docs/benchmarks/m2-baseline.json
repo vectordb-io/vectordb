@@ -1,0 +1,785 @@
+{
+  "dimension": 32,
+  "dtype": "Float32",
+  "filter_selectivity": 0.01,
+  "format": 1,
+  "profile": "release",
+  "queries": 50,
+  "results": [
+    {
+      "build_ms": 21.505208,
+      "index": "FLAT",
+      "index_object_bytes": 306106,
+      "query_p50_ms": 2.322792,
+      "query_p99_ms": 2.84725,
+      "recall_at_10": 1.0,
+      "reload_ms": 34.724458,
+      "search_params": {},
+      "single_update_ms": 0.019375,
+      "status": {
+        "buildBytes": 0,
+        "builtSegments": 32,
+        "cacheBytes": 1224424,
+        "cacheLimit": 268435456,
+        "distanceEvaluations": 515000,
+        "flatFallbacks": 0,
+        "loadedSegments": 0,
+        "paused": false,
+        "pinnedBytes": 0,
+        "prunedSegments": 0,
+        "residentIndexBytes": 1224424,
+        "scratchBytes": 0,
+        "tasks": [
+          {
+            "attempt": 1,
+            "bucket": 0,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 1,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 2,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 3,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 4,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 5,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 6,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 7,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 8,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 9,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 10,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 11,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 12,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 13,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 14,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 15,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 16,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 17,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 18,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 19,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 20,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 21,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 22,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 23,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 24,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 25,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 26,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 27,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 28,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 29,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 30,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 31,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          }
+        ]
+      },
+      "strict_filter_p99_ms": 0.291166,
+      "strict_recall_at_10": 1.0
+    },
+    {
+      "build_ms": 353.51345899999995,
+      "index": "HNSW",
+      "index_object_bytes": 7440703,
+      "query_p50_ms": 2.990334,
+      "query_p99_ms": 3.771792,
+      "recall_at_10": 1.0,
+      "reload_ms": 56.040875,
+      "search_params": {
+        "ef": 64
+      },
+      "single_update_ms": 0.015917,
+      "status": {
+        "buildBytes": 0,
+        "builtSegments": 32,
+        "cacheBytes": 29762812,
+        "cacheLimit": 268435456,
+        "distanceEvaluations": 109448,
+        "flatFallbacks": 1600,
+        "loadedSegments": 0,
+        "paused": false,
+        "pinnedBytes": 0,
+        "prunedSegments": 0,
+        "residentIndexBytes": 29762812,
+        "scratchBytes": 0,
+        "tasks": [
+          {
+            "attempt": 1,
+            "bucket": 0,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 1,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 2,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 3,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 4,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 5,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 6,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 7,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 8,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 9,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 10,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 11,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 12,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 13,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 14,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 15,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 16,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 17,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 18,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 19,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 20,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 21,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 22,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 23,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 24,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 25,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 26,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 27,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 28,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 29,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 30,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 31,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          }
+        ]
+      },
+      "strict_filter_p99_ms": 0.283167,
+      "strict_recall_at_10": 1.0
+    },
+    {
+      "build_ms": 169.846,
+      "index": "IVF_FLAT",
+      "index_object_bytes": 976779,
+      "query_p50_ms": 2.643125,
+      "query_p99_ms": 3.2464999999999997,
+      "recall_at_10": 0.988,
+      "reload_ms": 30.512583,
+      "search_params": {
+        "nprobe": 16
+      },
+      "single_update_ms": 0.015667,
+      "status": {
+        "buildBytes": 0,
+        "builtSegments": 32,
+        "cacheBytes": 3907116,
+        "cacheLimit": 268435456,
+        "distanceEvaluations": 323108,
+        "flatFallbacks": 1600,
+        "loadedSegments": 0,
+        "paused": false,
+        "pinnedBytes": 0,
+        "prunedSegments": 0,
+        "residentIndexBytes": 3907116,
+        "scratchBytes": 0,
+        "tasks": [
+          {
+            "attempt": 1,
+            "bucket": 0,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 1,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 2,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 3,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 4,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 5,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 6,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 7,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 8,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 9,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 10,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 11,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 12,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 13,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 14,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 15,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 16,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 17,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 18,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 19,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 20,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 21,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 22,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 23,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 24,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 25,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 26,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 27,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 28,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 29,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 30,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          },
+          {
+            "attempt": 1,
+            "bucket": 31,
+            "error": null,
+            "revision": 11,
+            "state": "ready"
+          }
+        ]
+      },
+      "strict_filter_p99_ms": 0.261042,
+      "strict_recall_at_10": 1.0
+    }
+  ],
+  "rows": 10000,
+  "seed": 24301,
+  "top_k": 10,
+  "created_at": "2026-11-17T12:30:17.209539+00:00",
+  "platform": "macOS-26.5-arm64-arm-64bit",
+  "base_commit": "a67d9d1916834133187b957e88e9ee9d5b13a480",
+  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "binary_sha256": "c02547cae8d0775ac6e70d86a063ac66599373d57e1698d96b17743191b93281",
+  "source_sha256": "6036faa0b7888f343d05bb35be0d47965566d781ad91064a8dfa58f8534898eb",
+  "hardware": "Apple M5",
+  "memory_bytes": 25769803776,
+  "peak_rss_bytes": 138084352
+}

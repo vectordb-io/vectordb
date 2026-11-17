@@ -7,7 +7,7 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
-serde.workspace = true
+serde = { workspace = true, features = ["derive", "rc"] }
 serde_json.workspace = true
 thiserror.workspace = true
 rusqlite = { version = "0.41", features = ["bundled", "backup"] }
@@ -17,6 +17,7 @@ arrow-array = "56"
 arrow-schema = "56"
 bytes = "1"
 sha2 = "0.10"
+im = "15"
 
 [dev-dependencies]
 tempfile = "3"

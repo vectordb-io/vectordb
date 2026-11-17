@@ -123,6 +123,8 @@ pub fn score(a: &Value, b: &Value, metric: &str) -> f64 {
 pub fn ascending(metric: &str) -> bool {
     matches!(metric, "L2" | "HAMMING" | "JACCARD")
 }
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Ivf {
     centroids: Vec<Value>,
     buckets: Vec<Vec<usize>>,
@@ -130,17 +132,20 @@ pub struct Ivf {
 }
 impl Ivf {
     pub fn build(rows: &[Value], index: &Index) -> Self {
+        Self::build_cancellable(rows, index, &|| false).expect("uncancelled build")
+    }
+    fn build_cancellable(rows: &[Value], index: &Index, cancel: &dyn Fn() -> bool) -> Result<Self> {
         let n = number(&index.params["nlist"], 64, 4096, "nlist")
             .unwrap()
             .min(rows.len());
         let metric = index.metric_type.clone();
         let field = &index.field_name;
         if n == 0 {
-            return Self {
+            return Ok(Self {
                 centroids: vec![],
                 buckets: vec![],
                 metric,
-            };
+            });
         }
         let mut centroids: Vec<Value> = (0..n)
             .map(|i| rows[i * rows.len() / n][field].clone())
@@ -150,6 +155,9 @@ impl Ivf {
             let mut sums = vec![vec![0.0; dim]; n];
             let mut counts = vec![0; n];
             for row in rows {
+                if cancel() {
+                    return Err(invalid("index build cancelled"));
+                }
                 let v = &row[field];
                 let j = nearest(v, &centroids, &metric);
                 counts[j] += 1;
@@ -181,13 +189,16 @@ impl Ivf {
         }
         let mut buckets = vec![vec![]; n];
         for (i, row) in rows.iter().enumerate() {
+            if cancel() {
+                return Err(invalid("index build cancelled"));
+            }
             buckets[nearest(&row[field], &centroids, &metric)].push(i);
         }
-        Self {
+        Ok(Self {
             centroids,
             buckets,
             metric,
-        }
+        })
     }
     pub fn candidates(&self, q: &Value, nprobe: usize) -> Vec<usize> {
         let mut order: Vec<_> = self
@@ -227,6 +238,8 @@ fn nearest(v: &Value, cs: &[Value], metric: &str) -> usize {
 
 /// HNSW with deterministic geometric levels and nearest-neighbor pruning.
 /// Based on Malkov & Yashunin (2018), algorithms 1, 2, 4 and 5.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Hnsw {
     vectors: Vec<Value>,
     links: Vec<Vec<Vec<usize>>>,
@@ -259,6 +272,9 @@ impl Ord for Neighbor {
 }
 impl Hnsw {
     pub fn build(rows: &[Value], index: &Index) -> Self {
+        Self::build_cancellable(rows, index, &|| false).expect("uncancelled build")
+    }
+    fn build_cancellable(rows: &[Value], index: &Index, cancel: &dyn Fn() -> bool) -> Result<Self> {
         let m = number(&index.params["M"], 16, 128, "M").unwrap();
         let ef = number(&index.params["efConstruction"], 128, 4096, "efConstruction").unwrap();
         let mut graph = Self {
@@ -269,6 +285,9 @@ impl Hnsw {
             metric: index.metric_type.clone(),
         };
         for (i, row) in rows.iter().enumerate() {
+            if cancel() {
+                return Err(invalid("index build cancelled"));
+            }
             let q = row[&index.field_name].clone();
             // SplitMix64 gives stable pseudo-random levels without a runtime RNG.
             let mut seed = (i as u64).wrapping_add(0x9e3779b97f4a7c15);
@@ -313,7 +332,7 @@ impl Hnsw {
                 graph.top = level;
             }
         }
-        graph
+        Ok(graph)
     }
     fn distance(&self, q: &Value, i: usize) -> f64 {
         let d = score(q, &self.vectors[i], &self.metric);
@@ -364,6 +383,7 @@ impl Hnsw {
         self.layer(q, entry, 0, ef)
     }
 }
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum BuiltIndex {
     Ivf(Ivf),
     Hnsw(Hnsw),
@@ -381,5 +401,85 @@ impl BuiltIndex {
             Self::Ivf(i) => i.candidates(q, nprobe),
             Self::Hnsw(i) => i.candidates(q, ef),
         }
+    }
+}
+
+impl BuiltIndex {
+    pub fn build_cancellable(
+        rows: &[Value],
+        index: &Index,
+        cancel: &dyn Fn() -> bool,
+    ) -> Result<Self> {
+        if index.index_type == "HNSW" {
+            Ok(Self::Hnsw(Hnsw::build_cancellable(rows, index, cancel)?))
+        } else {
+            Ok(Self::Ivf(Ivf::build_cancellable(rows, index, cancel)?))
+        }
+    }
+    pub fn validate_persisted(&self, index: &Index, field: &Field, rows: usize) -> Result<()> {
+        let bad = || crate::Error::Integrity("invalid persisted ANN structure".into());
+        match self {
+            Self::Ivf(i) => {
+                if index.index_type != "IVF_FLAT"
+                    || i.metric != index.metric_type
+                    || i.centroids.len() != i.buckets.len()
+                    || i.centroids.len() > rows
+                    || i.centroids.len() > 4096
+                    || (rows > 0 && i.centroids.is_empty())
+                {
+                    return Err(bad());
+                }
+                for c in &i.centroids {
+                    field.validate(c).map_err(|_| bad())?;
+                }
+                let mut seen = vec![false; rows];
+                for bucket in &i.buckets {
+                    for &n in bucket {
+                        if n >= rows || seen[n] {
+                            return Err(bad());
+                        }
+                        seen[n] = true;
+                    }
+                }
+                if seen.iter().any(|v| !*v) {
+                    return Err(bad());
+                }
+            }
+            Self::Hnsw(i) => {
+                if index.index_type != "HNSW"
+                    || i.metric != index.metric_type
+                    || i.vectors.len() != rows
+                    || i.links.len() != rows
+                    || i.top > 16
+                {
+                    return Err(bad());
+                }
+                if rows == 0 {
+                    if i.entry != 0 || i.top != 0 {
+                        return Err(bad());
+                    }
+                    return Ok(());
+                }
+                if i.entry >= rows || i.links[i.entry].len() != i.top + 1 {
+                    return Err(bad());
+                }
+                for v in &i.vectors {
+                    field.validate(v).map_err(|_| bad())?;
+                }
+                for levels in &i.links {
+                    if levels.is_empty() || levels.len() > i.top + 1 {
+                        return Err(bad());
+                    }
+                    for (level, edges) in levels.iter().enumerate() {
+                        for &n in edges {
+                            if n >= rows || i.links[n].len() <= level {
+                                return Err(bad());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 }

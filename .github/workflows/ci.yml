@@ -107,6 +107,8 @@ jobs:
         run: rustup toolchain install stable --profile minimal && rustup default stable
       - name: Build experimental cluster runtime
         run: cargo build -p vectordb-cluster --locked
+      - name: Persistent index recall and strict-filter regression
+        run: cargo run --release -p vectordb-engine --example query_bench --locked -- 10000
       - name: Start isolated dependencies
         run: docker compose -p vectordb-cluster-test -f deployments/cluster/compose.yaml up -d
       - name: Real Kafka etcd and S3 recovery test

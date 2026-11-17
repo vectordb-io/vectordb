@@ -372,6 +372,35 @@ impl Replica {
         }
         Ok(())
     }
+    pub fn read_view(
+        &self,
+        op: &str,
+        request: &Value,
+    ) -> Result<vectordb_engine::query_index::ReadView> {
+        self.validate_request(op, request, false)?;
+        Ok(self.engine.read_view()?)
+    }
+    pub fn build_indexes(&self) -> Result<()> {
+        Ok(self.engine.build_indexes()?)
+    }
+    pub fn stop_index_jobs(&self) {
+        self.engine.cancel_index_builds();
+    }
+    pub fn index_jobs(&self) -> Vec<vectordb_engine::query_index::IndexJob> {
+        self.engine.index_jobs()
+    }
+    pub fn index_control(&self, action: &str, request: &Value) -> Result<Value> {
+        self.validate_request("collections/describe", request, false)?;
+        self.engine
+            .execute("collections/describe", request.clone())?;
+        match action {
+            "build" | "retry" => self.engine.request_index_build(),
+            "cancel" => self.engine.cancel_index_builds(),
+            "status" => {}
+            _ => return Err(Error::Invalid("unknown index control".into())),
+        }
+        Ok(self.engine.index_status())
+    }
     pub fn query(&mut self, operation: &str, request: Value) -> Result<Value> {
         self.validate_request(operation, &request, false)?;
         Ok(self.engine.execute(operation, request)?)

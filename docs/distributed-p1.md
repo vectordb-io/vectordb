@@ -1,6 +1,6 @@
-# 分布式 M1 运行与验证
+# 分布式 M2 运行与验证
 
-`vectordb-cluster` 实现了设计中的集合级日志读写与共享恢复链路：独立 writer、多个完整 query 副本、独立 checkpoint 任务，连接真实 etcd、Kafka 和 S3。当前为实验性 M1 运行时，尚未完成分片查询和生产高可用；不能替代完整的 Milvus 集群。
+`vectordb-cluster` 实现了设计中的集合级日志读写与共享恢复链路：独立 writer、多个完整 query 副本、独立 checkpoint 任务，连接真实 etcd、Kafka 和 S3。当前为实验性 M2 运行时，尚未完成分片查询和生产高可用；不能替代完整的 Milvus 集群。
 
 后续范围、协议和实施顺序以 [Rust 核心架构与实施计划](implementation-plan.md) 为准。本文仅记录运行与验证方法；唯一实施计划仍为上述文档。
 
@@ -10,7 +10,7 @@
 - etcd 30 秒所有权租约，每 5 秒续租；Kafka 固定 transactional.id 隔离旧 producer。失去所有权或提交结果不确定后，writer 停止服务，必须重启恢复。
 - mutation 通过原生主键状态表和批次暂存校验，以一个 Kafka 事务写入请求、幂等键、摘要和结果。提交后才修改可见状态并返回。批次失败不污染原状态或消耗自动 ID。
 - 幂等结果随日志和检查点恢复；同一键不同内容返回 409。键格式为 `v2-<issuedUnixMs>-<nonce>`，24 小时到期，时间最多允许领先 60 秒。超时或 503 后在有效期内使用原键重试；过期返回 409，先核对结果，不得换时间戳重发同一未知结果的请求。
-- query 先向 writer 获取已提交 barrier，再回放到该位置并在进程锁内执行查询。各 query 是完整集合副本，可以独立运行在不同主机；它们尚不拆分集合数据。
+- query 先向 writer 获取已提交 barrier，再回放到该位置并固定读视图，释放集合锁后并行执行查询。各 query 是完整集合副本，可以独立运行在不同主机；它们尚不拆分集合数据。
 - checkpoint 先上传不可变对象、下载校验，再通过 etcd CAS 发布 manifest。重启从共享检查点与 Kafka 尾部恢复，无需计算节点本地持久卷。
 - readiness 会执行完整读屏障；healthz 仅表示 HTTP 进程存活。所有数据请求要求 Bearer Token，写请求还要求 Idempotency-Key。
 
@@ -18,13 +18,13 @@
 
 当前集群使用原生段引擎，检查点为当前状态的 Parquet 标量列/主键版本列及二进制向量文件；新集合 dense 默认 Float32，`vectorDtype: "Float64"` 可显式保留双精度。writer 每 128 条提交记录同步检查点化，发布成功后截断 Kafka 前缀，并通过 etcd pin 协议回收旧检查点对象；落后副本重新加载状态。没有整库复制和 48 MiB 累计历史上限。
 
-当前行状态的编码与行开销预算为 256 MiB，集合元数据 1 MiB，24 小时幂等结果 16 MiB；请求体上限 512 KiB，日志记录 1 MiB，单对象 64 MiB，每进程最多 32 个运行或排队请求。这些不等于 RSS 上限，查询和 seal 仍有额外缓冲。记录未过期时幂等额度耗尽会拒绝新请求。
+当前行状态的编码与行开销预算为 256 MiB，集合元数据 1 MiB，24 小时幂等结果 16 MiB；请求体上限 512 KiB，日志记录 1 MiB，单对象 64 MiB，每进程最多 32 个运行或排队请求。M2 另有索引缓存 256 MiB、构建 256 MiB、查询工作区 128 MiB、读视图 2 GiB 的计费准入，超限返回 503 或回退 FLAT。这些不等于 RSS 上限，seal 仍有额外缓冲。记录未过期时幂等额度耗尽会拒绝新请求。
 
-查询仍为完整集合副本，ANN 索引重启后重建；内部运行通信仍是受认证 HTTP。M0 已固定 Protobuf envelope，但 gRPC/mTLS、持久化索引、查询并发、分片、自动 Coordinator 和生产 HA 尚未完成。上传后未发布即崩溃的孤儿对象保守保留，后台孤儿 GC 和完整备份迁移属于 M6。
+查询仍为完整集合副本；HNSW/IVF_FLAT 和标量索引按段持久化，重启直接加载，后台补建缺失或落后的桶。新写入走精确增量，查询不触发全集合索引重建。固定读视图支持独立查询并行。内部运行通信仍是受认证 HTTP；gRPC/mTLS、分片、自动 Coordinator 和生产 HA 尚未完成。上传后未发布即崩溃的孤儿对象保守保留，后台孤儿 GC 和完整备份迁移属于 M6。
 
 支持 create collection、insert、upsert、显式 `entities/delete`（`ids` 数组）、create partition、create/drop index，以及 describe、stats、get、query、search 和索引/分区查询。过滤删除、drop/recreate、Schema 演进、别名、混合检索等未开放操作明确拒绝。通过 `/capabilities` 查看当前模式。
 
-**格式升级：** M1 使用 WAL/状态格式 2，不能原地读取或混写旧 P1 格式 1；请使用新 generation。旧数据需要保留旧 reader，并按统一计划中的 M6 离线迁移流程处理，不能删除旧数据后直接切换。
+**格式升级：** M2 读取 M1 状态格式 2，写入带索引引用的状态格式 3；raw 段和 WAL 保持格式 2。采用停机升级所有计算进程，禁止 M1/M2 混跑和直接降级。旧 P1 格式 1 仍需使用旧 reader 按 M6 的离线迁移流程处理。
 
 ## 构建
 
@@ -118,6 +118,17 @@ curl --fail-with-body http://127.0.0.1:19532/v2/vectordb/entities/search \
 
 正常退出 writer 会撤销租约；SIGKILL 后需等待最多约 30 秒租约到期再启动替代 writer。替代进程会建立新 epoch，解决旧 Kafka 事务，重建状态后才监听 HTTP。不能在失败进程中重新初始化 producer。
 
+## 索引任务和状态
+
+以下操作作用于请求到达的节点，都是派生索引管理，不改变已确认实体，也不要求 Idempotency-Key。请求体为 `{"collectionName":"items"}`，仍需 Bearer Token：
+
+- `POST /v2/vectordb/indexes/build`：请求构建或补建全部本地桶。
+- `POST /v2/vectordb/indexes/get_status`：查看任务、缓存计费、已加载/已构建桶数、裁剪和回退计数。
+- `POST /v2/vectordb/indexes/cancel`：协作取消运行中的构建，并暂停未调度的桶；查询继续使用已有索引或 FLAT。
+- `POST /v2/vectordb/indexes/retry`：恢复调度，重试失败或阻塞的桶。
+
+后台最多两个构建任务，默认自动重建阈值为一个桶内 256 个变更的存活 PK。成功的索引随下一次 checkpoint 上传并发布；失败不会发布部分图。控制请求的成功表示已接受调度，可通过 get_status 等待 ready。任务状态本身在当前进程内，跨进程调度属于 M5。
+
 ## 真实依赖测试
 
 ```sh
@@ -136,8 +147,8 @@ docker compose -p vectordb-cluster-test -f deployments/cluster/compose.yaml down
 
 尚未验证单故障域丢失、etcd 多数派丢失、持续网络分区、生产吞吐、百万级数据、跨区域恢复和完整多角色滚动升级；这些按 [统一实施计划](implementation-plan.md) 的 M4—M6 及后续扩展分别验收。
 
-## M0/M1 验收入口
+## M0—M2 验收入口
 
-类型、物理格式、错误语义、幂等期限、资源预算、回收协议和测试证据统一记录在 [实施计划第 12 节](implementation-plan.md)。原生基准记录见 [m1-baseline.json](benchmarks/m1-baseline.json)。CI 运行 workspace 测试、最低 Rust 版本、Clippy 和真实依赖测试。
+类型、物理格式、错误语义、幂等期限、资源预算、回收协议和测试证据统一记录在 [实施计划第 12 节](implementation-plan.md)。原生状态基准见 [m1-baseline.json](benchmarks/m1-baseline.json)，索引 recall/延迟/内存基准见 [m2-baseline.json](benchmarks/m2-baseline.json)。CI 运行 workspace 测试、最低 Rust 版本、Clippy 和真实依赖测试。
 
-这些结果验证 M0/M1 的契约与可持续恢复链路，不代表 M2—M6 或生产 HA 已完成。
+这些结果验证 M0—M2 的契约、可持续恢复和查询执行；M3—M6 及生产 HA 尚未完成。

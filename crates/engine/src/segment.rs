@@ -3,12 +3,13 @@ use crate::{
     Error, Result,
     error::invalid,
     filter::{Expr, compare, lookup},
-    index::{BuiltIndex, Index, ascending, score},
+    index::{Index, ascending, score},
     schema::{Schema, name, number},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::BTreeSet;
+use std::sync::Arc;
 
 pub const STATE_FORMAT: u32 = 2;
 pub const MAX_METADATA_BYTES: usize = 1024 * 1024;
@@ -53,13 +54,13 @@ pub struct MutationBatch {
     rows: Vec<VersionedRow>,
     pub result: Value,
 }
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct SegmentEngine {
     pub(crate) spec: Option<CollectionSpec>,
-    pub(crate) rows: BTreeMap<String, VersionedRow>,
+    pub(crate) rows: im::OrdMap<String, Arc<VersionedRow>>,
     pub(crate) revision: i64,
     pub(crate) bytes: usize,
-    indexes: HashMap<(i64, String), BuiltIndex>,
+    pub(crate) accelerator: Arc<crate::query_index::Accelerator>,
 }
 impl SegmentEngine {
     pub fn new() -> Self {
@@ -69,13 +70,13 @@ impl SegmentEngine {
         self.revision
     }
     pub fn get_version(&self, key: &Value) -> Option<VersionedRow> {
-        self.rows.get(&key.to_string()).cloned()
+        self.rows.get(&key.to_string()).map(|r| r.as_ref().clone())
     }
     pub fn spec(&self) -> Option<&CollectionSpec> {
         self.spec.as_ref()
     }
     pub(crate) fn recount_bytes(&mut self) {
-        self.bytes = self.rows.values().map(VersionedRow::bytes).sum();
+        self.bytes = self.rows.values().map(|r| r.bytes()).sum();
     }
     pub fn state_bytes(&self) -> usize {
         self.bytes
@@ -253,7 +254,7 @@ impl SegmentEngine {
         }
         let mut bytes = self.bytes;
         for row in &rows {
-            bytes = bytes.saturating_sub(self.rows.get(&row.key).map_or(0, VersionedRow::bytes))
+            bytes = bytes.saturating_sub(self.rows.get(&row.key).map_or(0, |r| r.bytes()))
                 + row.bytes();
         }
         let metadata_bytes = serde_json::to_vec(&c)?.len();
@@ -283,20 +284,25 @@ impl SegmentEngine {
         for mut row in batch.rows {
             self.bytes = self
                 .bytes
-                .saturating_sub(self.rows.get(&row.key).map_or(0, VersionedRow::bytes))
+                .saturating_sub(self.rows.get(&row.key).map_or(0, |r| r.bytes()))
                 + row.bytes();
             row.version = version;
-            self.rows.insert(row.key.clone(), row);
+            self.rows.insert(row.key.clone(), Arc::new(row));
         }
         self.revision = version;
-        self.indexes.clear();
+
         Ok(batch.result)
     }
     /// Safe only after a full state snapshot has been persisted. No historical reads
     /// are served by this engine; existing snapshot readers own immutable files.
     pub fn reclaim_tombstones(&mut self) {
-        self.rows.retain(|_, r| r.body.is_some());
-        self.bytes = self.rows.values().map(VersionedRow::bytes).sum();
+        self.rows = self
+            .rows
+            .iter()
+            .filter(|(_, r)| r.body.is_some())
+            .map(|(k, r)| (k.clone(), r.clone()))
+            .collect();
+        self.bytes = self.rows.values().map(|r| r.bytes()).sum();
     }
     fn collection(&self, r: &Value) -> Result<&CollectionSpec> {
         self.spec
@@ -304,8 +310,9 @@ impl SegmentEngine {
             .filter(|c| r["collectionName"] == c.name)
             .ok_or_else(|| Error::NotFound("collection not found".into()))
     }
-    pub fn execute(&mut self, op: &str, r: Value) -> Result<Value> {
+    pub fn execute(&self, op: &str, r: Value) -> Result<Value> {
         crate::engine::validate_request(op, &r)?;
+        let _memory = self.query_memory(&r)?;
         if r.get("dbName").is_some_and(|v| v != "default") {
             return Err(invalid("native engine requires default database"));
         }
@@ -355,23 +362,6 @@ impl SegmentEngine {
             Err(Error::NotFound("partition not found".into()))
         }
     }
-    fn selected_rows<'a>(
-        &'a self,
-        c: &CollectionSpec,
-        r: &Value,
-        _loaded: bool,
-    ) -> Result<Vec<&'a Value>> {
-        let ps = strings(r, "partitionNames")?;
-        for p in &ps {
-            self.partition(c, p)?;
-        }
-        Ok(self
-            .rows
-            .values()
-            .filter(|r| ps.is_empty() || ps.contains(&r.partition))
-            .filter_map(|r| r.body.as_ref())
-            .collect())
-    }
     fn add_indexes(&self, c: &mut CollectionSpec, v: &Value) -> Result<()> {
         let indexes: Vec<Index> =
             serde_json::from_value(v.clone()).map_err(|e| invalid(e.to_string()))?;
@@ -412,7 +402,10 @@ impl SegmentEngine {
     fn query(&self, c: &CollectionSpec, r: &Value, get: bool) -> Result<Value> {
         let expr = self.filter(c, r)?;
         let fields = output_fields(c, r)?;
-        let mut rows = self.selected_rows(c, r, true)?;
+        let partitions = strings(r, "partitionNames")?;
+        for p in &partitions {
+            self.partition(c, p)?;
+        }
         let ids = if get {
             let v = r.get("id").ok_or_else(|| invalid("id is required"))?;
             let ids = if let Some(a) = v.as_array() {
@@ -427,12 +420,25 @@ impl SegmentEngine {
         } else {
             None
         };
-        rows.retain(|row| {
-            expr.matches(row)
-                && ids
-                    .as_ref()
-                    .is_none_or(|ids| ids.contains(&row[&c.schema.primary().field_name]))
-        });
+        let selected = if let Some(ids) = ids {
+            ids.iter()
+                .map(Value::to_string)
+                .collect::<BTreeSet<_>>()
+                .iter()
+                .filter_map(|key| self.rows.get(key))
+                .filter(|row| {
+                    row.body.is_some()
+                        && (partitions.is_empty() || partitions.contains(&row.partition))
+                })
+                .cloned()
+                .collect()
+        } else {
+            self.indexed_rows(&expr, &partitions, None)
+        };
+        let mut rows = selected
+            .iter()
+            .filter_map(|row| row.body.as_ref())
+            .collect::<Vec<_>>();
         if fields == ["count(*)"] {
             return Ok(json!([{"count(*)":rows.len()}]));
         }
@@ -475,7 +481,7 @@ impl SegmentEngine {
                 .collect::<Vec<_>>()
         ))
     }
-    fn search(&mut self, c: &CollectionSpec, r: &Value) -> Result<Value> {
+    fn search(&self, c: &CollectionSpec, r: &Value) -> Result<Value> {
         let expr = self.filter(c, r)?;
         let fields = output_fields(c, r)?;
         if fields.contains(&"count(*)".into()) {
@@ -572,47 +578,42 @@ impl SegmentEngine {
             }
         }
         let (limit, offset) = pagination(r)?;
-        let selected = self.selected_rows(c, r, true)?;
-        if let Some(g) = group
-            && selected
-                .iter()
-                .any(|row| row[g].is_array() || row[g].is_object())
-        {
-            return Err(invalid("grouping requires scalar field"));
-        }
-        let allowed: BTreeSet<_> = selected
-            .iter()
-            .filter(|row| expr.matches(row))
-            .map(|row| row[&c.schema.primary().field_name].to_string())
-            .collect();
-        let rows = self
-            .rows
-            .values()
-            .filter_map(|r| r.body.as_ref())
-            .collect::<Vec<_>>();
-        let cache_key = (0, field.field_name.clone());
-        if index.index_type != "FLAT" && !self.indexes.contains_key(&cache_key) {
-            self.indexes.insert(
-                cache_key.clone(),
-                BuiltIndex::build(
-                    &rows.iter().map(|row| (*row).clone()).collect::<Vec<_>>(),
-                    &index,
-                ),
-            );
+        let partitions = strings(r, "partitionNames")?;
+        for p in &partitions {
+            self.partition(c, p)?;
         }
         let mut out = Vec::new();
         for (qi, q) in data.iter().enumerate() {
-            let candidates = if index.index_type != "FLAT" {
-                self.indexes[&cache_key].candidates(q, nprobe, ef.max(limit + offset))
-            } else {
-                (0..rows.len()).collect()
-            };
+            let selected = self.indexed_rows(
+                &expr,
+                &partitions,
+                Some((
+                    q,
+                    &index,
+                    nprobe,
+                    ef,
+                    limit + offset,
+                    group.is_some() || radius.is_some(),
+                )),
+            );
+            let rows = selected
+                .iter()
+                .map(|row| row.body.as_ref().unwrap())
+                .collect::<Vec<_>>();
+            if let Some(g) = group
+                && rows
+                    .iter()
+                    .any(|row| row[g].is_array() || row[g].is_object())
+            {
+                return Err(invalid("grouping requires scalar field"));
+            }
+            let candidates = 0..rows.len();
             let mut hits = Vec::new();
             for i in candidates {
                 let row = &rows[i];
-                if !allowed.contains(&row[&c.schema.primary().field_name].to_string()) {
-                    continue;
-                }
+                self.accelerator
+                    .distances
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 let d = score(q, &row[&field.field_name], &index.metric_type);
                 if !d.is_finite() {
                     return Err(invalid("vector magnitude overflows finite distance"));
