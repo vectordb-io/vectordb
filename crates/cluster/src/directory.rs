@@ -33,6 +33,10 @@ pub struct Collection {
     pub drop_id: Option<String>,
     pub spec: Option<CollectionSpec>,
     pub spec_offset: i64,
+    #[serde(default = "vectordb_engine::shard::one")]
+    pub shard_count: usize,
+    #[serde(default)]
+    pub query_routes: Option<crate::sharded::QueryRoutes>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -273,6 +277,9 @@ impl DirectoryState {
                     generation: uuid::Uuid::new_v4().simple().to_string(),
                 };
                 let mut create = r.clone();
+                if create.get("shardCount").is_none() {
+                    create["shardCount"] = json!(16);
+                }
                 create["dbName"] = json!("default");
                 create["collectionName"] = json!(scope.collection);
                 let mut engine = SegmentEngine::new();
@@ -295,9 +302,41 @@ impl DirectoryState {
                         drop_id: None,
                         spec: engine.spec().cloned(),
                         spec_offset: -1,
+                        shard_count: engine.spec().unwrap().shard_count,
+                        query_routes: None,
                     },
                 );
                 receipt.target = Some(scope);
+            }
+            "collections/set_query_routes" => {
+                let object = r
+                    .as_object()
+                    .ok_or_else(|| Error::Invalid("request must be object".into()))?;
+                if object.keys().any(|k| {
+                    !["dbName", "collectionName", "replicas", "expectedEpoch"].contains(&k.as_str())
+                }) {
+                    return Err(Error::Invalid("unknown route option".into()));
+                }
+                let target = self.resolve(&db, text(r, "collectionName")?)?;
+                let previous = target.query_routes.as_ref().map_or(0, |r| r.epoch);
+                if r["expectedEpoch"].as_u64() != Some(previous) {
+                    return Err(Error::Conflict("query routing epoch changed".into()));
+                }
+                let routes = crate::sharded::QueryRoutes {
+                    epoch: previous
+                        .checked_add(1)
+                        .ok_or_else(|| Error::Conflict("route epoch exhausted".into()))?,
+                    hash_version: 1,
+                    shards: serde_json::from_value(r["replicas"].clone()).map_err(|_| {
+                        Error::Invalid("replicas must be an array of address arrays".into())
+                    })?,
+                };
+                routes.validate(target.shard_count)?;
+                self.collections
+                    .get_mut(&target.scope.collection)
+                    .unwrap()
+                    .query_routes = Some(routes.clone());
+                receipt.result = Some(json!(routes));
             }
             "collections/drop" => {
                 vectordb_engine::validate_request(op, r)?;

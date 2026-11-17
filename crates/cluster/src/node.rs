@@ -1,4 +1,5 @@
-//! M3 multi-collection gateway. Assignment is demand-driven; M5 adds placement.
+//! Multi-collection gateway and distributed query routing.
+mod sharding;
 use super::*;
 use std::collections::BTreeMap;
 use vectordb_cluster::directory::{Collection, Directory, Lifecycle, MAX_COLLECTIONS, database};
@@ -18,6 +19,8 @@ struct Node {
     config: Config,
     directory: Directory,
     sessions: Mutex<BTreeMap<String, Arc<Mutex<Runtime>>>>,
+    shard_cache:
+        Mutex<BTreeMap<String, Arc<Mutex<Option<vectordb_cluster::sharded::ShardReplica>>>>>,
 }
 #[derive(Clone)]
 struct NodeApp {
@@ -31,6 +34,7 @@ fn is_write(op: &str) -> bool {
             | "databases/drop"
             | "collections/create"
             | "collections/drop"
+            | "collections/set_query_routes"
             | "aliases/create"
             | "aliases/alter"
             | "aliases/drop"
@@ -92,6 +96,10 @@ const OPERATIONS: &[&str] = &[
     "entities/query",
     "entities/count",
     "entities/search",
+    "entities/hybrid_search",
+    "collections/set_query_routes",
+    "collections/get_query_routes",
+    "collections/shard_status",
 ];
 fn supported(op: &str) -> bool {
     OPERATIONS.contains(&op)
@@ -124,9 +132,15 @@ impl Node {
             config,
             directory,
             sessions: Mutex::new(BTreeMap::new()),
+            shard_cache: Mutex::new(BTreeMap::new()),
         })
     }
     fn session(&self, c: &Collection) -> Result<Arc<Mutex<Runtime>>> {
+        if self.config.role == Role::QueryNode {
+            return Err(Error::Unsupported(
+                "query-node cannot load full collection or own a writer".into(),
+            ));
+        }
         let mut sessions = self.sessions.lock().unwrap();
         if let Some(session) = sessions.get(&c.scope.collection) {
             let usable = {
@@ -253,12 +267,34 @@ impl Node {
         });
         Ok(())
     }
-    fn execute(&self, op: &str, r: Value, id: Option<&str>) -> Result<Value> {
+    fn execute(&self, op: &str, mut r: Value, id: Option<&str>) -> Result<Value> {
+        let timeout = r
+            .as_object_mut()
+            .and_then(|r| r.remove("timeoutMs"))
+            .map(|v| {
+                v.as_u64()
+                    .filter(|n| *n > 0 && *n <= 30_000)
+                    .ok_or_else(|| Error::Invalid("timeoutMs must be 1..30000".into()))
+            })
+            .transpose()?
+            .unwrap_or(30_000);
+        if self.config.role == Role::QueryNode && is_write(op) {
+            return Err(Error::Unsupported("writes require a node gateway".into()));
+        }
         if !supported(op) {
             return Err(Error::Unsupported(op.into()));
         }
         if catalog_read(op) {
             return Ok(json!({"code":0,"data":self.directory.snapshot()?.read(op,&r)?}));
+        }
+        if matches!(
+            op,
+            "collections/get_query_routes" | "collections/shard_status"
+        ) && r.as_object().is_none_or(|obj| {
+            obj.keys()
+                .any(|k| !["dbName", "collectionName"].contains(&k.as_str()))
+        }) {
+            return Err(Error::Invalid("unknown query routing option".into()));
         }
         let db = database(&r)?.to_string();
         let target = if is_write(op) {
@@ -282,6 +318,14 @@ impl Node {
                 .scope
         };
         let c = self.directory.snapshot()?.by_scope(&target)?;
+        if op == "collections/get_query_routes" {
+            return Ok(
+                json!({"code":0,"data":{"shardCount":c.shard_count,"hashVersion":1,"routes":c.query_routes}}),
+            );
+        }
+        if op == "collections/shard_status" {
+            return self.shard_stats(&c);
+        }
         if op == "collections/create" || op == "collections/drop" {
             failpoint(if op == "collections/create" {
                 "catalog_creating"
@@ -304,6 +348,17 @@ impl Node {
         let mut request = r;
         request["dbName"] = json!("default");
         request["collectionName"] = json!(target.collection);
+        if matches!(
+            op,
+            "entities/search"
+                | "entities/hybrid_search"
+                | "entities/query"
+                | "entities/get"
+                | "entities/count"
+        ) && c.query_routes.is_some()
+        {
+            return self.distributed(&c, op, request, timeout);
+        }
         let mut value = self.internal(&target, op, request, id)?;
         if op == "collections/describe" && value["code"] == 0 {
             value["data"]["collectionName"] = json!(c.name);
@@ -324,7 +379,7 @@ impl Node {
                 "lifecycle mutations require catalog reconciliation".into(),
             ));
         }
-        if !supported(op) && op != "internal/barrier" {
+        if !supported(op) && !["internal/barrier", "internal/snapshot"].contains(&op) {
             return Err(Error::Unsupported(op.into()));
         }
         if matches!(c.state, Lifecycle::Creating | Lifecycle::Dropping) {
@@ -334,6 +389,15 @@ impl Node {
         let (work, spec, offset) = {
             let mut runtime = session.lock().unwrap();
             // Internal requests may not redirect an obsolete owner to itself.
+            if op == "internal/snapshot" {
+                runtime.guard()?;
+                let token = runtime.barrier()?;
+                let spec = runtime
+                    .replica
+                    .spec()
+                    .ok_or_else(|| Error::Conflict("collection dropped before snapshot".into()))?;
+                return Ok(json!({"code":0,"data":{"token":token,"spec":spec}}));
+            }
             if op == "internal/barrier" {
                 runtime.guard()?;
                 return Ok(json!({"code":0,"data":runtime.barrier()?}));
@@ -396,10 +460,21 @@ async fn execute_node(
     Json(body): Json<Value>,
 ) -> Response {
     let id = request_id(&headers);
-    run_node(app, headers, move |node| {
-        node.execute(&format!("{category}/{action}"), body, id.as_deref())
-    })
+    let timeout = body["timeoutMs"]
+        .as_u64()
+        .unwrap_or(30_000)
+        .clamp(1, 30_000);
+    match tokio::time::timeout(
+        Duration::from_millis(timeout),
+        run_node(app, headers, move |node| {
+            node.execute(&format!("{category}/{action}"), body, id.as_deref())
+        }),
+    )
     .await
+    {
+        Ok(response) => response,
+        Err(_) => error_response(Error::Unavailable("request deadline exceeded".into())),
+    }
 }
 async fn internal_node(
     State(app): State<NodeApp>,
@@ -457,11 +532,13 @@ pub(super) async fn serve(config: Config) -> std::result::Result<(), Box<dyn std
         loop {
             let Some(node) = weak.upgrade() else { break };
             if let Ok(state) = node.directory.snapshot() {
-                for c in state
-                    .collections
-                    .values()
-                    .filter(|c| matches!(c.state, Lifecycle::Creating | Lifecycle::Dropping))
-                {
+                for c in state.collections.values() {
+                    node.prune_shards(c);
+                }
+                for c in state.collections.values().filter(|c| {
+                    node.config.role == Role::Node
+                        && matches!(c.state, Lifecycle::Creating | Lifecycle::Dropping)
+                }) {
                     if let Err(e) = node.reconcile(c) {
                         eprintln!("lifecycle recovery pending: {e}");
                     }
@@ -477,6 +554,13 @@ pub(super) async fn serve(config: Config) -> std::result::Result<(), Box<dyn std
             let Some(node) = weak.upgrade() else { break };
             let sessions = node
                 .sessions
+                .lock()
+                .unwrap()
+                .values()
+                .cloned()
+                .collect::<Vec<_>>();
+            let shard_caches = node
+                .shard_cache
                 .lock()
                 .unwrap()
                 .values()
@@ -501,6 +585,28 @@ pub(super) async fn serve(config: Config) -> std::result::Result<(), Box<dyn std
                     let _ = thread.join();
                 }
             }
+            for cache in shard_caches {
+                let jobs = {
+                    let cached = cache.lock().unwrap();
+                    let mut jobs = vec![];
+                    if let Some(replica) = cached.as_ref() {
+                        for engine in replica.engines.values() {
+                            if !jobs.is_empty() {
+                                break;
+                            }
+                            jobs.extend(engine.index_jobs());
+                        }
+                    }
+                    jobs
+                };
+                let threads = jobs
+                    .into_iter()
+                    .map(|job| std::thread::spawn(move || job.run()))
+                    .collect::<Vec<_>>();
+                for thread in threads {
+                    let _ = thread.join();
+                }
+            }
             std::thread::sleep(Duration::from_millis(100));
         }
     });
@@ -509,9 +615,10 @@ pub(super) async fn serve(config: Config) -> std::result::Result<(), Box<dyn std
         slots: Arc::new(tokio::sync::Semaphore::new(32)),
     };
     let app=Router::new()
-        .route("/healthz",get(||async{Json(json!({"status":"alive","mode":"cluster-m3"}))}))
-        .route("/capabilities",get(||async{Json(json!({"mode":"cluster-m3","productionReady":false,"atomicScope":"collection","queryShards":1,"consistency":["Strong"],"checkpointFormat":"state-segments-v3","persistentIndexes":true,"concurrentReads":true,"multiCollection":true,"namespaces":true,"aliases":true,"collectionLifecycle":true,"partitionDelete":true,"count":true,"automaticFailover":false,"writerTakeover":"demand-driven recovery","idempotencyWindowMs":86400000,"maxActiveCollections":MAX_COLLECTIONS,"defaultVectorDtype":"Float32","operations":OPERATIONS,"maxRoutingReceipts":vectordb_cluster::directory::MAX_ROUTE_RECEIPTS}))}))
+        .route("/healthz",get(||async{Json(json!({"status":"alive","mode":"cluster-m4"}))}))
+        .route("/capabilities",get(||async{Json(json!({"mode":"cluster-m4","productionReady":false,"atomicScope":"collection","maxQueryShards":32,"shardedQueries":true,"consistency":["Strong"],"checkpointFormat":"state-segments-v4","persistentIndexes":true,"concurrentReads":true,"multiCollection":true,"namespaces":true,"aliases":true,"collectionLifecycle":true,"partitionDelete":true,"count":true,"automaticFailover":false,"writerTakeover":"demand-driven recovery","idempotencyWindowMs":86400000,"maxActiveCollections":MAX_COLLECTIONS,"defaultVectorDtype":"Float32","operations":OPERATIONS,"maxRoutingReceipts":vectordb_cluster::directory::MAX_ROUTE_RECEIPTS}))}))
         .route("/readyz",get(ready_node))
+        .route("/internal/shard-query",post(sharding::handle))
         .route("/v2/vectordb/{category}/{action}",post(execute_node))
         .route("/internal/collections/{collection}/{generation}/v2/vectordb/{category}/{action}",post(internal_node))
         .route("/internal/collections/{collection}/{generation}/internal/{action}",post(control_node))

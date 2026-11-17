@@ -15,3 +15,7 @@ pub mod segment_storage;
 pub mod query_index;
 
 pub use engine::validate_request;
+
+pub mod shard;
+
+pub mod distributed_query;

@@ -37,6 +37,8 @@ pub struct ObjectRef {
 pub struct SegmentManifest {
     pub format: u32,
     pub ordinal: usize,
+    #[serde(default)]
+    pub shard: Option<usize>,
     pub rows: usize,
     pub scalars: ObjectRef,
     pub versions: ObjectRef,
@@ -122,9 +124,15 @@ fn take(cur: &mut Cursor<&[u8]>) -> Result<Vec<u8>> {
 }
 impl SegmentEngine {
     pub fn seal(&self) -> Result<SealedState> {
+        if self.selection.is_some() {
+            return Err(storage(
+                "partial query state cannot publish a writer checkpoint",
+            ));
+        }
+        let count = self.spec.as_ref().map_or(1, |c| c.shard_count);
         let mut sealed = SealedState {
             manifest: StateManifest {
-                format: 3,
+                format: if count > 1 { 4 } else { 3 },
                 revision: self.revision,
                 spec: self.spec.clone(),
                 segments: vec![],
@@ -135,13 +143,18 @@ impl SegmentEngine {
         let Some(spec) = &self.spec else {
             return Ok(sealed);
         };
-        let rows = self.rows.values().collect::<Vec<_>>();
+        let mut rows = self.rows.values().collect::<Vec<_>>();
+        rows.sort_by_key(|r| crate::shard::shard_for(&r.key, count));
         // Bound individual objects; current-state admission bounds the whole seal.
         let mut start = 0;
         while start < rows.len() {
             let mut end = start;
             let mut size = 0;
-            while end < rows.len() && end - start < 4096 {
+            while end < rows.len()
+                && end - start < 4096
+                && crate::shard::shard_for(&rows[end].key, count)
+                    == crate::shard::shard_for(&rows[start].key, count)
+            {
                 let n = serde_json::to_vec(rows[end])?.len();
                 if end > start && size + n > 4 * 1024 * 1024 {
                     break;
@@ -259,6 +272,7 @@ impl SegmentEngine {
             sealed.manifest.segments.push(SegmentManifest {
                 format: STATE_FORMAT,
                 ordinal,
+                shard: (count > 1).then(|| crate::shard::shard_for(&rows[start].key, count)),
                 rows: chunk.len(),
                 scalars: object("scalars.parquet", scalars),
                 versions: object("versions.parquet", versions),
@@ -276,11 +290,22 @@ impl SegmentEngine {
         }
         Ok(sealed)
     }
-    pub fn load(
+    pub fn load(manifest: StateManifest, get: impl FnMut(&str) -> Result<Vec<u8>>) -> Result<Self> {
+        Self::load_selected(manifest, None, get)
+    }
+    pub fn load_shards(
         manifest: StateManifest,
+        selected: BTreeSet<usize>,
+        get: impl FnMut(&str) -> Result<Vec<u8>>,
+    ) -> Result<Self> {
+        Self::load_selected(manifest, Some(selected), get)
+    }
+    fn load_selected(
+        manifest: StateManifest,
+        selected: Option<BTreeSet<usize>>,
         mut get: impl FnMut(&str) -> Result<Vec<u8>>,
     ) -> Result<Self> {
-        if ![STATE_FORMAT, 3].contains(&manifest.format)
+        if ![STATE_FORMAT, 3, 4].contains(&manifest.format)
             || (manifest.format == STATE_FORMAT && !manifest.indexes.is_empty())
             || manifest.revision < 0
         {
@@ -288,6 +313,7 @@ impl SegmentEngine {
         }
         let mut engine = Self::new();
         engine.revision = manifest.revision;
+        engine.selection = selected.clone();
         let Some(spec) = manifest.spec else {
             if !manifest.segments.is_empty() || !manifest.indexes.is_empty() {
                 return Err(storage("segments without schema"));
@@ -300,6 +326,14 @@ impl SegmentEngine {
         }
         if serde_json::to_vec(&spec)?.len() > MAX_METADATA_BYTES {
             return Err(storage("metadata exceeds quota"));
+        }
+        crate::shard::validate_count(spec.shard_count)?;
+        if (manifest.format < 4 && spec.shard_count != 1)
+            || selected
+                .as_ref()
+                .is_some_and(|s| s.is_empty() || s.iter().any(|id| *id >= spec.shard_count))
+        {
+            return Err(storage("invalid shard layout"));
         }
         Schema::from_request(&json!({"schema":spec.schema}))?;
         for i in &spec.indexes {
@@ -314,6 +348,18 @@ impl SegmentEngine {
                 || segment.rows > 4096
             {
                 return Err(storage("invalid segment descriptor"));
+            }
+            if manifest.format == 4 && segment.shard.is_none_or(|s| s >= spec.shard_count) {
+                return Err(storage("missing/invalid shard descriptor"));
+            }
+            if manifest.format < 4 && segment.shard.is_some() {
+                return Err(storage("unexpected shard descriptor"));
+            }
+            if selected
+                .as_ref()
+                .is_some_and(|s| !s.contains(&segment.shard.unwrap_or(0)))
+            {
+                continue;
             }
             let mut fetch = |r: &ObjectRef| -> Result<Vec<u8>> {
                 if r.bytes > 64 * 1024 * 1024 {
@@ -357,6 +403,11 @@ impl SegmentEngine {
                         .ok_or_else(|| storage("missing version column"))
                 };
                 let key = value("pk")?.to_string();
+                if manifest.format == 4
+                    && Some(crate::shard::shard_for(&key, spec.shard_count)) != segment.shard
+                {
+                    return Err(storage("row belongs to another shard"));
+                }
                 let partition = value("partition")?.to_string();
                 let version: i64 = value("version")?.parse().map_err(storage)?;
                 let tombstone: bool = value("tombstone")?.parse().map_err(storage)?;
@@ -456,6 +507,18 @@ impl SegmentEngine {
         for reference in &manifest.indexes {
             if !index_keys.insert(&reference.key) {
                 return Err(storage("duplicate index object"));
+            }
+            if let Some(selection) = &selected {
+                let bucket = reference
+                    .key
+                    .strip_prefix("index-bucket-")
+                    .and_then(|s| s.strip_suffix(".json"))
+                    .and_then(|s| s.parse::<usize>().ok())
+                    .filter(|b| *b < crate::query_index::BUCKETS)
+                    .ok_or_else(|| storage("invalid index bucket reference"))?;
+                if !selection.contains(&(bucket % engine.spec.as_ref().unwrap().shard_count)) {
+                    continue;
+                }
             }
             engine.load_index(reference, get(&reference.key)?)?;
         }

@@ -19,11 +19,9 @@ pub const BUCKETS: usize = 32;
 pub const INDEX_FORMAT: u32 = 1;
 const MAX_OBJECT: usize = 64 * 1024 * 1024;
 pub fn bucket(key: &str) -> usize {
-    key.bytes().fold(0xcbf29ce484222325u64, |h, b| {
-        (h ^ u64::from(b)).wrapping_mul(0x100000001b3)
-    }) as usize
-        % BUCKETS
+    crate::shard::shard_for(key, BUCKETS)
 }
+
 fn identity(c: &CollectionSpec) -> String {
     checksum(
         &serde_json::to_vec(&(&c.name, &c.schema, c.dtype, &c.indexes)).expect("serializable spec"),

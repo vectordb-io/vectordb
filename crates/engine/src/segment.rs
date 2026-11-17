@@ -30,6 +30,8 @@ pub struct CollectionSpec {
     pub indexes: Vec<Index>,
     pub next_id: i64,
     pub partitions: BTreeSet<String>,
+    #[serde(default = "crate::shard::one")]
+    pub shard_count: usize,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -49,14 +51,15 @@ impl VersionedRow {
 }
 #[derive(Debug)]
 pub struct MutationBatch {
-    base: i64,
-    spec: Option<CollectionSpec>,
-    rows: Vec<VersionedRow>,
+    pub(crate) base: i64,
+    pub(crate) spec: Option<CollectionSpec>,
+    pub(crate) rows: Vec<VersionedRow>,
     pub result: Value,
 }
 #[derive(Clone, Default)]
 pub struct SegmentEngine {
     pub(crate) spec: Option<CollectionSpec>,
+    pub(crate) selection: Option<BTreeSet<usize>>,
     pub(crate) rows: im::OrdMap<String, Arc<VersionedRow>>,
     pub(crate) revision: i64,
     pub(crate) bytes: usize,
@@ -86,6 +89,20 @@ impl SegmentEngine {
     }
     pub fn prepare(&self, operation: &str, request: Value) -> Result<MutationBatch> {
         let mut r = request;
+        let shard_count = if operation == "collections/create" {
+            let value = r
+                .as_object_mut()
+                .and_then(|r| r.remove("shardCount"))
+                .unwrap_or(json!(1));
+            let count = value
+                .as_u64()
+                .ok_or_else(|| invalid("shardCount must be an integer"))?
+                as usize;
+            crate::shard::validate_count(count)?;
+            count
+        } else {
+            1
+        };
         let dtype = if operation == "collections/create" {
             match r.as_object_mut().and_then(|r| r.remove("vectorDtype")) {
                 None => VectorDtype::Float32,
@@ -118,6 +135,7 @@ impl SegmentEngine {
                 indexes: vec![],
                 next_id: 1,
                 partitions: BTreeSet::from(["_default".into()]),
+                shard_count,
             };
             if r.get("indexParams").is_some() {
                 self.add_indexes(&mut c, &r["indexParams"])?;
@@ -397,6 +415,15 @@ impl SegmentEngine {
             }
             "entities/get" | "entities/query" => self.query(&c, &r, op.ends_with("get")),
             "entities/search" => self.search(&c, &r),
+            "entities/hybrid_search" => {
+                let plan = crate::distributed_query::QueryPlan::new(c, op, r)?;
+                let values = plan
+                    .requests
+                    .iter()
+                    .map(|request| self.execute(&plan.operation, request.clone()))
+                    .collect::<Result<Vec<_>>>()?;
+                plan.merge(vec![values])
+            }
             _ => Err(Error::Unsupported(op.into())),
         }
     }
@@ -727,7 +754,7 @@ fn strings(r: &Value, k: &str) -> Result<Vec<String>> {
             .collect(),
     }
 }
-fn pagination(r: &Value) -> Result<(usize, usize)> {
+pub(crate) fn pagination(r: &Value) -> Result<(usize, usize)> {
     let limit = number(&r["limit"], 10, 16384, "limit")?;
     let offset = number(&r["offset"], 0, 1000000, "offset")?;
     if limit == 0 {
@@ -735,7 +762,7 @@ fn pagination(r: &Value) -> Result<(usize, usize)> {
     }
     Ok((limit, offset))
 }
-fn output_fields(c: &CollectionSpec, r: &Value) -> Result<Vec<String>> {
+pub(crate) fn output_fields(c: &CollectionSpec, r: &Value) -> Result<Vec<String>> {
     let fields = strings(r, "outputFields")?;
     if fields.contains(&"count(*)".into()) && fields.len() != 1 {
         return Err(invalid("count(*) must be the only output field"));
@@ -747,7 +774,7 @@ fn output_fields(c: &CollectionSpec, r: &Value) -> Result<Vec<String>> {
     }
     Ok(fields)
 }
-fn project(row: &Value, fields: &[String], s: &Schema) -> Value {
+pub(crate) fn project(row: &Value, fields: &[String], s: &Schema) -> Value {
     if fields.iter().any(|f| f == "*") {
         return row.clone();
     }

@@ -28,6 +28,7 @@ use vectordb_cluster::{
 #[derive(Clone, Debug, ValueEnum, PartialEq)]
 enum Role {
     Node,
+    QueryNode,
     Writer,
     Query,
     Checkpoint,
@@ -605,7 +606,7 @@ async fn ready(State(app): State<App>, headers: HeaderMap) -> Response {
 #[tokio::main]
 async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let config = Config::parse();
-    if config.role == Role::Node {
+    if matches!(config.role, Role::Node | Role::QueryNode) {
         return node::serve(config).await;
     }
     let token = Arc::new(config.token.clone());

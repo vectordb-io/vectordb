@@ -95,7 +95,7 @@ jobs:
 
   cluster:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
@@ -115,6 +115,8 @@ jobs:
         run: python3 scripts/cluster_smoke.py
       - name: Multi-collection lifecycle and crash recovery
         run: python3 -u scripts/cluster_m3_smoke.py
+      - name: Sharded queries, replicas, migration and snapshot completeness
+        run: python3 -u scripts/cluster_m4_smoke.py
       - name: Catalog, pin/GC, S3 and Kafka fencing contracts
         run: cargo test -p vectordb-cluster --test backends --locked -- --ignored
       - name: Dependency logs on failure

@@ -1,0 +1,130 @@
+{
+  "format": 1,
+  "created_at": "2026-11-17T14:44:36.397706+00:00",
+  "seed": 24301,
+  "rows": 10000,
+  "dimension": 32,
+  "dtype": "Float32",
+  "index": "FLAT",
+  "shards": 16,
+  "vectors_per_request": 16,
+  "samples": 20,
+  "concurrency": 1,
+  "top_k": 10,
+  "profile": "release",
+  "platform": "macOS-26.5-arm64-arm-64bit",
+  "base_commit": "88debf02f23d4bcabb3d4125ec93284cb651d640",
+  "binary_sha256": "3a0af55563c073591a75abbf9249d798d29a06acf2ea8b26a32400479c27973c",
+  "source_sha256": "f160d8b865f7cfb33f5db909d19463f8d4da85ed4e04d388b4d3c723209cad7d",
+  "results": [
+    {
+      "query_nodes": 1,
+      "requests_per_second": 3.9714677839994126,
+      "vectors_per_second": 63.5434845439906,
+      "p50_ms": 253.41616600000006,
+      "p99_ms": 260.4358749999998,
+      "cold_query_ms": 401.3676669999997,
+      "query_process_rss_bytes": [
+        46268416
+      ],
+      "assigned_state": [
+        {
+          "fullCollectionSessions": 0,
+          "offsets": [
+            {
+              "cache": "m4-bench-7049be87c14e4351bef8c143e9cc6834/c5d6bd8e269ec4fe29c96ca0e3f54d637/cc6a86397935499bb3d60457b86c54aa/1",
+              "offset": 150
+            }
+          ],
+          "rows": 10000,
+          "shards": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "stateBytes": 7784209,
+          "walRecordsApplied": 21
+        }
+      ],
+      "exact_match": true
+    },
+    {
+      "query_nodes": 2,
+      "requests_per_second": 4.378782652445401,
+      "vectors_per_second": 70.06052243912642,
+      "p50_ms": 228.07433399999866,
+      "p99_ms": 236.61050000000117,
+      "cold_query_ms": 305.3898339999996,
+      "query_process_rss_bytes": [
+        31948800,
+        31752192
+      ],
+      "assigned_state": [
+        {
+          "fullCollectionSessions": 0,
+          "offsets": [
+            {
+              "cache": "m4-bench-7049be87c14e4351bef8c143e9cc6834/c5d6bd8e269ec4fe29c96ca0e3f54d637/cc6a86397935499bb3d60457b86c54aa/2",
+              "offset": 192
+            }
+          ],
+          "rows": 5027,
+          "shards": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "stateBytes": 3912917,
+          "walRecordsApplied": 42
+        },
+        {
+          "fullCollectionSessions": 0,
+          "offsets": [
+            {
+              "cache": "m4-bench-7049be87c14e4351bef8c143e9cc6834/c5d6bd8e269ec4fe29c96ca0e3f54d637/cc6a86397935499bb3d60457b86c54aa/2",
+              "offset": 192
+            }
+          ],
+          "rows": 4973,
+          "shards": [
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "stateBytes": 3871292,
+          "walRecordsApplied": 42
+        }
+      ],
+      "exact_match": true
+    }
+  ],
+  "throughput_ratio_2_vs_1": 1.1025602851638412,
+  "scope": "Single-host Query scaling only; writer still retains full collection state. RSS is a post-run sample, not peak RSS; no production throughput claim.",
+  "logical_cpus": 10,
+  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "hardware": "Apple M5",
+  "host_memory_bytes": 25769803776
+}

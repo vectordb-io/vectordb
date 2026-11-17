@@ -437,6 +437,7 @@ impl Replica {
                     | "collections/get_stats"
                     | "collections/get_load_state"
                     | "entities/search"
+                    | "entities/hybrid_search"
                     | "entities/get"
                     | "entities/query"
                     | "entities/count"

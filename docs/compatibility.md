@@ -2,7 +2,7 @@
 
 参考代码：本工作区的 `reference-code/milvus/`，提交 `61de3a82cce970235f9ffb0c90b38749d0c3b196`。主要核对了 `internal/distributed/proxy/httpserver/handler_v2.go` 的操作列表，以及 `request_v2.go` 的 Schema / entity / search / hybrid / index 请求定义。未修改 Milvus 参考目录，未复制 Go / C++ 实现。
 
-这是独立实现的 **单机 Alpha**，不是完整移植。不能把 REST 路径相似理解为 Milvus 客户端协议兼容，也不能据此声称“大部分 Milvus 功能已经全部完成”。以下清单以单机 SQLite 入口为主，分布式行单独标注集群能力。M3 原生集群另已实现多集合/命名空间、别名、可恢复集合与分区生命周期、持久化段索引和并发查询，详见 [实现记录](implementation-plan.md)。未来范围和实施顺序以统一计划为准。
+这是独立实现的 **单机 Alpha**，不是完整移植。不能把 REST 路径相似理解为 Milvus 客户端协议兼容，也不能据此声称“大部分 Milvus 功能已经全部完成”。以下清单以单机 SQLite 入口为主，分布式行单独标注集群能力。M4 原生集群另已实现多集合/命名空间、别名、可恢复集合与分区生命周期、持久化段索引和并发查询，详见 [实现记录](implementation-plan.md)。未来范围和实施顺序以统一计划为准。
 
 | 功能族 | Rust 当前状态 | 差异 / 待办 |
 | --- | --- | --- |
@@ -27,8 +27,8 @@
 | gRPC / SDK | 未实现 | PyMilvus / Milvus Go / Java SDK 尚不可直接使用 |
 | 认证 | 单个 Bearer Token | 无 users / roles / grants / RBAC |
 | 运维 | healthz、请求 / 错误计数器、优雅退出 | 无完整 tracing、查询画像、分布式指标 |
-| 分布式 | 实验性 M3：多集合目录、集合 WAL、完整查询副本、按请求恢复接管 | 尚无自动 Coordinator、sharding、自动 failover、CDC；见 [集群边界](distributed-p1.md) |
-| 存储分离 | 实验性 M3：Parquet/向量状态段、检查点与 Kafka 尾部恢复 | 已有基本 pin/GC 和持久化 ANN；tiering、冷热分层未完成 |
+| 分布式 | 实验性 M4：多集合目录、集合 WAL、分片查询副本、按请求恢复接管 | 尚无自动 Coordinator、自动再平衡、自动 failover、CDC；见 [集群边界](distributed-p1.md) |
+| 存储分离 | 实验性 M4：Parquet/向量状态段、检查点与 Kafka 尾部恢复 | 已有基本 pin/GC 和持久化 ANN；tiering、冷热分层未完成 |
 | 文本能力 | 未实现 | tokenizer、全文索引、BM25、文本函数 |
 | 生产性能 | 未完成验证 | 仅小数据正确性 / ANN 回归测试，无规模性能承诺 |
 
