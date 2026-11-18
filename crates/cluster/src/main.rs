@@ -28,13 +28,14 @@ use vectordb_cluster::{
 #[derive(Clone, Debug, ValueEnum, PartialEq)]
 enum Role {
     Node,
+    Coordinator,
     QueryNode,
     Writer,
     Query,
     Checkpoint,
 }
 #[derive(Parser, Clone)]
-#[command(about = "Experimental M3 distributed VectorDB")]
+#[command(about = "Experimental M5 distributed VectorDB")]
 struct Config {
     #[arg(long, value_enum)]
     role: Role,
@@ -70,6 +71,32 @@ struct Config {
     token: String,
     #[arg(long, env = "VECTORDB_WAL_REPLICAS", default_value_t = 1)]
     wal_replicas: i32,
+    #[arg(long, env = "VECTORDB_COORDINATED", default_value_t = false)]
+    coordinated: bool,
+    #[arg(long, env = "VECTORDB_NODE_ID", default_value = "")]
+    node_id: String,
+    #[arg(long, env = "VECTORDB_ZONE", default_value = "")]
+    zone: String,
+    #[arg(long, env = "VECTORDB_RPC_BIND")]
+    rpc_bind: Option<SocketAddr>,
+    #[arg(long, env = "VECTORDB_RPC_ADVERTISE")]
+    rpc_advertise: Option<String>,
+    #[arg(long, env = "VECTORDB_TLS_CA")]
+    tls_ca: Option<String>,
+    #[arg(long, env = "VECTORDB_TLS_CERT")]
+    tls_cert: Option<String>,
+    #[arg(long, env = "VECTORDB_TLS_KEY", hide_env_values = true)]
+    tls_key: Option<String>,
+    #[arg(long, env = "VECTORDB_QUERY_REPLICAS", default_value_t = 2)]
+    query_replicas: usize,
+    #[arg(long, env = "VECTORDB_MAINTENANCE_MS", default_value_t = 60000)]
+    maintenance_ms: i64,
+    #[arg(long, env = "VECTORDB_MAX_SHARDS", default_value_t = 128)]
+    max_shards: usize,
+    #[arg(skip)]
+    incarnation: String,
+    #[arg(skip)]
+    rpc: Option<vectordb_cluster::transport::Client>,
     #[arg(skip)]
     managed: bool,
 }
@@ -201,6 +228,17 @@ impl Runtime {
         Ok(runtime)
     }
     fn guard(&self) -> Result<()> {
+        if self.config.coordinated && self.lease.is_some() {
+            let control = &self.config.rpc.as_ref().unwrap().control;
+            if let Err(e) = control.authorize_writer(
+                &self.replica.scope,
+                &self.config.node_id,
+                &self.config.incarnation,
+            ) {
+                self.failed.store(true, Ordering::SeqCst);
+                return Err(e);
+            }
+        }
         if self.failed.load(Ordering::SeqCst) {
             return Err(Error::Unavailable(
                 "writer fenced or outcome unknown; restart after recovery".into(),
@@ -320,6 +358,14 @@ impl Runtime {
     }
     fn forward(&self, path: &str, body: Value, id: Option<&str>) -> Result<Value> {
         let owner = self.catalog.active_owner()?;
+        if let Some(rpc) = &self.config.rpc {
+            return rpc.call(
+                &format!("{}{path}", owner.address),
+                body,
+                id,
+                vectordb_cluster::state::now_ms() + 30_000,
+            );
+        }
         let mut request = self
             .client
             .post(format!("{}{path}", owner.address))
@@ -605,9 +651,18 @@ async fn ready(State(app): State<App>, headers: HeaderMap) -> Response {
 }
 #[tokio::main]
 async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let config = Config::parse();
-    if matches!(config.role, Role::Node | Role::QueryNode) {
+    let mut config = Config::parse();
+    if config.role == Role::Coordinator {
+        config.coordinated = true;
+    }
+    if matches!(
+        config.role,
+        Role::Node | Role::QueryNode | Role::Coordinator
+    ) {
         return node::serve(config).await;
+    }
+    if config.coordinated {
+        return Err("--coordinated requires node, query-node, or coordinator role".into());
     }
     let token = Arc::new(config.token.clone());
     let bind = config.bind;

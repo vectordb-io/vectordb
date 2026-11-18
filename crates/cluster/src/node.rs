@@ -1,4 +1,5 @@
 //! Multi-collection gateway and distributed query routing.
+mod controller;
 mod sharding;
 use super::*;
 use std::collections::BTreeMap;
@@ -18,6 +19,14 @@ pub(super) fn failpoint(name: &str) {
 struct Node {
     config: Config,
     directory: Directory,
+    membership: Option<(vectordb_cluster::control::Member, String)>,
+    alive: AtomicBool,
+    leader: Mutex<Option<Lease>>,
+    background_error: Mutex<Option<String>>,
+    snapshot_waiters: std::sync::atomic::AtomicUsize,
+    snapshot_wait_ms: std::sync::atomic::AtomicU64,
+    snapshot_wait_count: std::sync::atomic::AtomicU64,
+
     sessions: Mutex<BTreeMap<String, Arc<Mutex<Runtime>>>>,
     shard_cache:
         Mutex<BTreeMap<String, Arc<Mutex<Option<vectordb_cluster::sharded::ShardReplica>>>>>,
@@ -104,6 +113,36 @@ const OPERATIONS: &[&str] = &[
 fn supported(op: &str) -> bool {
     OPERATIONS.contains(&op)
 }
+fn available_operations(config: &Config) -> Vec<&'static str> {
+    OPERATIONS
+        .iter()
+        .copied()
+        .filter(|op| {
+            if config.role == Role::Coordinator
+                || (config.coordinated && *op == "collections/set_query_routes")
+            {
+                return false;
+            }
+            if config.role != Role::QueryNode {
+                return true;
+            }
+            if config.coordinated {
+                return !is_write(op) && *op != "collections/flush";
+            }
+            catalog_read(op)
+                || matches!(
+                    *op,
+                    "entities/get"
+                        | "entities/query"
+                        | "entities/count"
+                        | "entities/search"
+                        | "entities/hybrid_search"
+                        | "collections/get_query_routes"
+                        | "collections/shard_status"
+                )
+        })
+        .collect()
+}
 fn finish(work: Work) -> Result<Value> {
     match work {
         Work::Ready(value) => Ok(value),
@@ -116,7 +155,7 @@ fn finish(work: Work) -> Result<Value> {
     }
 }
 impl Node {
-    fn new(config: Config) -> Result<Self> {
+    fn new(mut config: Config) -> Result<Self> {
         if config.token.len() < 16
             || config.advertise.is_none()
             || !(1..=5).contains(&config.wal_replicas)
@@ -128,18 +167,33 @@ impl Node {
         advertised_origin(config.advertise.as_deref())?;
         let directory = Directory::new(config.etcd.clone(), &config.cluster)?;
         directory.snapshot()?;
+        let membership = controller::initialize(&mut config)?;
         Ok(Self {
             config,
             directory,
+            membership,
+            alive: AtomicBool::new(true),
+            leader: Mutex::new(None),
+            background_error: Mutex::new(None),
+            snapshot_waiters: std::sync::atomic::AtomicUsize::new(0),
+            snapshot_wait_ms: std::sync::atomic::AtomicU64::new(0),
+            snapshot_wait_count: std::sync::atomic::AtomicU64::new(0),
             sessions: Mutex::new(BTreeMap::new()),
             shard_cache: Mutex::new(BTreeMap::new()),
         })
     }
     fn session(&self, c: &Collection) -> Result<Arc<Mutex<Runtime>>> {
-        if self.config.role == Role::QueryNode {
+        if matches!(self.config.role, Role::QueryNode | Role::Coordinator) {
             return Err(Error::Unsupported(
                 "query-node cannot load full collection or own a writer".into(),
             ));
+        }
+        if let Some(rpc) = &self.config.rpc {
+            rpc.control.authorize_writer(
+                &c.scope,
+                &self.config.node_id,
+                &self.config.incarnation,
+            )?;
         }
         let mut sessions = self.sessions.lock().unwrap();
         if let Some(session) = sessions.get(&c.scope.collection) {
@@ -177,6 +231,10 @@ impl Node {
                 ));
             }
         }
+        if let Some(rpc) = &self.config.rpc {
+            rpc.control
+                .retire_owner(&c.scope, &self.config.node_id, &self.config.incarnation)?;
+        }
         let mut config = self.config.clone();
         config.collection = c.scope.collection.clone();
         config.generation = c.scope.generation.clone();
@@ -184,7 +242,7 @@ impl Node {
         config.role = Role::Writer;
         let runtime = match Runtime::open(config.clone()) {
             Ok(runtime) => runtime,
-            Err(Error::Conflict(_)) => {
+            Err(Error::Conflict(_)) if !self.config.coordinated => {
                 config.role = Role::Query;
                 Runtime::open(config)?
             }
@@ -268,6 +326,15 @@ impl Node {
         Ok(())
     }
     fn execute(&self, op: &str, mut r: Value, id: Option<&str>) -> Result<Value> {
+        self.check_alive()?;
+        if self.config.coordinated && op == "collections/set_query_routes" {
+            return Err(Error::Unsupported("coordinator owns query routing".into()));
+        }
+        if self.config.role == Role::Coordinator {
+            return Err(Error::Unsupported(
+                "coordinator accepts cluster administration only".into(),
+            ));
+        }
         let timeout = r
             .as_object_mut()
             .and_then(|r| r.remove("timeoutMs"))
@@ -359,6 +426,9 @@ impl Node {
         {
             return self.distributed(&c, op, request, timeout);
         }
+        if self.config.coordinated && op.starts_with("entities/") && !is_write(op) {
+            return Err(Error::Unavailable("query assignment is not ready".into()));
+        }
         let mut value = self.internal(&target, op, request, id)?;
         if op == "collections/describe" && value["code"] == 0 {
             value["data"]["collectionName"] = json!(c.name);
@@ -370,6 +440,30 @@ impl Node {
     }
     fn internal(&self, scope: &Scope, op: &str, r: Value, id: Option<&str>) -> Result<Value> {
         let c = self.directory.snapshot()?.by_scope(scope)?;
+        if let Some(rpc) = &self.config.rpc {
+            self.check_alive()?;
+            let assignment = rpc.control.assignment(scope)?;
+            if assignment.placement.writer != self.config.node_id {
+                let members = rpc.control.members()?;
+                let writer = members
+                    .get(&assignment.placement.writer)
+                    .ok_or_else(|| Error::Unavailable("assigned writer unavailable".into()))?;
+                let path = if op.starts_with("internal/") {
+                    op.into()
+                } else {
+                    format!("v2/vectordb/{op}")
+                };
+                return rpc.call(
+                    &format!(
+                        "{}/internal/collections/{}/{}/{path}",
+                        writer.origin, scope.collection, scope.generation
+                    ),
+                    r,
+                    id,
+                    now_ms() + 30_000,
+                );
+            }
+        }
         if op == "internal/reconcile" {
             self.reconcile(&c)?;
             return Ok(json!({"code":0}));
@@ -482,6 +576,11 @@ async fn internal_node(
     headers: HeaderMap,
     Json(body): Json<Value>,
 ) -> Response {
+    if app.node.config.coordinated {
+        return error_response(Error::Unsupported(
+            "internal operations require mTLS RPC".into(),
+        ));
+    }
     let id = request_id(&headers);
     run_node(app, headers, move |node| {
         node.internal(
@@ -503,6 +602,11 @@ async fn control_node(
     headers: HeaderMap,
     Json(body): Json<Value>,
 ) -> Response {
+    if app.node.config.coordinated {
+        return error_response(Error::Unsupported(
+            "internal operations require mTLS RPC".into(),
+        ));
+    }
     run_node(app, headers, move |node| {
         node.internal(
             &Scope {
@@ -520,6 +624,7 @@ async fn control_node(
 async fn ready_node(State(app): State<NodeApp>, headers: HeaderMap) -> Response {
     run_node(app, headers, |node| {
         node.directory.snapshot()?;
+        node.readiness()?;
         Ok(json!({"code":0,"ready":true}))
     })
     .await
@@ -527,6 +632,7 @@ async fn ready_node(State(app): State<NodeApp>, headers: HeaderMap) -> Response 
 pub(super) async fn serve(config: Config) -> std::result::Result<(), Box<dyn std::error::Error>> {
     let bind = config.bind;
     let node = Arc::new(tokio::task::spawn_blocking(move || Node::new(config)).await??);
+    controller::start(&node);
     let weak = Arc::downgrade(&node);
     std::thread::spawn(move || {
         loop {
@@ -537,6 +643,7 @@ pub(super) async fn serve(config: Config) -> std::result::Result<(), Box<dyn std
                 }
                 for c in state.collections.values().filter(|c| {
                     node.config.role == Role::Node
+                        && !node.config.coordinated
                         && matches!(c.state, Lifecycle::Creating | Lifecycle::Dropping)
                 }) {
                     if let Err(e) = node.reconcile(c) {
@@ -615,16 +722,39 @@ pub(super) async fn serve(config: Config) -> std::result::Result<(), Box<dyn std
         slots: Arc::new(tokio::sync::Semaphore::new(32)),
     };
     let app=Router::new()
-        .route("/healthz",get(||async{Json(json!({"status":"alive","mode":"cluster-m4"}))}))
-        .route("/capabilities",get(||async{Json(json!({"mode":"cluster-m4","productionReady":false,"atomicScope":"collection","maxQueryShards":32,"shardedQueries":true,"consistency":["Strong"],"checkpointFormat":"state-segments-v4","persistentIndexes":true,"concurrentReads":true,"multiCollection":true,"namespaces":true,"aliases":true,"collectionLifecycle":true,"partitionDelete":true,"count":true,"automaticFailover":false,"writerTakeover":"demand-driven recovery","idempotencyWindowMs":86400000,"maxActiveCollections":MAX_COLLECTIONS,"defaultVectorDtype":"Float32","operations":OPERATIONS,"maxRoutingReceipts":vectordb_cluster::directory::MAX_ROUTE_RECEIPTS}))}))
+        .route("/healthz",get(||async{Json(json!({"status":"alive","mode":"cluster-m5"}))}))
+        .route("/capabilities",get(|State(app): State<NodeApp>|async move{Json(json!({"mode":"cluster-m5","productionReady":false,"atomicScope":"collection","maxQueryShards":32,"shardedQueries":true,"consistency":["Strong"],"checkpointFormat":"state-segments-v4","persistentIndexes":true,"concurrentReads":true,"multiCollection":true,"namespaces":true,"aliases":true,"collectionLifecycle":true,"partitionDelete":true,"count":true,"automaticFailover":app.node.config.coordinated,"coordinated":app.node.config.coordinated,"internalProtocol":if app.node.config.coordinated {"grpc-mtls-v1"} else {"http-development"},"writerTakeover":if app.node.config.coordinated {"automatic"} else {"demand-driven recovery"},"idempotencyWindowMs":86400000,"maxActiveCollections":MAX_COLLECTIONS,"defaultVectorDtype":"Float32","role":match app.node.config.role {Role::Coordinator=>"coordinator",Role::QueryNode=>"query-node",_=>"node"},"clusterAdministration":app.node.config.coordinated,"operations":available_operations(&app.node.config),"maxRoutingReceipts":vectordb_cluster::directory::MAX_ROUTE_RECEIPTS}))}))
         .route("/readyz",get(ready_node))
+        .route("/cluster/status",get(controller::status))
+        .route("/cluster/nodes/{id}/{action}",post(controller::drain))
+        .route("/metrics",get(controller::metrics))
         .route("/internal/shard-query",post(sharding::handle))
         .route("/v2/vectordb/{category}/{action}",post(execute_node))
         .route("/internal/collections/{collection}/{generation}/v2/vectordb/{category}/{action}",post(internal_node))
         .route("/internal/collections/{collection}/{generation}/internal/{action}",post(control_node))
         .layer(DefaultBodyLimit::max(512*1024)).with_state(state.clone());
+    let (shutdown, receiver) = tokio::sync::watch::channel(false);
+    let rpc_node = state.node.clone();
+    let rpc_task = if let Some(client) = rpc_node.config.rpc.clone() {
+        let bind = rpc_node.config.rpc_bind.unwrap();
+        Some(tokio::spawn(async move {
+            let mut receiver = receiver;
+            let result =
+                vectordb_cluster::transport::serve(bind, client, rpc_node.clone(), async move {
+                    let _ = receiver.changed().await;
+                })
+                .await;
+            if let Err(ref error) = result {
+                rpc_node.alive.store(false, Ordering::SeqCst);
+                eprintln!("RPC server failed: {error}");
+            }
+            result
+        }))
+    } else {
+        None
+    };
     let listener = tokio::net::TcpListener::bind(bind).await?;
-    eprintln!("M3 node listening on {}", listener.local_addr()?);
+    eprintln!("cluster HTTP listening on {}", listener.local_addr()?);
     axum::serve(listener, app)
         .with_graceful_shutdown(async {
             let ctrl = async {
@@ -643,6 +773,15 @@ pub(super) async fn serve(config: Config) -> std::result::Result<(), Box<dyn std
             tokio::select! {_=ctrl=>{},_=term=>{}}
         })
         .await?;
-    tokio::task::spawn_blocking(move || drop(state)).await?;
+    let _ = shutdown.send(true);
+    if let Some(task) = rpc_task {
+        task.await??;
+    }
+    state.node.alive.store(false, Ordering::SeqCst);
+    tokio::task::spawn_blocking(move || {
+        state.node.shutdown_membership();
+        drop(state);
+    })
+    .await?;
     Ok(())
 }

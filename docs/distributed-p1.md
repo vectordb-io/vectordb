@@ -1,6 +1,6 @@
-# 分布式 M4 运行与验证
+# 分布式 M5 运行与验证
 
-`vectordb-cluster --role node` 提供多集合、命名空间、别名和可恢复的数据操作，连接真实 etcd、Kafka 与 S3。`query-node` 支持只加载分配的分片、查询副本和全局结果合并。当前仍是实验性运行时，自动调度和生产高可用尚待 M5—M6。
+`vectordb-cluster --role node` 提供多集合、命名空间、别名和可恢复的数据操作，连接真实 etcd、Kafka 与 S3。`query-node` 支持只加载分配的分片、查询副本和全局结果合并。M5 增加可选的受控模式，支持自动放置、恢复、预热迁移和内部 mTLS/gRPC。当前仍是实验性运行时，真实多主机验收和核心 V1 发布尚未完成。
 
 本文是运行说明，架构、协议和验收依据统一在 [implementation-plan.md](implementation-plan.md)。文件名沿用早期 P1 路径，以保留已有链接。
 
@@ -56,7 +56,7 @@ export VECTORDB_CLUSTER_TOKEN=development-integration-token
   --bind 127.0.0.1:19532 --advertise http://127.0.0.1:19532
 ```
 
-无需指定 collection 或 generation。任意节点可接收请求，按集合获取 writer 归属，或者向现有 owner 转发写入并在本节点执行查询。正常退出会撤销租约；崩溃后，待旧租约到期，后续请求可驱动新 assignment 恢复，不需要修改 etcd 元数据。跨机器运行时，advertise 和 Kafka advertised listeners 都必须可达；当前内部通信只适合可信隔离网络，mTLS 和故障域调度仍属于 M5。
+无需指定 collection 或 generation。任意节点可接收请求，按集合获取 writer 归属，或者向现有 owner 转发写入并在本节点执行查询。正常退出会撤销租约；崩溃后，待旧租约到期，后续请求可驱动新 assignment 恢复，不需要修改 etcd 元数据。跨机器运行时，advertise 和 Kafka advertised listeners 都必须可达；当前内部通信只适合可信隔离网络，下面的受控模式提供 mTLS 与故障域调度；本节手动模式仍用于开发/回归。
 
 ```sh
 # 每个新操作生成一个键；重试复用原键。
@@ -108,7 +108,7 @@ curl --fail-with-body http://127.0.0.1:19531/v2/vectordb/collections/set_query_r
   --data-binary @/tmp/vectordb-routes.json
 ```
 
-`replicas[i]` 列出分片 i 的 1—3 个 HTTP(S) origin，按顺序选择并故障重试。数组必须覆盖全部分片；更新时传当前 `expectedEpoch`，CAS 冲突返回 409。用 `collections/get_query_routes` 查看当前映射，用 `collections/shard_status` 在各 Query 节点查看已加载分片、行数、状态字节、水位及 WAL 回放记录数。两者请求体均为 `{"collectionName":"items"}`。修改地址列表即可手动迁移，新的分配在首个查询时从 S3/WAL 加载；自动发现、故障域放置、主动预热与再平衡由 M5 实现。
+`replicas[i]` 列出分片 i 的 1—3 个 HTTP(S) origin，按顺序选择并故障重试。数组必须覆盖全部分片；更新时传当前 `expectedEpoch`，CAS 冲突返回 409。用 `collections/get_query_routes` 查看当前映射，用 `collections/shard_status` 在各 Query 节点查看已加载分片、行数、状态字节、水位及 WAL 回放记录数。两者请求体均为 `{"collectionName":"items"}`。修改地址列表即可手动迁移，新的分配在首个查询时从 S3/WAL 加载；自动发现、故障域放置、主动预热与再平衡使用下面的 M5 受控模式。
 
 发布路由后，向 node 或 query-node 发起实体读请求，代理在同一个 B 上收齐所有分片再合并。响应带 `readToken` 和 `routeEpoch`。query-node 不接受写入、不能接管 writer，也不加载完整集合；写请求仍发给 node。没有路由的集合保留原完整副本读取，writer 也仍保留完整状态。副本数量增加会相应增加 Query 的持久数据份数及 WAL 读取量；同一节点的多个分片共享一次 WAL 回放，当前按查询追赶。
 
@@ -125,6 +125,76 @@ VECTORDB_M4_BINARY="$PWD/target/release/vectordb-cluster" \
 ```
 
 这会写入 `docs/benchmarks/m4-baseline.json`。10k × 32 Float32、16 分片、FLAT top-10、每请求 16 个向量、并发 1，记录精确结果比对、吞吐、延迟、分配行数/字节及运行后 RSS 样本；不代表跨主机扩容验收。故障冒烟使用 debug 构建，`VECTORDB_TEST_SHARD_DELAY_MS` 仅在 debug 下启用。
+
+## M5 受控集群
+
+本节适用于新建受控集群。前面的手动路由模式继续用于开发和旧测试；两种模式不能混用。若迁移已有手动模式集群，先停止旧计算进程，再部署全部支持 M5 的受控进程；保留 etcd、Kafka、S3 和同一 cluster ID，不需要重建集合。不要在仍运行旧进程时引入 Coordinator。
+
+建议至少两个 Coordinator、两个 node（网关兼 writer）、三个 query-node，并将查询节点放到三个不同的故障域。基础设施本身也需要独立的高可用配置；单节点开发 Compose 不能验证这一点。所有节点继续使用前面的共享存储环境变量，并增加：
+
+```sh
+export VECTORDB_COORDINATED=true
+export VECTORDB_TLS_CA=/secure/cluster-ca.crt
+export VECTORDB_QUERY_REPLICAS=2
+export VECTORDB_MAINTENANCE_MS=60000
+```
+
+每个节点使用自己的证书和私钥。证书应由该集群 CA 签发，DNS SAN 精确包含节点 ID，EKU 同时允许 serverAuth 和 clientAuth。节点 ID 是不超过 63 字符的小写 DNS label；不要共享节点 ID/证书。连接按注册节点 ID 验证 SAN，RPC 地址可以是可达 IP。不要关闭证书验证。[tonic 服务端双向 TLS 配置](https://docs.rs/tonic/latest/tonic/transport/server/struct.ServerTlsConfig.html)、[客户端身份和服务名验证](https://docs.rs/tonic/latest/tonic/transport/channel/struct.ClientTlsConfig.html)。
+
+以下是 Coordinator 的启动模板，将地址和证书换成实际值：
+
+```sh
+export VECTORDB_TLS_CERT=/secure/coord-a.crt
+export VECTORDB_TLS_KEY=/secure/coord-a.key
+./target/debug/vectordb-cluster --role coordinator \
+  --node-id coord-a --zone az-a \
+  --bind 0.0.0.0:19531 --advertise http://10.0.0.11:19531 \
+  --rpc-bind 0.0.0.0:19541 --rpc-advertise https://10.0.0.11:19541
+```
+
+第二个 Coordinator 使用不同 ID、证书、地址与 zone，策略参数必须与首次持久化值相同。writer 节点使用 `--role node`，Query 使用 `--role query-node`，其他身份/RPC 配置方式相同。`--max-shards` 默认为 128，可设 1—512，控制每个 Query 的分片准入；每节点最多 16 个集合、集群最多 32 个成员。每个 shard 的副本尽量分布在不同 zone；不会把同 zone 的两个实例伪装为两个故障域。
+
+向任意 node 创建集合、写入，向 node 或 query-node 查询即可。无需调用 `set_query_routes`，受控模式会拒绝该手动操作。创建时分配尚未完成可能返回 503；继续使用原幂等键重试。未准备好的集合不会回退到完整集合查询来伪装分片已就绪。query-node 主动追赶 WAL，不需要客户端查询来触发；writer 故障接管同样由控制面驱动。
+
+每次启动分配新的 incarnation。成员租约为 10 秒，每 2 秒续租；Coordinator 的独立主租约为 30 秒。失去成员租约的进程永久停止当前身份的服务，恢复网络后应重启。恢复旧 writer 进程不能继续写入；确认结果未知的写操作仍以原幂等键重试。正常退出会撤销成员和拥有的租约。
+
+### 状态、故障与指标
+
+以下接口均需要 Bearer Token：
+
+- `GET /cluster/status`：主 Coordinator、成员、故障域、容量/水位、任务版本、阶段、重试错误、维护序列及 degraded 状态。
+- `GET /readyz`：检查成员/控制面及已分配角色的恢复状态；`/healthz` 只表示进程存活。
+- `GET /metrics`：Prometheus 文本格式，提供 `vectordb_live_nodes`、`vectordb_pending_assignments`、`vectordb_task_attempts`、`vectordb_last_progress_timestamp_seconds`、`vectordb_degraded`、`vectordb_query_wal_lag_offsets`、`vectordb_snapshot_waiters`、`vectordb_snapshot_wait_ms_total`、`vectordb_snapshot_wait_count`。水位差基于心跳采样，单位为 Kafka offset 差而非精确 mutation 数量。
+
+路由切换前必须完成目标预热。Task Active 和新路由在一个 etcd 事务发布；Coordinator 崩溃后续做原任务。维护任务至少执行一次，在效果已发生但未确认时可能重新计算/发布更新 offset 的检查点；不会覆盖较新状态或重复推进同一迁移的路由 epoch。索引暂时失败可继续 FLAT 查询，原始数据仍能检查点化，任务保留错误并退避重试。
+
+故障后可能临时降级为每分片一个副本，status/metrics 会明确标记；完全没有可用副本则失败。成员租约和 owner fencing 需要真实 etcd/Kafka 可达，不把开发 Compose 的单副本配置当作基础设施 HA。客户端在故障期间应处理可重试错误，不承诺迁移期间所有请求都零失败。
+
+### 排空与受控滚动升级
+
+先部署有容量且协议兼容的新节点，再排空旧节点。例如：
+
+```sh
+curl --fail-with-body -X POST http://10.0.0.11:19531/cluster/nodes/query-a/drain \
+  -H "Authorization: Bearer $VECTORDB_CLUSTER_TOKEN"
+```
+
+排空意图持久化。等待 `/cluster/status` 中所有有关任务 Active、placement 不再引用该节点，再停止进程。容量不足时任务会保留错误或报告降级，不应提前停止旧节点。writer 排空会经过重新分配、fencing 和恢复，可能短暂返回可重试错误。
+
+更新二进制或证书并重新启动；相同 ID 注册新 incarnation 前必须等旧身份退出/租约失效。然后调用 `POST /cluster/nodes/query-a/resume`，等待预热、Active 和 readiness。一次操作一个节点/故障域，最后确认副本数和 degraded 恢复正常。
+
+当前内部协议支持范围为 `[1,1]`，请求/响应版本、成员版本范围和集群身份都必须匹配；不兼容节点或请求明确拒绝，不自动降级为 HTTP。滚动升级只适用于双方均支持协议 1 且状态格式兼容的版本。格式迁移或不相交版本范围必须另做停机迁移方案，不能把当前同版本重启测试当成未来所有版本组合都可滚动。
+
+### M5 本机验收
+
+```sh
+cargo build -p vectordb-cluster --bins --examples --locked
+python3 -u scripts/cluster_m5_smoke.py
+```
+
+脚本自动生成临时 CA/节点证书并启动独立进程，测试证书只供本机验证。覆盖自动调度、WAL 追赶、加入/排空迁移、主备切换、旧 writer 复活拒绝、Query 冷恢复、mTLS/协议拒绝、真实 S3 中断后的维护重试、三个任务崩溃边界，以及同一 zone 标签下整组计算进程同时失效。它会明确标注基础设施仍然在线；多主机网络分区和物理故障域尚未验收。
+
+受控节点分别限制 32 个 HTTP 工作请求和 32 个 RPC 工作请求。迁移可同时保留当前和在途两个缓存版本；资源计费不是硬 RSS 限额。RPC body 最多 1 MiB，响应约 32 MiB，deadline 最多 45 秒，分片查询仍受 M4 的 30 秒总截止时间和合并预算约束。当前维护任务在 writer 执行，独立 Data worker 和生产容量隔离属于后续部署完善范围。
 
 ## API 与资源边界
 
@@ -159,10 +229,12 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 python3 scripts/cluster_smoke.py
 python3 -u scripts/cluster_m3_smoke.py
 python3 -u scripts/cluster_m4_smoke.py
+cargo build -p vectordb-cluster --examples --locked
+python3 -u scripts/cluster_m5_smoke.py
 cargo test -p vectordb-cluster --test backends --locked -- --ignored
 docker compose -p vectordb-cluster-test -f deployments/cluster/compose.yaml down -v
 ```
 
-三份集群脚本按顺序运行：旧脚本会暂停 Kafka 来验证故障恢复。M3 脚本覆盖双节点操作和 12 个崩溃场景，包括已提交但未回复、接管阶段、集合生命周期，以及路由绑定后崩溃再切换别名；还验证同一节点进程内从未知提交结果恢复。调试构建的 `VECTORDB_TEST_CRASH_AT` 仅供测试，release 构建不执行该钩子。
+四份集群脚本按顺序运行：旧脚本会暂停 Kafka，M5 脚本会暂停 S3 服务来验证维护任务重试；不要并发运行这些测试。M3 脚本覆盖双节点操作和 12 个崩溃场景，包括已提交但未回复、接管阶段、集合生命周期，以及路由绑定后崩溃再切换别名；还验证同一节点进程内从未知提交结果恢复。调试构建的 `VECTORDB_TEST_CRASH_AT` 仅供测试，release 构建不执行该钩子。
 
-契约和验证记录见 [统一实施计划](implementation-plan.md)，性能历史记录见 [M1 状态基准](benchmarks/m1-baseline.json)、[M2 索引基准](benchmarks/m2-baseline.json) 和 [M4 查询扩展基准](benchmarks/m4-baseline.json)。M4 未宣称完成跨主机故障域、生产吞吐、百万级数据、72 小时稳定性、备份迁移或核心 V1 发布验收。
+契约和验证记录见 [统一实施计划](implementation-plan.md)，性能历史记录见 [M1 状态基准](benchmarks/m1-baseline.json)、[M2 索引基准](benchmarks/m2-baseline.json) 和 [M4 查询扩展基准](benchmarks/m4-baseline.json)。M5 未宣称完成跨主机故障域、生产吞吐、百万级数据、72 小时稳定性、备份迁移或核心 V1 发布验收。

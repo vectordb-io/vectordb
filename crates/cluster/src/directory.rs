@@ -405,7 +405,7 @@ impl Directory {
             cluster: cluster.into(),
         })
     }
-    fn load(&self) -> Result<(String, DirectoryState)> {
+    pub(crate) fn load(&self) -> Result<(String, DirectoryState)> {
         match self.store.get("directory")? {
             None => Ok(("0".into(), DirectoryState::default())),
             Some((revision, bytes)) => {
@@ -420,14 +420,14 @@ impl Directory {
     pub fn snapshot(&self) -> Result<DirectoryState> {
         Ok(self.load()?.1)
     }
-    fn compare(&self, revision: &str) -> Value {
+    pub(crate) fn compare(&self, revision: &str) -> Value {
         if revision == "0" {
             json!({"key":self.store.key("directory"),"target":"VERSION","version":"0","result":"EQUAL"})
         } else {
             json!({"key":self.store.key("directory"),"target":"MOD","mod_revision":revision,"result":"EQUAL"})
         }
     }
-    fn put(&self, state: &DirectoryState) -> Result<Value> {
+    pub(crate) fn put(&self, state: &DirectoryState) -> Result<Value> {
         let bytes = serde_json::to_vec(state)?;
         if bytes.len() > 1024 * 1024 {
             return Err(Error::Unavailable(

@@ -23,6 +23,13 @@ hmac = "0.12"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 uuid = { version = "1", features = ["v4"] }
 prost = "0.14"
+tonic = { version = "0.14", features = ["transport", "tls-ring"] }
+tonic-prost = "0.14"
+x509-parser = "0.18"
+
+[build-dependencies]
+tonic-prost-build = "0.14"
+protoc-bin-vendored = "3"
 
 [dev-dependencies]
 tempfile = "3"

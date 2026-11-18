@@ -73,6 +73,8 @@ pub struct ShardQuery {
     pub operation: String,
     pub requests: Vec<Value>,
     pub deadline_ms: i64,
+    #[serde(default)]
+    pub warm_version: Option<u64>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

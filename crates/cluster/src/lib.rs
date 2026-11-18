@@ -1,5 +1,5 @@
 //! Experimental multi-collection catalog, ordered logs and shared checkpoints.
-//! M0-M3 lifecycle and recovery; sharding and production milestones remain open.
+//! M0-M5 recovery, sharding and coordinated compute; production qualification remains open.
 pub mod catalog;
 pub mod kafka;
 pub mod object;
@@ -55,3 +55,6 @@ pub mod contracts;
 pub mod directory;
 
 pub mod sharded;
+
+pub mod control;
+pub mod transport;

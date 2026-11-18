@@ -50,6 +50,9 @@ impl Catalog {
             prefix: format!("/vectordb/{}/", scope.prefix()),
         })
     }
+    pub(crate) fn endpoint(&self) -> &str {
+        &self.endpoint
+    }
     pub(crate) fn key(&self, name: &str) -> String {
         STANDARD.encode(format!("{}{name}", self.prefix))
     }
@@ -152,11 +155,15 @@ impl Catalog {
         Ok(())
     }
     pub fn renew(&self, lease: &Lease) -> Result<()> {
+        self.keepalive(&lease.id)?;
+        self.verify(lease)
+    }
+    pub fn keepalive(&self, id: &str) -> Result<()> {
         // The HTTP gateway streams responses: read exactly one line, then close.
         let response = self
             .client
             .post(format!("{}/v3/lease/keepalive", self.endpoint))
-            .json(&json!({"ID":lease.id}))
+            .json(&json!({"ID":id}))
             .send()?
             .error_for_status()?;
         let mut line = String::new();
@@ -169,7 +176,7 @@ impl Catalog {
         if ttl <= 0 {
             return Err(Error::Unavailable("ownership lease expired".into()));
         }
-        self.verify(lease)
+        Ok(())
     }
     pub fn revoke(&self, id: &str) -> Result<()> {
         self.post("/v3/lease/revoke", json!({"ID":id}))?;
@@ -246,7 +253,7 @@ impl Catalog {
         )?;
         Ok(result["succeeded"] == true)
     }
-    fn range(&self, name: &str) -> Result<Vec<(String, Vec<u8>)>> {
+    pub(crate) fn range(&self, name: &str) -> Result<Vec<(String, Vec<u8>)>> {
         let prefix = format!("{}{name}", self.prefix);
         let mut end = prefix.as_bytes().to_vec();
         let last = end

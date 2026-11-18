@@ -261,6 +261,7 @@ fn incomplete_duplicate_or_mixed_snapshot_results_fail_closed() {
         operation: "entities/count".into(),
         requests: vec![json!({"collectionName":"items"})],
         deadline_ms: now_ms() + 1000,
+        warm_version: None,
     };
     let mut reply = ShardReply {
         token,

@@ -18,6 +18,16 @@ fn remaining(deadline: i64) -> Result<Duration> {
     }
     Ok(Duration::from_millis(ms as u64))
 }
+struct Wait<'a>(&'a Node, Instant);
+impl Drop for Wait<'_> {
+    fn drop(&mut self) {
+        self.0.snapshot_waiters.fetch_sub(1, Ordering::Relaxed);
+        self.0
+            .snapshot_wait_ms
+            .fetch_add(self.1.elapsed().as_millis() as u64, Ordering::Relaxed);
+        self.0.snapshot_wait_count.fetch_add(1, Ordering::Relaxed);
+    }
+}
 struct Pin {
     catalog: Catalog,
     lease: Option<String>,
@@ -29,6 +39,20 @@ impl Drop for Pin {
         }
     }
 }
+fn charge(budget: &AtomicUsize, n: usize) -> Result<()> {
+    let mut used = budget.load(Ordering::Relaxed);
+    loop {
+        let total = used
+            .checked_add(n)
+            .filter(|v| *v <= MAX_REPLY)
+            .ok_or_else(|| Error::Unavailable("aggregate query response exceeds budget".into()))?;
+        match budget.compare_exchange_weak(used, total, Ordering::Relaxed, Ordering::Relaxed) {
+            Ok(_) => break,
+            Err(actual) => used = actual,
+        }
+    }
+    Ok(())
+}
 fn post(
     client: &reqwest::blocking::Client,
     address: &str,
@@ -36,7 +60,21 @@ fn post(
     body: &impl serde::Serialize,
     deadline: i64,
     budget: &AtomicUsize,
+    rpc: Option<&vectordb_cluster::transport::Client>,
 ) -> Result<Value> {
+    if let Some(rpc) = rpc {
+        let value = rpc.call(address, serde_json::to_value(body)?, None, deadline)?;
+        let size = serde_json::to_vec(&value)?.len();
+        charge(budget, size)?;
+        if value["code"] != 0 {
+            return Err(Error::Unavailable(format!(
+                "RPC query failed: {}",
+                value["message"]
+            )));
+        }
+        remaining(deadline)?;
+        return Ok(value);
+    }
     let mut response = client
         .post(address)
         .bearer_auth(token)
@@ -50,19 +88,7 @@ fn post(
         if n == 0 {
             break;
         }
-        let mut used = budget.load(Ordering::Relaxed);
-        loop {
-            let total = used
-                .checked_add(n)
-                .filter(|v| *v <= MAX_REPLY)
-                .ok_or_else(|| {
-                    Error::Unavailable("aggregate query response exceeds budget".into())
-                })?;
-            match budget.compare_exchange_weak(used, total, Ordering::Relaxed, Ordering::Relaxed) {
-                Ok(_) => break,
-                Err(actual) => used = actual,
-            }
-        }
+        charge(budget, n)?;
         bytes.extend_from_slice(&chunk[..n]);
     }
     let value: Value = serde_json::from_slice(&bytes)?;
@@ -107,8 +133,22 @@ impl Node {
             prefix,
             c.query_routes.as_ref().map_or(0, |r| r.epoch)
         );
+        let pending = self
+            .config
+            .rpc
+            .as_ref()
+            .and_then(|rpc| rpc.control.assignment(&c.scope).ok())
+            .filter(|a| {
+                a.phase != vectordb_cluster::control::Phase::Active
+                    && a.placement
+                        .replicas
+                        .iter()
+                        .any(|r| r.contains(&self.config.node_id))
+            })
+            .map(|a| format!("{}{}", prefix, a.route_epoch));
         self.shard_cache.lock().unwrap().retain(|k, _| {
             !k.starts_with(&prefix)
+                || (c.state == Lifecycle::Active && pending.as_ref() == Some(k))
                 || (*k == key
                     && c.state == Lifecycle::Active
                     && c.query_routes.as_ref().is_some_and(|r| {
@@ -169,6 +209,7 @@ impl Node {
                 &json!({}),
                 deadline,
                 &budget,
+                self.config.rpc.as_ref(),
             )?;
             let token: Token = serde_json::from_value(response["data"]["token"].clone())?;
             let spec: vectordb_engine::segment::CollectionSpec =
@@ -192,6 +233,7 @@ impl Node {
                 operation: plan.operation.clone(),
                 requests: plan.requests.clone(),
                 deadline_ms: deadline,
+                warm_version: None,
             };
             let mut received = BTreeMap::<usize, ShardPart>::new();
             let mut errors = vec![];
@@ -223,6 +265,7 @@ impl Node {
                                     &request,
                                     now_ms() + (deadline - now_ms()).max(1) / (3 - replica) as i64,
                                     budget,
+                                    self.config.rpc.as_ref(),
                                 )?;
                                 let reply: ShardReply =
                                     serde_json::from_value(value["data"].clone())?;
@@ -296,19 +339,46 @@ impl Node {
             return Err(Error::Invalid("invalid shard query envelope".into()));
         }
         let c = self.directory.snapshot()?.by_scope(&request.token.scope)?;
-        let routes = c
-            .query_routes
-            .as_ref()
-            .ok_or_else(|| Error::Conflict("query routing absent".into()))?;
-        let address = self
-            .config
-            .advertise
-            .as_deref()
-            .unwrap()
-            .trim_end_matches('/');
-        let assigned = routes.assigned(address);
+        self.check_alive()?;
+        let assigned = if let Some(version) = request.warm_version {
+            let rpc = self
+                .config
+                .rpc
+                .as_ref()
+                .ok_or_else(|| Error::Invalid("warm requires coordinated mode".into()))?;
+            let a = rpc.control.assignment(&c.scope)?;
+            if a.version != version
+                || a.route_epoch != request.route_epoch
+                || a.phase != vectordb_cluster::control::Phase::Warming
+                || a.placement.incarnations.get(&self.config.node_id)
+                    != Some(&self.config.incarnation)
+            {
+                return Err(Error::Conflict("stale warm task".into()));
+            }
+            a.placement
+                .replicas
+                .iter()
+                .enumerate()
+                .filter(|(_, ids)| ids.contains(&self.config.node_id))
+                .map(|(i, _)| i)
+                .collect()
+        } else {
+            let routes = c
+                .query_routes
+                .as_ref()
+                .ok_or_else(|| Error::Conflict("query routing absent".into()))?;
+            if routes.epoch != request.route_epoch {
+                return Err(Error::Conflict("stale route epoch".into()));
+            }
+            routes.assigned(
+                self.config
+                    .advertise
+                    .as_deref()
+                    .unwrap()
+                    .trim_end_matches('/'),
+            )
+        };
         if c.state != Lifecycle::Active
-            || routes.epoch != request.route_epoch
             || c.shard_count != request.shard_count
             || request.shards.is_empty()
             || !request.shards.is_subset(&assigned)
@@ -316,10 +386,10 @@ impl Node {
             return Err(Error::Conflict("stale route or unassigned shard".into()));
         }
         self.prune_shards(&c);
-        let cache_key = format!("{}/{}", c.scope.prefix(), routes.epoch);
+        let cache_key = format!("{}/{}", c.scope.prefix(), request.route_epoch);
         let cache = {
             let mut cache = self.shard_cache.lock().unwrap();
-            if cache.len() >= MAX_COLLECTIONS && !cache.contains_key(&cache_key) {
+            if cache.len() >= MAX_COLLECTIONS * 2 && !cache.contains_key(&cache_key) {
                 return Err(Error::Unavailable("shard cache collection quota".into()));
             }
             cache
@@ -328,6 +398,8 @@ impl Node {
                 .clone()
         };
         let catalog = Catalog::new(self.config.etcd.clone(), &c.scope)?;
+        self.snapshot_waiters.fetch_add(1, Ordering::Relaxed);
+        let wait = Wait(self, Instant::now());
         let views = {
             let mut cached = cache.lock().unwrap();
             let use_cached = cached.as_ref().is_some_and(|r| {
@@ -362,6 +434,7 @@ impl Node {
             }
             views
         };
+        drop(wait);
         if cfg!(debug_assertions)
             && let Ok(delay) = std::env::var("VECTORDB_TEST_SHARD_DELAY_MS")
         {
@@ -464,6 +537,11 @@ pub(super) async fn handle(
     headers: HeaderMap,
     Json(request): Json<ShardQuery>,
 ) -> Response {
+    if app.node.config.coordinated {
+        return error_response(Error::Unsupported(
+            "internal operations require mTLS RPC".into(),
+        ));
+    }
     let timeout = request
         .deadline_ms
         .saturating_sub(now_ms())

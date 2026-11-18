@@ -95,7 +95,7 @@ jobs:
 
   cluster:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
@@ -106,7 +106,7 @@ jobs:
       - name: Install Rust
         run: rustup toolchain install stable --profile minimal && rustup default stable
       - name: Build experimental cluster runtime
-        run: cargo build -p vectordb-cluster --locked
+        run: cargo build -p vectordb-cluster --bins --examples --locked
       - name: Persistent index recall and strict-filter regression
         run: cargo run --release -p vectordb-engine --example query_bench --locked -- 10000
       - name: Start isolated dependencies
@@ -117,6 +117,8 @@ jobs:
         run: python3 -u scripts/cluster_m3_smoke.py
       - name: Sharded queries, replicas, migration and snapshot completeness
         run: python3 -u scripts/cluster_m4_smoke.py
+      - name: Coordinator, mTLS, automatic recovery and migration
+        run: python3 -u scripts/cluster_m5_smoke.py
       - name: Catalog, pin/GC, S3 and Kafka fencing contracts
         run: cargo test -p vectordb-cluster --test backends --locked -- --ignored
       - name: Dependency logs on failure

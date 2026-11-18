@@ -1,0 +1,16 @@
+syntax = "proto3";
+package vectordb.internal.rpc.v1;
+// Authenticated cluster RPC. Semantic version is checked before body decoding.
+// Body is the bounded JSON operation contract, not arbitrary HTTP forwarding.
+service Cluster { rpc Call(CallRequest) returns (CallResponse); }
+message CallRequest {
+  uint32 version = 1;
+  string cluster = 2;
+  string sender = 3;
+  string incarnation = 4;
+  string path = 5;
+  bytes body = 6;
+  string idempotency_key = 7;
+  int64 deadline_ms = 8;
+}
+message CallResponse { uint32 version = 1; bytes body = 2; }

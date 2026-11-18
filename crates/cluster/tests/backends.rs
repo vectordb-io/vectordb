@@ -266,3 +266,194 @@ fn real_directory_receipts_cas_and_owner_recovery_phases() {
             .is_err()
     );
 }
+
+#[test]
+#[ignore = "requires isolated etcd from deployments/cluster/compose.yaml"]
+fn real_control_fences_stale_leaders_incarnations_and_atomic_route_publication() {
+    use serde_json::json;
+    use std::collections::BTreeMap;
+    use vectordb_cluster::{
+        control::{Assignment, Control, Member, NodeRole, Phase, Placement},
+        directory::{Directory, Lifecycle},
+        state::{idempotency_key, now_ms},
+    };
+    let cluster = format!("control-{}", uuid::Uuid::new_v4().simple());
+    let control = Control::new("http://127.0.0.1:12379".into(), &cluster).unwrap();
+    control.initialize(2, 60000).unwrap();
+    assert!(control.initialize(1, 60000).is_err());
+    let member = |id: &str, role| Member {
+        id: id.into(),
+        incarnation: format!("boot-{id}"),
+        role,
+        zone: id.into(),
+        origin: format!("http://{id}:8000"),
+        rpc: format!("https://{id}:9000"),
+        protocol_min: 1,
+        protocol_max: 1,
+        max_shards: 32,
+        max_collections: 16,
+        resources: json!({}),
+    };
+    let w = member("w1", NodeRole::Writer);
+    let q = member("q1", NodeRole::Query);
+    let wl = control.register(&w).unwrap();
+    let ql = control.register(&q).unwrap();
+    // Simulate a future binary's registration; healthy protocol-1 peers remain usable.
+    let mut future = q.clone();
+    future.id = "future".into();
+    future.protocol_min = 2;
+    future.protocol_max = 2;
+    {
+        use base64::Engine;
+        let b64 = base64::engine::general_purpose::STANDARD;
+        let client = reqwest::blocking::Client::new();
+        let grant: serde_json::Value = client
+            .post("http://127.0.0.1:12379/v3/lease/grant")
+            .json(&json!({"TTL":10}))
+            .send()
+            .unwrap()
+            .json()
+            .unwrap();
+        client.post("http://127.0.0.1:12379/v3/kv/put").json(&json!({"key":b64.encode(format!("/vectordb/{cluster}/_control/v1/nodes/future")),"value":b64.encode(serde_json::to_vec(&future).unwrap()),"lease":grant["ID"]})).send().unwrap().error_for_status().unwrap();
+        assert!(!control.members().unwrap().contains_key("future"));
+    }
+
+    assert!(control.register(&q).is_err());
+    control.heartbeat(&q, &ql).unwrap();
+    let directory = Directory::new("http://127.0.0.1:12379".into(), &cluster).unwrap();
+    let receipt = directory
+        .begin(
+            "collections/create",
+            &json!({"collectionName":"items","dimension":2,"shardCount":2}),
+            &idempotency_key(now_ms(), "create"),
+        )
+        .unwrap();
+    let scope = receipt.target.unwrap();
+    directory
+        .finish(&scope, Lifecycle::Active, None, 0)
+        .unwrap();
+    let c1 = member("c1", NodeRole::Coordinator);
+    let c2 = member("c2", NodeRole::Coordinator);
+    let c1lease = control.register(&c1).unwrap();
+    let c2lease = control.register(&c2).unwrap();
+    let lease = control.acquire("c1", &c1.incarnation).unwrap();
+    let (rev, mut state) = control.load().unwrap();
+    state.assignments.insert(
+        scope.collection.clone(),
+        Assignment {
+            scope: scope.clone(),
+            version: 1,
+            route_epoch: 1,
+            placement: Placement {
+                writer: "w1".into(),
+                replicas: vec![vec!["q1".into()]; 2],
+                incarnations: BTreeMap::from([
+                    ("w1".into(), w.incarnation.clone()),
+                    ("q1".into(), q.incarnation.clone()),
+                ]),
+            },
+            phase: Phase::Warming,
+            attempts: 0,
+            retry_at_ms: 0,
+            error: None,
+            maintenance_sequence: 0,
+            maintenance_pending: false,
+            maintenance_completed_ms: 0,
+            warmed_offset: Some(2),
+        },
+    );
+    assert!(control.save(&lease, &rev, &mut state).unwrap());
+    let (rev, mut state) = control.load().unwrap();
+    // Query restart between warm acknowledgement and publication invalidates the CAS.
+    control.revoke(&ql).unwrap();
+    let mut replacement = q.clone();
+    replacement.incarnation = "second-boot".into();
+    let ql = control.register(&replacement).unwrap();
+    assert!(control.verify_member("q1", &q.incarnation).is_err());
+    let members = BTreeMap::from([("w1".into(), w), ("q1".into(), replacement.clone())]);
+    assert!(
+        !control
+            .publish(
+                &lease,
+                &rev,
+                &mut state,
+                &directory,
+                &scope.collection,
+                &members
+            )
+            .unwrap()
+    );
+    assert!(
+        directory
+            .snapshot()
+            .unwrap()
+            .by_scope(&scope)
+            .unwrap()
+            .query_routes
+            .is_none()
+    );
+    // A lost coordinator lease prevents both task changes and route publication.
+    // Losing membership also fences publication while the longer leader lease remains.
+    control.revoke(&c1lease).unwrap();
+    let (rev, mut stale) = control.load().unwrap();
+    assert!(!control.save(&lease, &rev, &mut stale).unwrap());
+    assert!(control.renew(&lease).is_err());
+    control.revoke(&lease.id).unwrap();
+    let next = control.acquire("c2", &c2.incarnation).unwrap();
+    assert!(
+        control
+            .verify_leader("c1", &c1.incarnation, lease.epoch)
+            .is_err()
+    );
+    let (rev, mut state) = control.load().unwrap();
+    assert!(!control.save(&lease, &rev, &mut state).unwrap());
+    state
+        .assignments
+        .get_mut(&scope.collection)
+        .unwrap()
+        .placement
+        .incarnations
+        .insert("q1".into(), replacement.incarnation);
+    assert!(control.save(&next, &rev, &mut state).unwrap());
+    let (rev, mut state) = control.load().unwrap();
+    assert!(
+        control
+            .publish(
+                &next,
+                &rev,
+                &mut state,
+                &directory,
+                &scope.collection,
+                &members
+            )
+            .unwrap()
+    );
+    assert_eq!(control.assignment(&scope).unwrap().phase, Phase::Active);
+    assert_eq!(
+        directory
+            .snapshot()
+            .unwrap()
+            .by_scope(&scope)
+            .unwrap()
+            .query_routes
+            .unwrap()
+            .epoch,
+        1
+    );
+    assert!(
+        control
+            .publish(
+                &next,
+                &rev,
+                &mut state,
+                &directory,
+                &scope.collection,
+                &members
+            )
+            .is_err()
+    );
+    control.revoke(&wl).unwrap();
+    control.revoke(&ql).unwrap();
+    control.revoke(&next.id).unwrap();
+    control.revoke(&c2lease).unwrap();
+}

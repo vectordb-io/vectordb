@@ -383,6 +383,9 @@ impl Replica {
         self.validate_request(op, request, false)?;
         Ok(self.engine.read_view()?)
     }
+    pub fn state_bytes(&self) -> usize {
+        self.engine.state_bytes()
+    }
     pub fn build_indexes(&self) -> Result<()> {
         Ok(self.engine.build_indexes()?)
     }
