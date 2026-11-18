@@ -598,7 +598,7 @@ M7、BM25/稀疏倒排、量化/GPU、其他一致性模式各自维护验收结
 Milvus 本地参考提交为 `61de3a82cce970235f9ffb0c90b38749d0c3b196`。参考点包括日志作为变更来源、channel 分配与 term、可确认水位、事务回放和段恢复；首版不照搬其完整通道与时间戳体系。
 
 - [本项目当前架构](architecture.md)、[能力对照](compatibility.md)、[运维约束](operations.md)。
-- [Milvus Streaming 系统](../../reference-code/milvus/docs/agent_guides/streaming-system/streaming-system.md)。
-- [Milvus channel 管理](../../reference-code/milvus/docs/agent_guides/streaming-system/coordination/channel_management.md)。
-- [Milvus TimeTick 与事务](../../reference-code/milvus/docs/agent_guides/streaming-system/wal/timetick_and_txn.md)。
+- [Milvus Streaming 系统](https://github.com/milvus-io/milvus/blob/61de3a82cce970235f9ffb0c90b38749d0c3b196/docs/agent_guides/streaming-system/streaming-system.md)。
+- [Milvus channel 管理](https://github.com/milvus-io/milvus/blob/61de3a82cce970235f9ffb0c90b38749d0c3b196/docs/agent_guides/streaming-system/coordination/channel_management.md)。
+- [Milvus TimeTick 与事务](https://github.com/milvus-io/milvus/blob/61de3a82cce970235f9ffb0c90b38749d0c3b196/docs/agent_guides/streaming-system/wal/timetick_and_txn.md)。
 - [Milvus 官方架构](https://milvus.io/docs/architecture_overview.md)，2026-11-17 查阅；在线文档会随版本变化，以明确的源码提交作为本地参考基线。
