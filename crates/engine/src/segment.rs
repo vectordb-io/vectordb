@@ -42,11 +42,15 @@ pub struct VersionedRow {
     pub body: Option<Value>,
 }
 impl VersionedRow {
-    fn bytes(&self) -> usize {
-        self.key.len()
-            + self.partition.len()
-            + self.body.as_ref().map_or(0, |v| v.to_string().len())
-            + 128
+    pub fn storage_bytes(key: usize, partition: usize, body: usize) -> usize {
+        key + partition + body + 128
+    }
+    pub fn bytes(&self) -> usize {
+        Self::storage_bytes(
+            self.key.len(),
+            self.partition.len(),
+            self.body.as_ref().map_or(0, |v| v.to_string().len()),
+        )
     }
 }
 #[derive(Debug)]
@@ -65,6 +69,93 @@ pub struct SegmentEngine {
     pub(crate) bytes: usize,
     pub(crate) accelerator: Arc<crate::query_index::Accelerator>,
 }
+/// Projection required to decide a transaction. For generated keys body_bytes
+/// includes the single digit placeholder 0, replaced at the decision point.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct RowIntent {
+    #[serde(rename = "k")]
+    pub id: Option<Value>,
+    #[serde(rename = "b")]
+    pub body_bytes: usize,
+}
+impl CollectionSpec {
+    pub fn check_storage_limit(&self, operation: &str, bytes: usize, limit: usize) -> Result<()> {
+        let metadata_bytes = serde_json::to_vec(self)?.len();
+        if metadata_bytes > MAX_METADATA_BYTES {
+            return Err(Error::Conflict(
+                "collection metadata exceeds 1 MiB quota".into(),
+            ));
+        }
+        if limit < MAX_STATE_BYTES
+            && bytes + metadata_bytes > limit
+            && matches!(
+                operation,
+                "collections/create" | "entities/insert" | "entities/upsert"
+            )
+        {
+            return Err(Error::Conflict("collection storage quota reached".into()));
+        }
+        if bytes + metadata_bytes > MAX_STATE_BYTES {
+            return Err(Error::Conflict(
+                "current state exceeds 256 MiB quota; delete data or increase deployment capacity"
+                    .into(),
+            ));
+        }
+        Ok(())
+    }
+    fn normalize_row(&self, row: &mut Value) -> Result<()> {
+        self.schema.validate_row(row)?;
+        normalize_vectors(self, row)
+    }
+    pub fn write_intents(&self, op: &str, request: &Value) -> Result<Vec<RowIntent>> {
+        let delete = op == "entities/delete";
+        if delete {
+            keys(request, &["collectionName", "dbName", "ids"], "delete")?;
+        } else if matches!(op, "entities/insert" | "entities/upsert") {
+            crate::engine::validate_request(op, request)?;
+        } else {
+            return Err(invalid("entity mutation required"));
+        }
+        if request["collectionName"] != self.name
+            || request.get("dbName").is_some_and(|v| v != "default")
+        {
+            return Err(invalid("incorrect transaction scope"));
+        }
+        let items = request[if delete { "ids" } else { "data" }]
+            .as_array()
+            .filter(|a| (1..=10000).contains(&a.len()))
+            .ok_or_else(|| invalid("write batch must have 1..10000 rows"))?;
+        let pk = &self.schema.primary().field_name;
+        let generate = self.schema.auto_id && op == "entities/insert";
+        let mut out = Vec::with_capacity(items.len());
+        for item in items {
+            if delete {
+                self.schema.primary().validate(item)?;
+                out.push(RowIntent {
+                    id: Some(item.clone()),
+                    body_bytes: 0,
+                });
+            } else {
+                let mut row = item.clone();
+                if !row.is_object() {
+                    return Err(invalid("entity must be object"));
+                }
+                if generate {
+                    if row.get(pk).is_some() {
+                        return Err(invalid("do not supply primary key with autoID insert"));
+                    }
+                    row[pk] = json!(0);
+                }
+                self.normalize_row(&mut row)?;
+                out.push(RowIntent {
+                    id: (!generate).then(|| row[pk].clone()),
+                    body_bytes: serde_json::to_vec(&row)?.len(),
+                });
+            }
+        }
+        Ok(out)
+    }
+}
 impl SegmentEngine {
     pub fn new() -> Self {
         Self::default()
@@ -80,6 +171,9 @@ impl SegmentEngine {
     }
     pub(crate) fn recount_bytes(&mut self) {
         self.bytes = self.rows.values().map(|r| r.bytes()).sum();
+    }
+    pub fn row_by_key(&self, key: &str) -> Option<&VersionedRow> {
+        self.rows.get(key).map(AsRef::as_ref)
     }
     pub fn state_bytes(&self) -> usize {
         self.bytes
@@ -318,8 +412,7 @@ impl SegmentEngine {
                             .checked_add(1)
                             .ok_or_else(|| invalid("autoID exhausted"))?;
                     }
-                    c.schema.validate_row(&mut row)?;
-                    normalize_vectors(&c, &mut row)?;
+                    c.normalize_row(&mut row)?;
                     let id = row[pk].clone();
                     let key = id.to_string();
                     if !seen.insert(key.clone()) {
@@ -383,27 +476,7 @@ impl SegmentEngine {
             bytes = bytes.saturating_sub(self.rows.get(&row.key).map_or(0, |r| r.bytes()))
                 + row.bytes();
         }
-        let metadata_bytes = serde_json::to_vec(&c)?.len();
-        if metadata_bytes > MAX_METADATA_BYTES {
-            return Err(Error::Conflict(
-                "collection metadata exceeds 1 MiB quota".into(),
-            ));
-        }
-        if limit < MAX_STATE_BYTES
-            && bytes + metadata_bytes > limit
-            && matches!(
-                operation,
-                "collections/create" | "entities/insert" | "entities/upsert"
-            )
-        {
-            return Err(Error::Conflict("collection storage quota reached".into()));
-        }
-        if bytes + metadata_bytes > MAX_STATE_BYTES {
-            return Err(Error::Conflict(
-                "current state exceeds 256 MiB quota; delete data or increase deployment capacity"
-                    .into(),
-            ));
-        }
+        c.check_storage_limit(operation, bytes, limit)?;
         Ok(MutationBatch {
             base: self.revision,
             spec: Some(c),

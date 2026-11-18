@@ -198,6 +198,13 @@ impl ShardReplica {
                 }
                 self.epoch = epoch;
             }
+            Entry::ChannelCut { epoch, floors } => {
+                self.check_epoch(epoch)?;
+                crate::channels::validate_cut(&[], &floors)?;
+                for engine in self.engines.values_mut() {
+                    engine.reclaim_tombstones();
+                }
+            }
             Entry::Barrier { epoch } => self.check_epoch(epoch)?,
             Entry::Mutation {
                 epoch,

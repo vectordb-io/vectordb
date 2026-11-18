@@ -425,11 +425,13 @@ def exercise(tmp, destination):
     denied(reader, "indexes/build", base, 403)
     denied(writer, "collections/compact", base, 403)
     owner.execute(
-        "collections/create", {**base, "dimension": 2, "autoID": True}, owner.new_key()
+        "collections/create",
+        {**base, "dimension": 2, "autoID": True, "writeChannels": 4},
+        owner.new_key(),
     )
     owner.execute(
         "collections/create",
-        {"collectionName": "second", "dimension": 2},
+        {"collectionName": "second", "dimension": 2, "writeChannels": 2},
         owner.new_key(),
     )
     denied(

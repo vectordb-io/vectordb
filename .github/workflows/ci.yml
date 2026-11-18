@@ -129,6 +129,8 @@ jobs:
           cargo build -p vectordb-server --locked
           python3 -u scripts/cluster_m6_smoke.py
           python3 -u scripts/cluster_m6_soak.py --local --binary target/debug/vectordb-cluster --seconds 30 --interval 1 --maintenance-every 2 --backup-every 4
+      - name: Multi-log atomic writes, sharded visibility and writer takeover
+        run: python3 -u scripts/cluster_m7_smoke.py
       - uses: azure/setup-helm@v4
       - name: Helm deployment manifests
         run: helm lint deployments/helm/vectordb && helm template ci deployments/helm/vectordb > /dev/null

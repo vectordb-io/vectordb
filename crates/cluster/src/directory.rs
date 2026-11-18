@@ -37,6 +37,8 @@ pub struct Collection {
     pub spec_offset: i64,
     #[serde(default = "vectordb_engine::shard::one")]
     pub shard_count: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub write_channels: Option<usize>,
     #[serde(default)]
     pub query_routes: Option<crate::sharded::QueryRoutes>,
 }
@@ -279,6 +281,20 @@ impl DirectoryState {
                     generation: uuid::Uuid::new_v4().simple().to_string(),
                 };
                 let mut create = r.clone();
+                let write_channels = create
+                    .as_object_mut()
+                    .and_then(|o| o.remove("writeChannels"))
+                    .map(|v| {
+                        let n = v
+                            .as_u64()
+                            .and_then(|n| usize::try_from(n).ok())
+                            .ok_or_else(|| {
+                                Error::Invalid("writeChannels must be an integer".into())
+                            })?;
+                        crate::channels::validate_count(n)?;
+                        Ok::<_, Error>(n)
+                    })
+                    .transpose()?;
                 if create.get("shardCount").is_none() {
                     create["shardCount"] = json!(16);
                 }
@@ -306,6 +322,7 @@ impl DirectoryState {
                         spec: engine.spec().cloned(),
                         spec_offset: -1,
                         shard_count: engine.spec().unwrap().shard_count,
+                        write_channels,
                         query_routes: None,
                     },
                 );

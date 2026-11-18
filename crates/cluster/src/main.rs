@@ -117,6 +117,8 @@ struct Config {
     #[arg(skip)]
     rpc: Option<vectordb_cluster::transport::Client>,
     #[arg(skip)]
+    write_channels: Option<usize>,
+    #[arg(skip)]
     managed: bool,
 }
 fn advertised_origin(address: Option<&str>) -> Result<String> {
@@ -144,6 +146,10 @@ enum Work {
         request: Value,
     },
 }
+struct ReplayTask {
+    target: std::sync::mpsc::Sender<i64>,
+    worker: std::thread::JoinHandle<Result<Replica>>,
+}
 struct Runtime {
     config: Config,
     catalog: Catalog,
@@ -153,6 +159,9 @@ struct Runtime {
     lease: Option<Lease>,
     failed: Arc<AtomicBool>,
     client: reqwest::blocking::Client,
+    write_head: vectordb_cluster::decisions::WriteHead,
+    replay_task: Option<ReplayTask>,
+    publication: Option<std::thread::JoinHandle<Result<Value>>>,
     uncheckpointed_records: usize,
     directory: Option<vectordb_cluster::directory::Directory>,
 }
@@ -190,6 +199,9 @@ impl Runtime {
         };
         let mut runtime = Self {
             config,
+            write_head: Default::default(),
+            replay_task: None,
+            publication: None,
             uncheckpointed_records: 0,
             directory,
             catalog,
@@ -232,6 +244,13 @@ impl Runtime {
             node::failpoint("owner_assigned");
             if runtime.config.managed {
                 runtime.log.ensure_topic(runtime.config.wal_replicas)?;
+            }
+            if let Some(n) = runtime.config.write_channels {
+                runtime.log.participants.ensure(
+                    &runtime.replica.scope,
+                    n,
+                    runtime.config.wal_replicas,
+                )?;
             }
             runtime
                 .catalog
@@ -350,7 +369,89 @@ impl Runtime {
         }
         result
     }
+    fn advance_replay(&mut self, offset: i64) {
+        // Start only for sustained writes. At most one worker follows an immutable
+        // base and the bounded (128-record) decision tail for this collection.
+        if self.replay_task.is_none() && self.uncheckpointed_records >= 16 {
+            let mut replica = self.replica.clone();
+            let log = Log::reader(self.config.kafka.clone(), &replica.scope);
+            let (target, work) = std::sync::mpsc::channel::<i64>();
+            let worker = std::thread::spawn(move || {
+                while let Ok(mut end) = work.recv() {
+                    for newer in work.try_iter() {
+                        end = newer;
+                    }
+                    log.replay(replica.offset, end, |n, r| replica.apply(n, r))?;
+                }
+                Ok(replica)
+            });
+            self.replay_task = Some(ReplayTask { target, worker });
+        }
+        if let Some(task) = &self.replay_task {
+            let _ = task.target.send(offset);
+        }
+    }
+    fn materialize(&mut self) -> Result<()> {
+        if let Some(end) = self.write_head.offset {
+            if let Some(task) = self.replay_task.take() {
+                drop(task.target);
+                // A failed prefetch has no persistent effects. Resume from our
+                // verified base using the normal checkpoint/WAL recovery path.
+                if let Ok(Ok(r)) = task.worker.join() {
+                    self.replica = r;
+                }
+            }
+            self.catch_up(end)
+                .inspect_err(|_| self.failed.store(true, Ordering::SeqCst))?;
+            self.write_head = Default::default();
+        }
+        Ok(())
+    }
+    fn decide(&mut self, vote: vectordb_cluster::channels::Vote) -> Result<Value> {
+        self.guard()?;
+        if self.lease.is_none() {
+            return Err(Error::Conflict("decision owner required".into()));
+        }
+        if let Some(directory) = &self.directory {
+            directory.allow_mutations()?;
+        }
+        let result = match self.write_head.prepare(
+            &self.replica,
+            vote,
+            self.config.collection_bytes,
+            vectordb_cluster::state::now_ms(),
+        )? {
+            Err(known) => known,
+            Ok(plan) => {
+                node::failpoint("before_channel_decision");
+                let committed = (|| {
+                    let offset = self.log.decide(&plan.decision)?;
+                    node::failpoint("channel_decided");
+                    if self.publication.is_some() {
+                        node::failpoint("channel_next_decision_after_cut");
+                    }
+                    if node::injected("mutation_unknown") {
+                        return Err(Error::Unavailable("unknown decision outcome".into()));
+                    }
+                    let r = self.write_head.committed(plan, offset)?;
+                    self.guard()?;
+                    self.uncheckpointed_records += 1;
+                    self.advance_replay(offset);
+                    if self.uncheckpointed_records >= 128 {
+                        self.automatic_flush()?;
+                    }
+                    Ok(r)
+                })();
+                if committed.is_err() {
+                    self.failed.store(true, Ordering::SeqCst);
+                }
+                committed?
+            }
+        };
+        Ok(json!({"code":0,"data":result.data,"commitToken":result.token}))
+    }
     fn commit(&mut self, record: Record) -> Result<i64> {
+        self.materialize()?;
         self.guard()?;
         if matches!(record.entry, Entry::Mutation { .. })
             && let Some(directory) = &self.directory
@@ -370,7 +471,7 @@ impl Runtime {
             self.guard()?;
             self.uncheckpointed_records += 1;
             if self.uncheckpointed_records >= 128 {
-                self.flush_state()?;
+                self.automatic_flush()?;
             }
             Ok(offset)
         })();
@@ -378,6 +479,43 @@ impl Runtime {
             self.failed.store(true, Ordering::SeqCst);
         }
         result
+    }
+    // Sharded readers resolve the same decision prefix on their own Query processes.
+    fn query_snapshot(&mut self) -> Result<(Token, vectordb_engine::segment::CollectionSpec)> {
+        let mut spec = self
+            .replica
+            .spec()
+            .ok_or_else(|| Error::Conflict("collection dropped before snapshot".into()))?
+            .clone();
+        if let Some(next) = self.write_head.next_id() {
+            self.guard()?;
+            spec.next_id = next;
+            let record = Record {
+                format: FORMAT,
+                scope: self.replica.scope.clone(),
+                entry: Entry::Barrier {
+                    epoch: self.replica.epoch,
+                },
+            };
+            let offset = self
+                .log
+                .append(&record)
+                .inspect_err(|_| self.failed.store(true, Ordering::SeqCst))?;
+            self.write_head.offset = Some(offset);
+            self.guard()?;
+            self.uncheckpointed_records += 1;
+            if self.uncheckpointed_records >= 128 {
+                self.automatic_flush()?;
+            }
+            return Ok((
+                Token {
+                    scope: self.replica.scope.clone(),
+                    offset,
+                },
+                spec,
+            ));
+        }
+        Ok((self.barrier()?, spec))
     }
     fn barrier(&mut self) -> Result<Token> {
         if self.lease.is_some() {
@@ -433,6 +571,11 @@ impl Runtime {
             ));
         }
         if operation == "collections/storage_stats" {
+            if self.config.write_channels.is_some() && self.lease.is_none() {
+                return self
+                    .forward("/v2/vectordb/collections/storage_stats", request, None)
+                    .map(Work::Ready);
+            }
             let mut count = 0_u64;
             let mut bytes = 0_u64;
             self.objects.visit_checkpoint_objects(
@@ -444,8 +587,13 @@ impl Runtime {
                 },
             )?;
             let (low, high) = self.log.watermarks()?;
+            let channels = self
+                .config
+                .write_channels
+                .map(|n| self.log.participants.watermarks(&self.replica.scope, n))
+                .transpose()?;
             return Ok(Work::Ready(
-                json!({"code":0,"data":{"objectBytes":bytes,"objectCount":count,"walLow":low,"walHigh":high,"checkpointOffset":self.catalog.manifest()?.map(|m|m.offset),"stateBytes":self.replica.state_bytes()}}),
+                json!({"code":0,"data":{"prepareWatermarks":channels,"prepareFloors":self.replica.channel_floors,"objectBytes":bytes,"objectCount":count,"walLow":low,"walHigh":high,"checkpointOffset":self.catalog.manifest()?.map(|m|m.offset),"stateBytes":self.write_head.bytes().unwrap_or_else(||self.replica.state_bytes())}}),
             ));
         }
         if matches!(operation, "collections/flush" | "collections/compact") {
@@ -486,25 +634,7 @@ impl Runtime {
                     .forward(&format!("/v2/vectordb/{operation}"), request, Some(id))
                     .map(Work::Ready);
             }
-            self.guard()?;
-            match self
-                .replica
-                .prepare(self.replica.epoch, id, operation, request)?
-            {
-                Err(result) => Ok(Work::Ready(
-                    json!({"code":0,"data":result.data,"commitToken":result.token}),
-                )),
-                Ok(record) => {
-                    self.commit(record)?;
-                    let result = self
-                        .replica
-                        .result(id)
-                        .ok_or_else(|| Error::Integrity("committed result missing".into()))?;
-                    Ok(Work::Ready(
-                        json!({"code":0,"data":result.data,"commitToken":result.token}),
-                    ))
-                }
-            }
+            self.write(operation, request, id)
         } else {
             let token = self.barrier()?;
             let view = self.replica.read_view(operation, &request)?;
@@ -514,6 +644,35 @@ impl Runtime {
                 operation: operation.into(),
                 request,
             })
+        }
+    }
+    fn write(&mut self, operation: &str, request: Value, id: &str) -> Result<Work> {
+        self.materialize()?;
+        self.guard()?;
+        match self
+            .replica
+            .prepare(self.replica.epoch, id, operation, request)?
+        {
+            Err(result) => Ok(Work::Ready(
+                json!({"code":0,"data":result.data,"commitToken":result.token}),
+            )),
+            Ok(record) => {
+                if self.config.write_channels.is_some()
+                    && vectordb_cluster::channels::field(operation).is_some()
+                {
+                    return Err(Error::Invalid(
+                        "channel collection requires prepared writes".into(),
+                    ));
+                }
+                self.commit(record)?;
+                let result = self
+                    .replica
+                    .result(id)
+                    .ok_or_else(|| Error::Integrity("committed result missing".into()))?;
+                Ok(Work::Ready(
+                    json!({"code":0,"data":result.data,"commitToken":result.token}),
+                ))
+            }
         }
     }
     fn checkpoint(&mut self) -> Result<Value> {
@@ -529,33 +688,116 @@ impl Runtime {
             .collect_orphans(&self.objects, vectordb_cluster::state::now_ms() - 300_000)?;
         Ok(result)
     }
+    fn prepare_checkpoint(&mut self) -> Result<()> {
+        self.materialize()?;
+        if let Some(n) = self.config.write_channels
+            && self.lease.is_some()
+        {
+            // Order the cut with mutations using the fenced decision producer. Even an old
+            // checkpoint publisher can then reclaim only prepares below a durable cut.
+            self.guard()?;
+            let floors = self
+                .log
+                .participants
+                .watermarks(&self.replica.scope, n)?
+                .into_iter()
+                .map(|(_, hi)| (hi - 32).max(0))
+                .collect::<Vec<_>>();
+            let cut = Record {
+                format: FORMAT,
+                scope: self.replica.scope.clone(),
+                entry: Entry::ChannelCut {
+                    epoch: self.replica.epoch,
+                    floors,
+                },
+            };
+            let offset = self
+                .log
+                .append(&cut)
+                .inspect_err(|_| self.failed.store(true, Ordering::SeqCst))?;
+            self.replica
+                .apply(offset, cut)
+                .inspect_err(|_| self.failed.store(true, Ordering::SeqCst))?;
+            node::failpoint("channel_cut");
+        }
+        Ok(())
+    }
+    fn join_publication(&mut self) -> Result<()> {
+        if let Some(job) = self.publication.take() {
+            job.join()
+                .map_err(|_| Error::Unavailable("checkpoint worker terminated".into()))??;
+        }
+        Ok(())
+    }
+    fn automatic_flush(&mut self) -> Result<()> {
+        if self.config.write_channels.is_none() {
+            self.flush_state()?;
+            return Ok(());
+        }
+        self.join_publication()?;
+        self.prepare_checkpoint()?;
+        let replica = self.replica.clone();
+        let objects = self.objects.clone();
+        let catalog = self.catalog.clone();
+        let log = Log::reader(self.config.kafka.clone(), &replica.scope);
+        let grace = self.wal_grace();
+        self.publication = Some(std::thread::spawn(move || {
+            publish_checkpoint(&replica, &objects, &catalog, &log, grace)
+        }));
+        self.uncheckpointed_records = 0;
+        Ok(())
+    }
+    fn wal_grace(&self) -> u32 {
+        self.config
+            .wal_grace_offsets
+            .unwrap_or(if self.config.coordinated { 64 } else { 0 })
+    }
     fn flush_state(&mut self) -> Result<Value> {
-        let snapshot = self.replica.checkpoint()?;
-        let manifest = upload_snapshot(&self.objects, snapshot)?;
-        let published = self.catalog.publish(&manifest)?;
-        if published {
-            node::failpoint("checkpoint_published");
+        self.join_publication()?;
+        self.prepare_checkpoint()?;
+        let result = publish_checkpoint(
+            &self.replica,
+            &self.objects,
+            &self.catalog,
+            &self.log,
+            self.wal_grace(),
+        )?;
+        if result["published"] == true && self.config.write_channels.is_none() {
             self.replica.reclaim();
-            let grace = self
-                .config
-                .wal_grace_offsets
-                .unwrap_or(if self.config.coordinated { 64 } else { 0 });
-            let through = manifest.offset - i64::from(grace);
-            if through >= 0 {
-                self.log.trim(through)?;
-                node::failpoint("wal_trimmed");
-            }
-            self.catalog
-                .collect_retired(|key| self.objects.delete(key))?;
-        } else {
-            for key in &manifest.objects {
-                self.objects.delete(key)?;
-            }
-            self.objects.delete(&manifest.key)?;
         }
         self.uncheckpointed_records = 0;
-        Ok(json!({"published":published,"manifest":manifest}))
+        Ok(result)
     }
+}
+fn publish_checkpoint(
+    replica: &Replica,
+    objects: &Objects,
+    catalog: &Catalog,
+    log: &Log,
+    grace: u32,
+) -> Result<Value> {
+    let snapshot = replica.checkpoint()?;
+    let manifest = upload_snapshot(objects, snapshot)?;
+    let published = catalog.publish(&manifest)?;
+    if published {
+        node::failpoint("checkpoint_published");
+
+        let through = manifest.offset - i64::from(grace);
+        if through >= 0 {
+            log.trim(through)?;
+            node::failpoint("wal_trimmed");
+        }
+        log.participants
+            .trim(&replica.scope, &replica.channel_floors)?;
+        catalog.collect_retired(|key| objects.delete(key))?;
+    } else {
+        for key in &manifest.objects {
+            objects.delete(key)?;
+        }
+        objects.delete(&manifest.key)?;
+    }
+
+    Ok(json!({"published":published,"manifest":manifest}))
 }
 fn upload_snapshot(
     objects: &Objects,

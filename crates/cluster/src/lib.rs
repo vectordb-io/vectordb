@@ -1,9 +1,12 @@
 //! Experimental multi-collection catalog, ordered logs and shared checkpoints.
 //! M0-M5 recovery, sharding and coordinated compute; production qualification remains open.
 pub mod catalog;
+pub mod channels;
 pub mod client;
+pub mod decisions;
 pub mod kafka;
 pub mod object;
+pub mod participants;
 mod retention;
 pub mod state;
 

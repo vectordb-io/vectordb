@@ -240,6 +240,9 @@ fn restore(
         directory.stage_restore(lease, &c.scope)?;
         let mut log = Log::reader(config.kafka.clone(), &c.scope);
         log.ensure_topic(config.wal_replicas)?;
+        if let Some(n) = c.write_channels {
+            log.participants.ensure(&c.scope, n, config.wal_replicas)?;
+        }
         log.initialize_writer()?;
         for entry in [Entry::Activate { epoch: 1 }, Entry::Barrier { epoch: 1 }] {
             c.spec_offset = log.append(&Record {

@@ -37,6 +37,7 @@ fn collection(id: &str) -> Collection {
         spec: None,
         spec_offset: 0,
         shard_count: 16,
+        write_channels: None,
         query_routes: None,
     }
 }

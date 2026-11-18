@@ -26,7 +26,7 @@ def main():
         required=True,
         help="dedicated existing kind cluster with compute image already loaded",
     )
-    parser.add_argument("--image", default="vectordb-cluster:m6")
+    parser.add_argument("--image", default="vectordb-cluster:m7")
     args = parser.parse_args()
     context = "kind-" + args.kind
     ns = "vdb-m6-" + uuid.uuid4().hex[:8]

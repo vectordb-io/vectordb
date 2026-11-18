@@ -8,15 +8,21 @@ use rdkafka::{ClientConfig, Message, Offset, TopicPartitionList};
 use std::time::{Duration, Instant};
 
 const TIMEOUT: Duration = Duration::from_secs(15);
+// Sixteen maximal public batches bound raw replay payloads to about 8 MiB.
+const REPLAY_BATCH: usize = 16;
 pub struct Log {
     brokers: String,
     topic: String,
+    scope: Scope,
+    pub participants: crate::participants::Participants,
     producer: Option<FutureProducer>,
     cursor: std::sync::Mutex<Option<(BaseConsumer, Option<i64>)>>,
 }
 impl Log {
     pub fn reader(brokers: String, scope: &Scope) -> Self {
         Self {
+            scope: scope.clone(),
+            participants: crate::participants::Participants::new(brokers.clone()),
             brokers,
             topic: scope.topic(),
             producer: None,
@@ -29,7 +35,7 @@ impl Log {
             .set("bootstrap.servers", &self.brokers)
             .create::<AdminClient<rdkafka::client::DefaultClientContext>>()?;
         for res in futures::executor::block_on(admin.delete_topics(
-            &[&self.topic],
+            &[&self.topic, &format!("{}.prepare", self.topic)],
             &AdminOptions::new().operation_timeout(Some(TIMEOUT)),
         ))? {
             if let Err((_, e)) = res
@@ -88,11 +94,16 @@ impl Log {
         Ok(())
     }
     pub fn append(&self, record: &Record) -> Result<i64> {
+        self.append_bytes(serde_json::to_vec(record)?)
+    }
+    pub fn decide(&self, decision: &crate::channels::Decision) -> Result<i64> {
+        self.append_bytes(serde_json::to_vec(decision)?)
+    }
+    fn append_bytes(&self, bytes: Vec<u8>) -> Result<i64> {
         let producer = self
             .producer
             .as_ref()
             .ok_or_else(|| Error::Unavailable("read-only log".into()))?;
-        let bytes = serde_json::to_vec(record)?;
         if bytes.len() > 1024 * 1024 {
             return Err(Error::Invalid("WAL entry exceeds 1 MiB".into()));
         }
@@ -198,7 +209,19 @@ impl Log {
             assignment.add_partition_offset(&self.topic, 0, Offset::Offset(after + 1))?;
             consumer.assign(&assignment)?;
         }
-        let deadline = Instant::now() + TIMEOUT;
+        let mut deadline = Instant::now() + TIMEOUT;
+        let mut pending = Vec::new();
+        let resolve = |pending: &mut Vec<(i64, crate::channels::Decision)>,
+                       apply: &mut dyn FnMut(i64, Record) -> Result<()>|
+         -> Result<()> {
+            if !pending.is_empty() {
+                let requests = self.participants.read_batch(&self.scope, pending)?;
+                for ((position, d), r) in pending.drain(..).zip(requests) {
+                    apply(position, d.resolve(r)?)?;
+                }
+            }
+            Ok(())
+        };
 
         while Instant::now() < deadline {
             if let Some(message) = consumer.poll(Duration::from_millis(100)) {
@@ -209,7 +232,7 @@ impl Log {
                             .find_partition(&self.topic, 0)
                             .is_some_and(|p| matches!(p.offset(),Offset::Offset(o) if o>=high))
                         {
-                            return Ok(());
+                            return resolve(&mut pending, &mut apply);
                         }
                     }
                     continue;
@@ -225,8 +248,26 @@ impl Log {
                 if bytes.len() > 1024 * 1024 {
                     return Err(Error::Integrity("oversized WAL entry".into()));
                 }
-                apply(offset, serde_json::from_slice(bytes)?)?;
+                // Legacy records and control operations keep their original wire format.
+                match serde_json::from_slice::<Record>(bytes) {
+                    Ok(r) => {
+                        resolve(&mut pending, &mut apply)?;
+                        apply(offset, r)?;
+                    }
+                    Err(_) => {
+                        let d: crate::channels::Decision = serde_json::from_slice(bytes)?;
+                        if d.format != 3 || d.scope != self.scope {
+                            return Err(Error::Integrity("foreign or unsupported decision".into()));
+                        }
+                        pending.push((offset, d));
+                        if pending.len() >= REPLAY_BATCH {
+                            resolve(&mut pending, &mut apply)?;
+                        }
+                    }
+                };
+                deadline = Instant::now() + TIMEOUT;
                 if Some(offset) == through {
+                    resolve(&mut pending, &mut apply)?;
                     *last = Some(offset);
                     return Ok(());
                 }

@@ -75,6 +75,10 @@ pub enum Entry {
     Activate {
         epoch: i64,
     },
+    ChannelCut {
+        epoch: i64,
+        floors: Vec<i64>,
+    },
     Barrier {
         epoch: i64,
     },
@@ -103,6 +107,8 @@ pub struct Checkpoint {
     pub offset: i64,
     pub epoch: i64,
     pub clock_ms: i64,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub channel_floors: Vec<i64>,
     pub state: StateManifest,
     pub results: BTreeMap<String, (String, WriteResult)>,
 }
@@ -129,10 +135,12 @@ pub struct WriteResult {
     pub data: Value,
     pub token: Token,
 }
+#[derive(Clone)]
 pub struct Replica {
     pub scope: Scope,
     pub offset: i64,
     pub epoch: i64,
+    pub channel_floors: Vec<i64>,
     engine: SegmentEngine,
     admission_bytes: usize,
     clock_ms: i64,
@@ -147,6 +155,7 @@ impl Replica {
             scope,
             offset: -1,
             epoch: 0,
+            channel_floors: vec![],
             engine: SegmentEngine::new(),
             admission_bytes: vectordb_engine::segment::MAX_STATE_BYTES,
             clock_ms: 0,
@@ -172,6 +181,10 @@ impl Replica {
             ));
         }
         let mut replica = Self::empty(scope.clone())?;
+        if !checkpoint.channel_floors.is_empty() {
+            crate::channels::validate_cut(&[], &checkpoint.channel_floors)?;
+        }
+        replica.channel_floors = checkpoint.channel_floors;
         replica.engine = SegmentEngine::load(checkpoint.state, get)?;
         replica.offset = checkpoint.offset;
         replica.epoch = checkpoint.epoch;
@@ -271,6 +284,7 @@ impl Replica {
             offset: self.offset,
             epoch: self.epoch,
             clock_ms: clock,
+            channel_floors: self.channel_floors.clone(),
             state: sealed.manifest.clone(),
             results,
         };
@@ -365,6 +379,13 @@ impl Replica {
                 }
                 self.epoch = *epoch;
             }
+            Entry::ChannelCut { epoch, floors } => {
+                self.check_epoch(*epoch)?;
+                crate::channels::validate_cut(&self.channel_floors, floors)?;
+                self.channel_floors.clone_from(floors);
+                // Make quota accounting identical on both sides of checkpoint recovery.
+                self.engine.reclaim_tombstones();
+            }
             Entry::Barrier { epoch } => self.check_epoch(*epoch)?,
             Entry::Mutation {
                 accepted_ms,
@@ -433,7 +454,21 @@ impl Replica {
 
         Ok(())
     }
-    fn retained_bytes(&self, now: i64) -> usize {
+    pub(crate) fn row_by_key(&self, key: &str) -> Option<&vectordb_engine::segment::VersionedRow> {
+        self.engine.row_by_key(key)
+    }
+    pub(crate) fn clock(&self) -> i64 {
+        self.clock_ms
+    }
+    pub(crate) fn known(&self, id: &str, hash: &str) -> Result<Option<WriteResult>> {
+        match self.results.get(id) {
+            Some((h, _)) if h != hash => Err(Error::Conflict(
+                "idempotency key reused with different request".into(),
+            )),
+            value => Ok(value.map(|(_, r)| r.clone())),
+        }
+    }
+    pub(crate) fn retained_bytes(&self, now: i64) -> usize {
         self.dedup_bytes
             - self
                 .expirations

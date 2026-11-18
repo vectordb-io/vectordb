@@ -17,6 +17,9 @@ pub(super) fn failpoint(name: &str) {
     }
 }
 struct Node {
+    channels: vectordb_cluster::participants::Participants,
+    staged_batches: std::sync::atomic::AtomicU64,
+    http: reqwest::blocking::Client,
     config: Config,
     directory: Directory,
     membership: Option<(vectordb_cluster::control::Member, String)>,
@@ -193,6 +196,12 @@ impl Node {
         directory.configure_quota(config.namespace_collections)?;
         let membership = controller::initialize(&mut config)?;
         Ok(Self {
+            staged_batches: Default::default(),
+            http: reqwest::blocking::Client::builder()
+                .timeout(Duration::from_secs(30))
+                .redirect(reqwest::redirect::Policy::none())
+                .build()?,
+            channels: vectordb_cluster::participants::Participants::new(config.kafka.clone()),
             config,
             directory,
             membership,
@@ -264,6 +273,7 @@ impl Node {
         config.collection = c.scope.collection.clone();
         config.generation = c.scope.generation.clone();
         config.managed = true;
+        config.write_channels = c.write_channels;
         config.role = Role::Writer;
         let runtime = match Runtime::open(config.clone()) {
             Ok(runtime) => runtime,
@@ -454,17 +464,113 @@ impl Node {
         if self.config.coordinated && op.starts_with("entities/") && !is_write(op) {
             return Err(Error::Unavailable("query assignment is not ready".into()));
         }
+        if let Some(n) = c.write_channels
+            && c.state == Lifecycle::Active
+            && vectordb_cluster::channels::field(op).is_some()
+        {
+            let spec = c
+                .spec
+                .as_ref()
+                .ok_or_else(|| Error::Integrity("active collection has no schema".into()))?;
+            let intents = spec.write_intents(op, &request)?;
+            let request_bytes = serde_json::to_vec(&request)?.len();
+            let (prepared, fragments) = vectordb_cluster::channels::Prepared::split(
+                &c.scope,
+                n,
+                &spec.schema.primary().field_name,
+                id.unwrap(),
+                op,
+                request,
+            )?;
+            let prepared = self.channels.stage(&c.scope, prepared, fragments)?;
+            self.staged_batches.fetch_add(1, Ordering::Relaxed);
+            failpoint("channels_prepared");
+            let vote = vectordb_cluster::channels::Vote::sign(
+                &c.scope,
+                &self.config.token,
+                prepared,
+                intents,
+                request_bytes,
+            )?;
+            return self.route_decision(&c, vote);
+        }
         let mut value = self.internal(&target, op, request, id)?;
         if op == "collections/describe" && value["code"] == 0 {
             value["data"]["collectionName"] = json!(c.name);
             value["data"]["dbName"] = json!(db);
             value["data"]["collectionId"] = json!(target.collection);
             value["data"]["generation"] = json!(target.generation);
+            value["data"]["writeChannels"] = json!(c.write_channels);
         }
         Ok(value)
     }
+    fn route_decision(
+        &self,
+        c: &Collection,
+        vote: vectordb_cluster::channels::Vote,
+    ) -> Result<Value> {
+        if let Some(rpc) = &self.config.rpc {
+            let a = rpc.control.assignment(&c.scope)?;
+            if a.placement.writer != self.config.node_id {
+                let members = rpc.control.members()?;
+                let writer = members
+                    .get(&a.placement.writer)
+                    .ok_or_else(|| Error::Unavailable("decision owner unavailable".into()))?;
+                return rpc.call(
+                    &format!(
+                        "{}/internal/collections/{}/{}/internal/decide",
+                        writer.origin, c.scope.collection, c.scope.generation
+                    ),
+                    serde_json::to_value(&vote)?,
+                    None,
+                    now_ms() + 30000,
+                );
+            }
+        }
+        if self.config.rpc.is_none() {
+            let catalog = Catalog::new(self.config.etcd.clone(), &c.scope)?;
+            if let Ok(owner) = catalog.active_owner() {
+                let local = format!(
+                    "{}/internal/collections/{}/{}",
+                    self.config
+                        .advertise
+                        .as_deref()
+                        .unwrap()
+                        .trim_end_matches('/'),
+                    c.scope.collection,
+                    c.scope.generation
+                );
+                if owner.address != local {
+                    return Ok(self
+                        .http
+                        .post(format!("{}/internal/decide", owner.address))
+                        .bearer_auth(&self.config.token)
+                        .json(&vote)
+                        .send()?
+                        .json()?);
+                }
+            }
+        }
+        self.decide(c, vote)
+    }
+    fn decide(&self, c: &Collection, vote: vectordb_cluster::channels::Vote) -> Result<Value> {
+        let n = c
+            .write_channels
+            .ok_or_else(|| Error::Invalid("collection has no participant WAL".into()))?;
+        vote.verify(&c.scope, n, &self.config.token)?;
+        if c.state != Lifecycle::Active {
+            return Err(Error::Conflict(
+                "collection lifecycle changed during prepare".into(),
+            ));
+        }
+        let session = self.session(c)?;
+        session.lock().unwrap().decide(vote)
+    }
     fn internal(&self, scope: &Scope, op: &str, r: Value, id: Option<&str>) -> Result<Value> {
         let c = self.directory.snapshot()?.by_scope(scope)?;
+        if op == "internal/decide" {
+            return self.decide(&c, serde_json::from_value(r)?);
+        }
         if let Some(rpc) = &self.config.rpc {
             self.check_alive()?;
             let assignment = rpc.control.assignment(scope)?;
@@ -510,11 +616,7 @@ impl Node {
             // Internal requests may not redirect an obsolete owner to itself.
             if op == "internal/snapshot" {
                 runtime.guard()?;
-                let token = runtime.barrier()?;
-                let spec = runtime
-                    .replica
-                    .spec()
-                    .ok_or_else(|| Error::Conflict("collection dropped before snapshot".into()))?;
+                let (token, spec) = runtime.query_snapshot()?;
                 return Ok(json!({"code":0,"data":{"token":token,"spec":spec}}));
             }
             if op == "internal/barrier" {
@@ -838,8 +940,8 @@ pub(super) async fn serve(config: Config) -> std::result::Result<(), Box<dyn std
         slots: Arc::new(tokio::sync::Semaphore::new(32)),
     };
     let app=Router::new()
-        .route("/healthz",get(||async{Json(json!({"status":"alive","mode":"cluster-m6"}))}))
-        .route("/capabilities",get(|State(app): State<NodeApp>|async move{Json(json!({"mode":"cluster-m6","productionReady":false,"atomicScope":"collection","maxQueryShards":32,"shardedQueries":true,"consistency":["Strong"],"checkpointFormat":"state-segments-v4","persistentIndexes":true,"concurrentReads":true,"multiCollection":true,"namespaces":true,"aliases":true,"collectionLifecycle":true,"partitionDelete":true,"count":true,"automaticFailover":app.node.config.coordinated,"coordinated":app.node.config.coordinated,"internalProtocol":if app.node.config.coordinated {"grpc-mtls-v1"} else {"http-development"},"writerTakeover":if app.node.config.coordinated {"automatic"} else {"demand-driven recovery"},"idempotencyWindowMs":86400000,"maxActiveCollections":MAX_COLLECTIONS,"defaultVectorDtype":"Float32","role":match app.node.config.role {Role::Coordinator=>"coordinator",Role::QueryNode=>"query-node",_=>"node"},"maintenance":["flush","compact","orphanGC"],"accessRoles":["read","write","admin"],"namespaceCollectionLimit":app.node.config.namespace_collections,"collectionByteLimit":app.node.config.collection_bytes,"gatewayRequestsPerSecondPerRole":app.node.config.requests_per_second,"clusterAdministration":app.node.config.coordinated,"operations":available_operations(&app.node.config),"maxRoutingReceipts":vectordb_cluster::directory::MAX_ROUTE_RECEIPTS}))}))
+        .route("/healthz",get(||async{Json(json!({"status":"alive","mode":"cluster-m7"}))}))
+        .route("/capabilities",get(|State(app): State<NodeApp>|async move{Json(json!({"mode":"cluster-m7","writeChannelOptions":[1,2,4,8,16],"multiLogDecisionFormat":3,"productionReady":false,"atomicScope":"collection","maxQueryShards":32,"shardedQueries":true,"consistency":["Strong"],"checkpointFormat":"state-segments-v4","persistentIndexes":true,"concurrentReads":true,"multiCollection":true,"namespaces":true,"aliases":true,"collectionLifecycle":true,"partitionDelete":true,"count":true,"automaticFailover":app.node.config.coordinated,"coordinated":app.node.config.coordinated,"internalProtocol":if app.node.config.coordinated {"grpc-mtls-v1"} else {"http-development"},"writerTakeover":if app.node.config.coordinated {"automatic"} else {"demand-driven recovery"},"idempotencyWindowMs":86400000,"maxActiveCollections":MAX_COLLECTIONS,"defaultVectorDtype":"Float32","role":match app.node.config.role {Role::Coordinator=>"coordinator",Role::QueryNode=>"query-node",_=>"node"},"maintenance":["flush","compact","orphanGC"],"accessRoles":["read","write","admin"],"namespaceCollectionLimit":app.node.config.namespace_collections,"collectionByteLimit":app.node.config.collection_bytes,"gatewayRequestsPerSecondPerRole":app.node.config.requests_per_second,"clusterAdministration":app.node.config.coordinated,"operations":available_operations(&app.node.config),"maxRoutingReceipts":vectordb_cluster::directory::MAX_ROUTE_RECEIPTS}))}))
         .route("/readyz",get(ready_node))
         .route("/cluster/status",get(controller::status))
         .route("/cluster/nodes/{id}/{action}",post(controller::drain))
@@ -847,7 +949,7 @@ pub(super) async fn serve(config: Config) -> std::result::Result<(), Box<dyn std
         .route("/internal/shard-query",post(sharding::handle))
         .route("/v2/vectordb/{category}/{action}",post(execute_node))
         .route("/internal/collections/{collection}/{generation}/v2/vectordb/{category}/{action}",post(internal_node))
-        .route("/internal/collections/{collection}/{generation}/internal/{action}",post(control_node))
+        .route("/internal/collections/{collection}/{generation}/internal/{action}",post(control_node).layer(DefaultBodyLimit::max(1024*1024)))
         .layer(DefaultBodyLimit::max(512*1024)).with_state(state.clone());
     let (shutdown, receiver) = tokio::sync::watch::channel(false);
     let rpc_task = if let Some(client) = state.node.config.rpc.clone() {

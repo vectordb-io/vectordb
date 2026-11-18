@@ -1,4 +1,4 @@
-# 分布式 M5 运行与验证
+# 分布式运行与验证
 
 M6 原生单机目录、集群权限、维护、迁移、独立恢复与部署见 [M6 运行手册](m6-operations.md)。
 
@@ -9,13 +9,35 @@ M6 原生单机目录、集群权限、维护、迁移、独立恢复与部署�
 ## 数据与恢复契约
 
 - 名字在 etcd 目录解析为不可复用的 collection_id/generation。创建、删除中途崩溃后，node 恢复未完成意图；同名重建使用新身份，不接收旧日志。
-- 同一身份只有一个 writer，etcd 租约为 30 秒、每 5 秒续租。接管必须完成 Assigning、Recovering、Kafka fencing、激活记录回放和 Active 发布；失败的旧任务不能重新初始化 producer。
-- mutation 的请求、结果和自动 ID 在一个 Kafka 事务提交，提交后才返回成功。批量校验失败不修改数据、不消耗自动 ID。分区删除是有序、原子的控制操作；默认分区不能删除。
+- 同一身份只有一个负责有序提交的 writer，多个 M7 写入网关可以并行准备批次。writer 的 etcd 租约为 30 秒、每 5 秒续租。接管必须完成 Assigning、Recovering、Kafka fencing、激活记录回放和 Active 发布；失败的旧任务不能重新初始化 producer。
+- 默认单日志模式下，mutation 的请求、结果和自动 ID 在一个 Kafka 事务提交，提交后才返回成功。批量校验失败不修改数据、不消耗自动 ID。分区删除是有序、原子的控制操作；默认分区不能删除。
 - 写请求携带 `Idempotency-Key: v2-<issuedUnixMs>-<nonce>`，有效期 24 小时。重试保持整个键、请求体和访问名字不变。相同键不同内容返回 409，过期明确拒绝。
 - 路由凭证在发送写入前固定目标身份。别名切换或同名重建后，原请求不会误投新集合；已完成实体请求返回旧结果，未执行且目标已删除的请求明确失败。
 - Strong 读取先取得 writer 屏障，回放到对应位置，再固定不可变视图并释放写锁执行查询。没有跨集合事务或跨集合快照。
 - writer 每 128 条记录自动检查点化；`collections/flush` 可显式发布检查点。Parquet、向量段及 HNSW/IVF_FLAT 索引上传 S3 并校验后，再 CAS 发布 manifest。恢复只需要共享检查点与 WAL 尾部。
 - 所有数据和内部控制请求需要 Bearer Token。node 的 `/readyz` 验证目录可达，具体集合请求独立检查 owner 与读屏障；它不表示每个集合都已预热。`/healthz` 只表示进程存活。
+
+## 单集合多通道写入（M7）
+
+创建新集合时，可用 `writeChannels` 指定 1、2、4、8 或 16 个 Kafka 准备分区。省略字段时沿用单日志布局。已有集合保持创建时的布局，两种集合可以共用同一个 M7 集群。部署 M7 计算镜像后再创建多通道集合，M6 二进制不支持新增的目录字段、决定格式和检查点截断位置。
+
+```json
+{"collectionName":"events","dimension":128,"shardCount":16,"writeChannels":4}
+```
+
+向一个或多个 `node` 的原有实体端点发起 insert、upsert、按主键 delete，客户端按请求分摊到写入网关。网关校验实体并向对应 Kafka 分区写入准备数据，等所有分区确认后，才把包含主键、空间估算和准备位置的签名凭证发给集合的决定节点。显式主键按现有哈希路由；自动 ID 在决定节点分配，准备阶段按请求和行序号分散。决定节点校验主键冲突、幂等、分区与配额，以一条决定提交整批。相同键重试可取回原 ID 和 commit token。决定记录只引用准备位置与摘要，每条读取均使用同一个决定日志 offset 作为 Strong 快照。
+
+- `collections/describe` 返回 `writeChannels`。管理员可用 `collections/storage_stats` 查看 `prepareWatermarks`（各分区的 low/high，high 不含在内）和 `prepareFloors`（持久化截断下界）。受控节点的 `/cluster/status` 提供本机累计完成准备的 `local.stagedWriteBatches`，以及决定和完整状态各自的水位。
+- 查询副本和接管者从 S3 检查点继续回放决定及所引用的准备数据。缺少分区数据、摘要不符或快照不完整时，请求会失败。准备阶段中断可以使用原幂等键重试，未提交的数据没有可见效果。
+- 截断下界由有代际隔离的决定生产者有序写入。每个准备分区预留最近 32 个位置供在途事务使用。后台发布完整检查点并校验成功后，才允许回收更旧的准备数据。已跨过下界的未提交批次返回 503，客户端使用同一幂等键重试。Kafka 的实际磁盘释放还取决于 broker 段滚动和删除延迟。
+- 增加写入网关分摊的是请求处理、实体验证及向 Kafka 写入准备数据的负载。每个集合保留一个决定节点处理主键冲突、配额和有序提交，并维护完整检查点。生产容量还受这个节点、etcd 路由凭证和持久化基础设施限制。
+
+本机端到端验证使用 `python3 -u scripts/cluster_m7_smoke.py`，需要 debug 集群二进制和开发 Compose 后端。固定负载写入基准支持原生进程以及带 CPU 配额的 Linux 容器。先按下节启动 Compose 并创建 `vectordb` 桶，再执行以下容器基准。结果与验收范围见[统一计划](implementation-plan.md)。
+
+```sh
+docker build -f deployments/cluster/Dockerfile -t vectordb-cluster:m7-local .
+python3 scripts/cluster_m7_bench.py --writer-image vectordb-cluster:m7-local --output m7-scaling.json
+```
 
 ## 构建与依赖
 
@@ -34,7 +56,7 @@ docker compose -p vectordb-cluster-test -f deployments/cluster/compose.yaml exec
 
 Compose 仅绑定回环地址，使用单节点开发配置和公开测试凭据：etcd 12379、Kafka 19092、S3 19000。S3 服务使用固定版本的 Silo MinIO 分支；可替换为自己的 S3 服务。适配器使用 SigV4、静态 access/secret key、路径寻址，暂不支持 IAM 临时凭据。
 
-node 自动创建每个集合 generation 的专用单分区 Kafka topic，关闭时间/容量自动过期，由检查点协议安全截断；不要手动增加分区数。`--wal-replicas` 默认 1，仅适用于开发验证，可按 broker 数量调整。该开发配置不能证明生产容灾能力。
+node 为每个集合 generation 自动创建单分区的有序日志 topic，启用写通道时另建指定分区数的准备 topic。它们关闭时间和容量自动过期，由检查点协议安全截断。分区数由创建时的布局决定。`--wal-replicas` 默认 1，仅适用于开发验证，可按 broker 数量调整。该开发配置不能证明生产容灾能力。
 
 ## 运行多集合节点
 
@@ -214,11 +236,11 @@ python3 -u scripts/cluster_m5_smoke.py
 | `collections/flush` | 发布该集合检查点，不要求幂等键 |
 | `indexes/build/retry/cancel/get_status` | 作用于接收请求的节点；不要求幂等键，仍需认证 |
 
-命名空间及路由名字限 1..64 个 ASCII 字母、数字、`_`、`-`。集合定义至多 64 KiB，目录至多 1 MiB、32 个命名空间、16 个活跃集合、256 个保留身份；暂不自动回收旧 generation 的 topic/对象和身份，达到身份额度后拒绝新建，后续由 M6 完成安全回收。每 node 最多缓存 16 个集合、32 个运行或排队请求、两个索引 worker。集群路由凭证最多 32,768 个，在 24 小时有效期后加约一分钟保守余量，由后续新请求原子推进单调时钟并清理旧记录、释放预算；已有请求的重试不新增额度。达到目录/凭证额度时明确拒绝新请求，不驱逐仍有效的绑定。
+命名空间及路由名字限 1..64 个 ASCII 字母、数字、`_`、`-`。集合定义至多 64 KiB，目录至多 1 MiB、32 个命名空间、16 个活跃集合、256 个保留身份；已删除 generation 按 M6 保留窗口回收，M7 同时回收决定 topic 和准备 topic。每 node 最多缓存 16 个集合、32 个运行或排队请求、两个索引 worker。集群路由凭证最多 32,768 个，在 24 小时有效期后加约一分钟保守余量，由后续新请求原子推进单调时钟并清理旧记录、释放预算；已有请求的重试不新增额度。达到目录/凭证额度时明确拒绝新请求，不驱逐仍有效的绑定。
 
 每集合保留原有预算：当前状态 256 MiB、元数据 1 MiB、幂等结果 16 MiB、索引缓存 256 MiB、构建 256 MiB、查询工作区 128 MiB、读视图 2 GiB。HTTP 请求体 512 KiB、WAL 记录 1 MiB、单对象 64 MiB。这些是计费准入，不能视为进程 RSS 的硬上限；多个集合的内存占用会累加。
 
-单机 HTTP/Python 仍使用 SQLite。旧 `writer/query/checkpoint` 角色保留用于单集合回归测试，需要显式 collection/generation 及预建 topic；node 不会自动收编这类旧集合。raw/WAL 格式仍为 2，分片集合使用状态 manifest 4，单分片仍写 3；读取兼容 manifest 2/3（按单分片处理）。目录格式为 1，新增可选分片与路由字段。已有集合不自动改变分片数；写出 manifest 4 后，旧二进制无法读取该集合检查点。正式迁移工具属于 M6。
+单机持久化目录使用原生段，旧 SQLite 文件仍可直接打开。旧 `writer/query/checkpoint` 角色保留用于单集合回归测试，需要显式 collection/generation 及预建 topic；node 不会自动收编这类旧集合。默认集合 WAL 格式为 2，多通道集合增加格式 3 的事务决定。分片集合使用状态 manifest 4，单分片仍写 3；读取兼容 manifest 2/3（按单分片处理）。目录格式为 1，新增可选分片与路由字段。已有集合不自动改变分片数；写出 manifest 4 后，旧二进制无法读取该集合检查点。离线迁移见 [M6 手册](m6-operations.md)。
 
 ## 测试入口
 

@@ -166,8 +166,12 @@ impl Node {
         if let Ok(sessions) = self.sessions.try_lock() {
             for (id, session) in sessions.iter() {
                 if let Ok(runtime) = session.try_lock() {
-                    bytes += runtime.replica.state_bytes();
-                    writers.push(json!({"collection":id,"offset":runtime.replica.offset,"failed":runtime.failed.load(Ordering::Acquire),"stateBytes":runtime.replica.state_bytes()}));
+                    let size = runtime
+                        .write_head
+                        .bytes()
+                        .unwrap_or_else(|| runtime.replica.state_bytes());
+                    bytes += size;
+                    writers.push(json!({"collection":id,"offset":runtime.write_head.offset.unwrap_or(runtime.replica.offset),"materializedOffset":runtime.replica.offset,"failed":runtime.failed.load(Ordering::Acquire),"stateBytes":size}));
                 }
             }
         }
@@ -181,7 +185,7 @@ impl Node {
                 }
             }
         }
-        json!({"writers":writers,"replicas":replicas,"stateBytes":bytes,"observedAtMs":now_ms(),"backgroundError":*self.background_error.lock().unwrap(),"snapshotWaiters":self.snapshot_waiters.load(Ordering::Relaxed),"snapshotWaitMs":self.snapshot_wait_ms.load(Ordering::Relaxed),"snapshotWaitCount":self.snapshot_wait_count.load(Ordering::Relaxed)})
+        json!({"stagedWriteBatches":self.staged_batches.load(Ordering::Relaxed),"writers":writers,"replicas":replicas,"stateBytes":bytes,"observedAtMs":now_ms(),"backgroundError":*self.background_error.lock().unwrap(),"snapshotWaiters":self.snapshot_waiters.load(Ordering::Relaxed),"snapshotWaitMs":self.snapshot_wait_ms.load(Ordering::Relaxed),"snapshotWaitCount":self.snapshot_wait_count.load(Ordering::Relaxed)})
     }
     fn retire_sessions(&self) -> Result<()> {
         let rpc = self.config.rpc.as_ref().unwrap();
@@ -548,6 +552,11 @@ impl transport::Handler for Node {
             } else {
                 return Err(Error::Invalid("unknown internal RPC path".into()));
             };
+            if op == "internal/decide" && peer.role != NodeRole::Writer {
+                return Err(Error::Unsupported(
+                    "decision requires writer identity".into(),
+                ));
+            }
             if peer.role == NodeRole::Query
                 && (is_write(&op)
                     || matches!(

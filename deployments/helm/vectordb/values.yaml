@@ -1,5 +1,5 @@
 # Build deployments/cluster/Dockerfile and set the image to your registry reference.
-image: vectordb-cluster:m6
+image: vectordb-cluster:m7
 imagePullPolicy: IfNotPresent
 cluster: vectordb
 etcd: http://etcd:2379
