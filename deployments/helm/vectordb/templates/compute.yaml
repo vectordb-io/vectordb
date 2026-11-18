@@ -1,0 +1,109 @@
+{{- $names := dict }}
+{{- range .Values.members }}
+{{- if or (hasKey $names .id) (not (has .role (list "node" "query-node" "coordinator"))) (not (regexMatch "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$" .id)) }}{{ fail "invalid or duplicate compute member" }}{{ end }}
+{{- $_ := set $names .id true }}
+{{- $name := printf "%s-%s" $.Release.Name .id }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+spec:
+  # Recovery and prewarming must reach a new member before public readiness.
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector: {app.kubernetes.io/instance: {{ $.Release.Name }}, member: {{ .id }}}
+  ports:
+    - {name: rpc, port: 19532}
+    - {name: http, port: 19531}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $name }}
+spec:
+  serviceName: {{ $name }}
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/instance: {{ $.Release.Name }}, member: {{ .id }}}
+  # Upgrade one drained member at a time following docs/m6-operations.md.
+  updateStrategy: {type: OnDelete}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/instance: {{ $.Release.Name }}, member: {{ .id }}, role: {{ .role }}}
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      nodeSelector:
+        topology.kubernetes.io/zone: {{ required "each member needs a zone" .zone | quote }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels: {app.kubernetes.io/instance: {{ $.Release.Name }}, role: {{ .role }}}
+      containers:
+        - name: compute
+          image: {{ $.Values.image | quote }}
+          imagePullPolicy: {{ $.Values.imagePullPolicy }}
+          args: ["--role", {{ .role | quote }}, "--coordinated", "--bind", "0.0.0.0:19531", "--rpc-bind", "0.0.0.0:19532", "--advertise", "http://{{ $name }}:19531", "--rpc-advertise", "https://{{ $name }}:19532"]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          resources: {{- toYaml $.Values.resources | nindent 12 }}
+          env:
+            - {name: VECTORDB_NODE_ID, value: {{ .id | quote }}}
+            - {name: VECTORDB_ZONE, value: {{ .zone | quote }}}
+            - {name: VECTORDB_CLUSTER, value: {{ $.Values.cluster | quote }}}
+            - {name: VECTORDB_ETCD, value: {{ $.Values.etcd | quote }}}
+            - {name: VECTORDB_KAFKA, value: {{ $.Values.kafka | quote }}}
+            - {name: VECTORDB_S3_ENDPOINT, value: {{ $.Values.s3Endpoint | quote }}}
+            - {name: VECTORDB_S3_BUCKET, value: {{ $.Values.s3Bucket | quote }}}
+            - {name: VECTORDB_S3_REGION, value: {{ $.Values.s3Region | quote }}}
+            - {name: VECTORDB_WAL_REPLICAS, value: {{ $.Values.walReplicas | quote }}}
+            - {name: VECTORDB_QUERY_REPLICAS, value: {{ $.Values.queryReplicas | quote }}}
+            - {name: VECTORDB_NAMESPACE_COLLECTIONS, value: {{ $.Values.namespaceCollections | quote }}}
+            - {name: VECTORDB_REQUESTS_PER_SECOND, value: {{ $.Values.requestsPerSecond | quote }}}
+            - {name: VECTORDB_TLS_CA, value: /tls/ca.crt}
+            - {name: VECTORDB_TLS_CERT, value: /tls/tls.crt}
+            - {name: VECTORDB_TLS_KEY, value: /tls/tls.key}
+{{- range $key := list "VECTORDB_CLUSTER_TOKEN" "VECTORDB_READ_TOKEN" "VECTORDB_WRITE_TOKEN" "VECTORDB_S3_ACCESS_KEY" "VECTORDB_S3_SECRET_KEY" }}
+            - name: {{ $key }}
+              valueFrom:
+                secretKeyRef: {name: {{ $.Values.credentialsSecret }}, key: {{ $key }}}
+{{- end }}
+          ports:
+            - {containerPort: 19531, name: http}
+            - {containerPort: 19532, name: rpc}
+          readinessProbe:
+            exec:
+              command: ["sh", "-ec", "curl -fsS --max-time 4 -H \"Authorization: Bearer $VECTORDB_CLUSTER_TOKEN\" http://127.0.0.1:19531/readyz >/dev/null"]
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+          volumeMounts:
+            - {name: tls, mountPath: /tls, readOnly: true}
+      volumes:
+        - name: tls
+          secret: {secretName: {{ required "member TLS secret required" .tlsSecret }}, defaultMode: 0440}
+{{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-gateway
+spec:
+  selector: {app.kubernetes.io/instance: {{ .Release.Name }}, role: node}
+  ports: [{name: http, port: 19531}]
+{{- range $role := list "coordinator" "node" "query-node" }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $.Release.Name }}-{{ $role }}-budget
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: {app.kubernetes.io/instance: {{ $.Release.Name }}, role: {{ $role }}}
+{{- end }}

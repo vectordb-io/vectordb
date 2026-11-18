@@ -415,10 +415,8 @@ impl Node {
             } else {
                 self.load_shards(&catalog, &request, &assigned)?
             };
-            let log = Log::reader(self.config.kafka.clone(), &c.scope);
-            log.replay(replica.offset, request.token.offset, |offset, record| {
-                remaining(request.deadline_ms)?;
-                replica.apply(offset, record)
+            replica.catch_up(&self.config.kafka, request.token.offset, || {
+                remaining(request.deadline_ms).map(|_| ())
             })?;
             if replica.bytes() > 256 * 1024 * 1024 {
                 return Err(Error::Unavailable(

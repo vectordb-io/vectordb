@@ -33,6 +33,7 @@ fn collection(id: &str) -> Collection {
         create_request: json!({}),
         create_id: "create".into(),
         drop_id: None,
+        dropped_at_ms: None,
         spec: None,
         spec_offset: 0,
         shard_count: 16,

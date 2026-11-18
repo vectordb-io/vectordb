@@ -27,6 +27,7 @@ struct Node {
     snapshot_wait_ms: std::sync::atomic::AtomicU64,
     snapshot_wait_count: std::sync::atomic::AtomicU64,
 
+    rate: Mutex<[(std::time::Instant, u32); 3]>,
     sessions: Mutex<BTreeMap<String, Arc<Mutex<Runtime>>>>,
     shard_cache:
         Mutex<BTreeMap<String, Arc<Mutex<Option<vectordb_cluster::sharded::ShardReplica>>>>>,
@@ -80,6 +81,8 @@ const OPERATIONS: &[&str] = &[
     "collections/get_stats",
     "collections/get_load_state",
     "collections/flush",
+    "collections/compact",
+    "collections/storage_stats",
     "aliases/create",
     "aliases/alter",
     "aliases/drop",
@@ -127,7 +130,8 @@ fn available_operations(config: &Config) -> Vec<&'static str> {
                 return true;
             }
             if config.coordinated {
-                return !is_write(op) && *op != "collections/flush";
+                return !is_write(op)
+                    && !matches!(*op, "collections/flush" | "collections/compact");
             }
             catalog_read(op)
                 || matches!(
@@ -167,6 +171,26 @@ impl Node {
         advertised_origin(config.advertise.as_deref())?;
         let directory = Directory::new(config.etcd.clone(), &config.cluster)?;
         directory.snapshot()?;
+        let mut tokens = std::collections::BTreeSet::from([config.token.as_str()]);
+        for token in [config.read_token.as_deref(), config.write_token.as_deref()]
+            .into_iter()
+            .flatten()
+        {
+            if token.len() < 16 || !tokens.insert(token) {
+                return Err(Error::Invalid(
+                    "read, write and admin tokens must be distinct and at least 16 bytes".into(),
+                ));
+            }
+        }
+        if !(1..=vectordb_engine::segment::MAX_STATE_BYTES).contains(&config.collection_bytes) {
+            return Err(Error::Invalid(
+                "collection byte budget exceeds engine limits".into(),
+            ));
+        }
+        if config.requests_per_second == 0 {
+            return Err(Error::Invalid("rate limit must be positive".into()));
+        }
+        directory.configure_quota(config.namespace_collections)?;
         let membership = controller::initialize(&mut config)?;
         Ok(Self {
             config,
@@ -178,6 +202,7 @@ impl Node {
             snapshot_waiters: std::sync::atomic::AtomicUsize::new(0),
             snapshot_wait_ms: std::sync::atomic::AtomicU64::new(0),
             snapshot_wait_count: std::sync::atomic::AtomicU64::new(0),
+            rate: Mutex::new([(std::time::Instant::now(), 0); 3]),
             sessions: Mutex::new(BTreeMap::new()),
             shard_cache: Mutex::new(BTreeMap::new()),
         })
@@ -526,6 +551,13 @@ async fn run_node(
         )
             .into_response();
     }
+    dispatch(app, action).await
+}
+
+async fn dispatch(
+    app: NodeApp,
+    action: impl FnOnce(&Node) -> Result<Value> + Send + 'static,
+) -> Response {
     let permit = match app.slots.clone().try_acquire_owned() {
         Ok(p) => p,
         Err(_) => return error_response(Error::Unavailable("request queue full".into())),
@@ -547,12 +579,66 @@ fn request_id(headers: &HeaderMap) -> Option<String> {
         .and_then(|v| v.to_str().ok())
         .map(str::to_owned)
 }
+fn access_error(status: StatusCode, message: &str) -> Response {
+    (
+        status,
+        Json(json!({"code":status.as_u16(),"message":message})),
+    )
+        .into_response()
+}
 async fn execute_node(
     State(app): State<NodeApp>,
     Path((category, action)): Path<(String, String)>,
     headers: HeaderMap,
     Json(body): Json<Value>,
 ) -> Response {
+    let op = format!("{category}/{action}");
+    let config = &app.node.config;
+    let role = if authorized(&headers, &config.token) {
+        2
+    } else if config
+        .write_token
+        .as_ref()
+        .is_some_and(|t| authorized(&headers, t))
+    {
+        1
+    } else if config
+        .read_token
+        .as_ref()
+        .is_some_and(|t| authorized(&headers, t))
+    {
+        0
+    } else {
+        return access_error(StatusCode::UNAUTHORIZED, "invalid token");
+    };
+    // Unknown operations default to administration. Maintenance calls mutate state
+    // even though they do not require an entity idempotency key.
+    let required = match op.as_str() {
+        "entities/insert" | "entities/upsert" | "entities/delete" => 1,
+        "collections/storage_stats"
+        | "collections/flush"
+        | "collections/compact"
+        | "indexes/build"
+        | "indexes/retry"
+        | "indexes/cancel" => 2,
+        op if supported(op) && !is_write(op) => 0,
+        _ => 2,
+    };
+    if role < required {
+        return access_error(StatusCode::FORBIDDEN, "insufficient permission");
+    }
+    {
+        let mut limits = app.node.rate.lock().unwrap();
+        let (start, count) = &mut limits[role];
+        if start.elapsed() >= Duration::from_secs(1) {
+            *start = std::time::Instant::now();
+            *count = 0;
+        }
+        if *count >= config.requests_per_second {
+            return access_error(StatusCode::TOO_MANY_REQUESTS, "gateway rate limit exceeded");
+        }
+        *count += 1;
+    }
     let id = request_id(&headers);
     let timeout = body["timeoutMs"]
         .as_u64()
@@ -560,9 +646,7 @@ async fn execute_node(
         .clamp(1, 30_000);
     match tokio::time::timeout(
         Duration::from_millis(timeout),
-        run_node(app, headers, move |node| {
-            node.execute(&format!("{category}/{action}"), body, id.as_deref())
-        }),
+        dispatch(app, move |node| node.execute(&op, body, id.as_deref())),
     )
     .await
     {
@@ -633,6 +717,38 @@ pub(super) async fn serve(config: Config) -> std::result::Result<(), Box<dyn std
     let bind = config.bind;
     let node = Arc::new(tokio::task::spawn_blocking(move || Node::new(config)).await??);
     controller::start(&node);
+    if matches!(node.config.role, Role::Coordinator)
+        || (node.config.role == Role::Node && !node.config.coordinated)
+    {
+        let weak = Arc::downgrade(&node);
+        std::thread::spawn(move || {
+            loop {
+                let Some(node) = weak.upgrade() else { break };
+                let sweep = || -> Result<()> {
+                    let c = &node.config;
+                    if c.coordinated && node.leader.lock().unwrap().is_none() {
+                        return Ok(());
+                    }
+                    let now = now_ms();
+                    node.directory.retire_staging(now)?;
+                    node.directory.retire_dropped(now)?;
+                    let objects = Objects::new(
+                        c.s3_endpoint.clone(),
+                        c.bucket.clone(),
+                        c.region.clone(),
+                        c.access_key.clone(),
+                        c.secret_key.clone(),
+                    )?;
+                    node.directory.purge_retired(&objects, &c.kafka, now)
+                };
+                if let Err(e) = sweep() {
+                    eprintln!("generation retirement will retry: {e}");
+                }
+                drop(node);
+                std::thread::sleep(Duration::from_secs(60));
+            }
+        });
+    }
     let weak = Arc::downgrade(&node);
     std::thread::spawn(move || {
         loop {
@@ -722,8 +838,8 @@ pub(super) async fn serve(config: Config) -> std::result::Result<(), Box<dyn std
         slots: Arc::new(tokio::sync::Semaphore::new(32)),
     };
     let app=Router::new()
-        .route("/healthz",get(||async{Json(json!({"status":"alive","mode":"cluster-m5"}))}))
-        .route("/capabilities",get(|State(app): State<NodeApp>|async move{Json(json!({"mode":"cluster-m5","productionReady":false,"atomicScope":"collection","maxQueryShards":32,"shardedQueries":true,"consistency":["Strong"],"checkpointFormat":"state-segments-v4","persistentIndexes":true,"concurrentReads":true,"multiCollection":true,"namespaces":true,"aliases":true,"collectionLifecycle":true,"partitionDelete":true,"count":true,"automaticFailover":app.node.config.coordinated,"coordinated":app.node.config.coordinated,"internalProtocol":if app.node.config.coordinated {"grpc-mtls-v1"} else {"http-development"},"writerTakeover":if app.node.config.coordinated {"automatic"} else {"demand-driven recovery"},"idempotencyWindowMs":86400000,"maxActiveCollections":MAX_COLLECTIONS,"defaultVectorDtype":"Float32","role":match app.node.config.role {Role::Coordinator=>"coordinator",Role::QueryNode=>"query-node",_=>"node"},"clusterAdministration":app.node.config.coordinated,"operations":available_operations(&app.node.config),"maxRoutingReceipts":vectordb_cluster::directory::MAX_ROUTE_RECEIPTS}))}))
+        .route("/healthz",get(||async{Json(json!({"status":"alive","mode":"cluster-m6"}))}))
+        .route("/capabilities",get(|State(app): State<NodeApp>|async move{Json(json!({"mode":"cluster-m6","productionReady":false,"atomicScope":"collection","maxQueryShards":32,"shardedQueries":true,"consistency":["Strong"],"checkpointFormat":"state-segments-v4","persistentIndexes":true,"concurrentReads":true,"multiCollection":true,"namespaces":true,"aliases":true,"collectionLifecycle":true,"partitionDelete":true,"count":true,"automaticFailover":app.node.config.coordinated,"coordinated":app.node.config.coordinated,"internalProtocol":if app.node.config.coordinated {"grpc-mtls-v1"} else {"http-development"},"writerTakeover":if app.node.config.coordinated {"automatic"} else {"demand-driven recovery"},"idempotencyWindowMs":86400000,"maxActiveCollections":MAX_COLLECTIONS,"defaultVectorDtype":"Float32","role":match app.node.config.role {Role::Coordinator=>"coordinator",Role::QueryNode=>"query-node",_=>"node"},"maintenance":["flush","compact","orphanGC"],"accessRoles":["read","write","admin"],"namespaceCollectionLimit":app.node.config.namespace_collections,"collectionByteLimit":app.node.config.collection_bytes,"gatewayRequestsPerSecondPerRole":app.node.config.requests_per_second,"clusterAdministration":app.node.config.coordinated,"operations":available_operations(&app.node.config),"maxRoutingReceipts":vectordb_cluster::directory::MAX_ROUTE_RECEIPTS}))}))
         .route("/readyz",get(ready_node))
         .route("/cluster/status",get(controller::status))
         .route("/cluster/nodes/{id}/{action}",post(controller::drain))
@@ -734,8 +850,8 @@ pub(super) async fn serve(config: Config) -> std::result::Result<(), Box<dyn std
         .route("/internal/collections/{collection}/{generation}/internal/{action}",post(control_node))
         .layer(DefaultBodyLimit::max(512*1024)).with_state(state.clone());
     let (shutdown, receiver) = tokio::sync::watch::channel(false);
-    let rpc_node = state.node.clone();
-    let rpc_task = if let Some(client) = rpc_node.config.rpc.clone() {
+    let rpc_task = if let Some(client) = state.node.config.rpc.clone() {
+        let rpc_node = state.node.clone();
         let bind = rpc_node.config.rpc_bind.unwrap();
         Some(tokio::spawn(async move {
             let mut receiver = receiver;

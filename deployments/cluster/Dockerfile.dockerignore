@@ -1,0 +1,7 @@
+**
+!Cargo.toml
+!Cargo.lock
+!crates/
+!crates/**
+!proto/
+!proto/**

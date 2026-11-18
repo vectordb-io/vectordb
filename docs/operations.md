@@ -1,6 +1,8 @@
 # 运行、备份与部署
 
-## 服务配置
+M6 原生单机目录、集群权限、维护、迁移、独立恢复与部署见 [M6 运行手册](m6-operations.md)。
+
+## SQLite 单机服务配置
 
 ```sh
 cargo build --release --locked

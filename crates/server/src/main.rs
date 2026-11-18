@@ -1,7 +1,15 @@
 use clap::{Parser, Subcommand};
 use std::{net::SocketAddr, path::PathBuf};
-use vectordb_engine::Engine;
+use vectordb_engine::Database;
 use vectordb_server::{AppState, router};
+fn default_data() -> PathBuf {
+    let legacy = PathBuf::from("data/vectordb.sqlite");
+    if legacy.is_file() {
+        legacy
+    } else {
+        PathBuf::from("data/vectordb.vdb")
+    }
+}
 #[derive(Parser)]
 #[command(version, about = "VectorDB — a Rust vector database")]
 struct Args {
@@ -14,14 +22,14 @@ enum Command {
     Serve {
         #[arg(long, env = "VECTORDB_BIND", default_value = "127.0.0.1:19530")]
         bind: SocketAddr,
-        #[arg(long, env = "VECTORDB_DATA", default_value = "data/vectordb.sqlite")]
+        #[arg(long, env = "VECTORDB_DATA", default_value_os_t = default_data())]
         data: PathBuf,
         #[arg(long, env = "VECTORDB_API_KEY", hide_env_values = true)]
         api_key: Option<String>,
     },
     /// Import JSON Lines while the server is stopped. Each batch commits independently.
     Import {
-        #[arg(long, default_value = "data/vectordb.sqlite")]
+        #[arg(long, default_value_os_t = default_data())]
         data: PathBuf,
         #[arg(long, default_value = "default")]
         database: String,
@@ -36,7 +44,7 @@ enum Command {
     },
     /// Export entities as JSON Lines while the server is stopped. Never overwrites output.
     Export {
-        #[arg(long, default_value = "data/vectordb.sqlite")]
+        #[arg(long, default_value_os_t = default_data())]
         data: PathBuf,
         #[arg(long, default_value = "default")]
         database: String,
@@ -47,7 +55,7 @@ enum Command {
     },
     /// Make a consistent snapshot while the server is stopped.
     Backup {
-        #[arg(long, default_value = "data/vectordb.sqlite")]
+        #[arg(long, default_value_os_t = default_data())]
         data: PathBuf,
         #[arg(long)]
         output: PathBuf,
@@ -73,7 +81,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return Err("source database does not exist".into());
             }
             let input = std::io::BufReader::new(std::fs::File::open(input)?);
-            let count = Engine::open(data)?.import_jsonl(
+            let count = Database::open(data)?.import_jsonl(
                 &database,
                 &collection,
                 input,
@@ -91,7 +99,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             if !data.exists() {
                 return Err("source database does not exist".into());
             }
-            let engine = Engine::open(data)?;
+            let engine = Database::open(data)?;
             let file = std::fs::OpenOptions::new()
                 .write(true)
                 .create_new(true)
@@ -106,7 +114,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             if !data.exists() {
                 return Err("source database does not exist".into());
             }
-            Engine::open(data)?.backup(&output)?;
+            Database::open(data)?.backup(&output)?;
             println!("Snapshot saved to {}", output.display());
         }
         Command::Serve {
@@ -117,7 +125,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             if api_key.as_ref().is_some_and(|s| s.is_empty()) {
                 return Err("API key cannot be empty".into());
             }
-            let engine = Engine::open(data)?;
+            let engine = Database::open(data)?;
             let listener = tokio::net::TcpListener::bind(bind).await?;
             tracing::info!(address=%listener.local_addr()?,authentication=api_key.is_some(),"VectorDB listening");
             axum::serve(listener, router(AppState::new(engine, api_key)))

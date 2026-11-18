@@ -481,3 +481,47 @@ fn dropped_collection_preserves_results_and_rejects_new_mutations_after_recovery
     };
     assert!(recovered.apply(recovered.offset + 1, record).is_err());
 }
+
+#[test]
+fn recurring_checkpoint_recovery_bounds_receipts_across_retention_windows() {
+    let mut r = replica();
+    let start = now_ms().max(r.logical_backup().clock_ms);
+    for hour in 1..=96 {
+        let time = start + hour * 3_600_000;
+        for (op, request) in [
+            (
+                "entities/upsert",
+                json!({"collectionName":"items","data":[{"id":1,"vector":[hour,0]},{"id":2,"vector":[0,hour]}]}),
+            ),
+            (
+                "entities/delete",
+                json!({"collectionName":"items","ids":[2]}),
+            ),
+        ] {
+            let id = idempotency_key(time, if op.ends_with("upsert") { "up" } else { "del" });
+            let record = r
+                .prepare_at(r.epoch, &id, op, request, time)
+                .unwrap()
+                .unwrap();
+            r.apply(r.offset + 2, record).unwrap();
+        }
+        r.reclaim();
+        let snapshot = r.checkpoint().unwrap();
+        assert!(snapshot.checkpoint.results.len() <= 48);
+        assert!(
+            snapshot
+                .sealed
+                .objects
+                .iter()
+                .map(|(_, bytes)| bytes.len())
+                .sum::<usize>()
+                < 32 * 1024
+        );
+        r = restore(snapshot).unwrap();
+        assert_eq!(
+            r.query("entities/count", json!({"collectionName":"items"}))
+                .unwrap()["count"],
+            1
+        );
+    }
+}

@@ -25,12 +25,16 @@
 | 加载状态 | 单机集合/分区访问状态；M5 查询副本预热与迁移 | 无资源组、冷热分层 |
 | HTTP | `/v2/vectordb` 核心路径与 camelCase | 错误码 / HTTP 状态和部分返回形状不同；多查询增加 queryIndex |
 | gRPC / SDK | M5 内部 mTLS/gRPC；对外 gRPC 未实现 | PyMilvus / Milvus Go / Java SDK 尚不可直接使用 |
-| 认证 | 对外单个 Bearer Token；M5 内部 mTLS 服务身份 | 无 users / roles / grants / RBAC |
+| 认证 | 集群读/写/管理 Bearer 权限、入口限流、命名空间配额；内部 mTLS | 无 users / roles / grants / RBAC |
 | 运维 | healthz、请求 / 错误计数器、优雅退出 | 无完整 tracing、查询画像、分布式指标 |
-| 分布式 | 实验性 M5：多集合目录、集合 WAL、分片查询副本、Coordinator 自动调度/恢复和 mTLS/gRPC | 已通过本机故障模拟；真实多主机 HA、生产发布与 CDC 尚未验收；见 [集群边界](distributed-p1.md) |
-| 存储分离 | 实验性 M5：Parquet/向量状态段、检查点与 Kafka 尾部恢复 | 已有基本 pin/GC 和持久化 ANN；tiering、冷热分层未完成 |
+| 分布式 | 实验性 M6：多集合目录、集合 WAL、分片查询副本、Coordinator 自动调度/恢复和 mTLS/gRPC | 已通过本机故障模拟；真实多主机 HA、生产发布与 CDC 尚未验收；见 [集群边界](distributed-p1.md) |
+| 存储分离 | 实验性 M6：Parquet/向量状态段、检查点与 Kafka 尾部恢复 | 已有 pin/GC、压缩、持久化 ANN 和独立恢复；tiering、冷热分层未完成 |
 | 文本能力 | 未实现 | tokenizer、全文索引、BM25、文本函数 |
 | 生产性能 | 未完成验证 | 仅小数据正确性 / ANN 回归测试，无规模性能承诺 |
+
+## M6 数据路径
+
+单机原生目录、集群维护、离线迁移、Rust/Python 客户端与 Helm 的入口和验证边界见 [M6 运行手册](m6-operations.md)。
 
 ## 实施计划
 

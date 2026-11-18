@@ -1,0 +1,6 @@
+apiVersion: v2
+name: vectordb
+description: Coordinated VectorDB compute nodes with external etcd, Kafka and S3
+type: application
+version: 0.1.0
+appVersion: "m6"

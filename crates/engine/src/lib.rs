@@ -19,3 +19,8 @@ pub use engine::validate_request;
 pub mod shard;
 
 pub mod distributed_query;
+
+mod local;
+pub use local::LocalStore;
+mod database;
+pub use database::Database;

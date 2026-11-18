@@ -1,5 +1,7 @@
 # 分布式 M5 运行与验证
 
+M6 原生单机目录、集群权限、维护、迁移、独立恢复与部署见 [M6 运行手册](m6-operations.md)。
+
 `vectordb-cluster --role node` 提供多集合、命名空间、别名和可恢复的数据操作，连接真实 etcd、Kafka 与 S3。`query-node` 支持只加载分配的分片、查询副本和全局结果合并。M5 增加可选的受控模式，支持自动放置、恢复、预热迁移和内部 mTLS/gRPC。当前仍是实验性运行时，真实多主机验收和核心 V1 发布尚未完成。
 
 本文是运行说明，架构、协议和验收依据统一在 [implementation-plan.md](implementation-plan.md)。文件名沿用早期 P1 路径，以保留已有链接。

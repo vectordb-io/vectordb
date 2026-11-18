@@ -1,5 +1,6 @@
 [package]
 name = "vectordb-cluster"
+default-run = "vectordb-cluster"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -26,6 +27,7 @@ prost = "0.14"
 tonic = { version = "0.14", features = ["transport", "tls-ring"] }
 tonic-prost = "0.14"
 x509-parser = "0.18"
+quick-xml = { version = "0.38", features = ["serialize"] }
 
 [build-dependencies]
 tonic-prost-build = "0.14"

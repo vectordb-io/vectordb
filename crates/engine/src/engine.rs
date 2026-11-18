@@ -121,6 +121,23 @@ impl Engine {
         }
         Ok(())
     }
+    /// Carry colliding P1 request keys inside the offline SQLite transfer file.
+    pub fn retain_legacy_keys(
+        &mut self,
+        collection: &str,
+        keys: impl Iterator<Item = String>,
+    ) -> Result<()> {
+        let tx = self.conn.transaction()?;
+        tx.execute_batch("CREATE TABLE vectordb_p1_keys(collection TEXT NOT NULL, request_id TEXT NOT NULL, PRIMARY KEY(collection,request_id))")?;
+        for id in keys {
+            tx.execute(
+                "INSERT INTO vectordb_p1_keys VALUES (?1,?2)",
+                params![collection, id],
+            )?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
     /// Creates a consistent SQLite snapshot. Destination must not already exist.
     pub fn backup(&self, path: impl AsRef<Path>) -> Result<()> {
         let path = path.as_ref();
@@ -264,66 +281,22 @@ impl Engine {
         &mut self,
         db: &str,
         collection: &str,
-        mut reader: impl std::io::BufRead,
+        reader: impl std::io::BufRead,
         upsert: bool,
         batch_size: usize,
     ) -> Result<usize> {
-        use std::io::{BufRead, Read};
-        if batch_size == 0 || batch_size > 10000 {
-            return Err(invalid("batch_size must be 1..10000"));
-        }
         self.collection(db, collection)?;
-        let mut batch = Vec::new();
-        let mut count = 0;
-        let mut line_number = 0;
-        loop {
-            let mut line = String::new();
-            let bytes = Read::take(&mut reader, 16 * 1024 * 1024 + 1).read_line(&mut line)?;
-            if bytes == 0 {
-                break;
-            }
-            line_number += 1;
-            if bytes > 16 * 1024 * 1024 {
-                return Err(invalid(format!(
-                    "line {line_number} exceeds 16 MiB; {count} rows already committed"
-                )));
-            }
-            if line.trim().is_empty() {
-                continue;
-            }
-            let value: Value = serde_json::from_str(&line).map_err(|e| {
-                invalid(format!(
-                    "JSONL line {line_number}: {e}; {count} rows already committed"
-                ))
-            })?;
-            batch.push(value);
-            if batch.len() == batch_size {
-                let n = batch.len();
-                self.execute(
-                    if upsert {
-                        "entities/upsert"
-                    } else {
-                        "entities/insert"
-                    },
-                    json!({"dbName":db,"collectionName":collection,"data":batch}),
-                )?;
-                count += n;
-                batch = Vec::new();
-            }
-        }
-        if !batch.is_empty() {
-            let n = batch.len();
+        import_batches(reader, batch_size, |rows| {
             self.execute(
                 if upsert {
                     "entities/upsert"
                 } else {
                     "entities/insert"
                 },
-                json!({"dbName":db,"collectionName":collection,"data":batch}),
-            )?;
-            count += n;
-        }
-        Ok(count)
+                json!({"dbName":db,"collectionName":collection,"data":rows}),
+            )
+            .map(|_| ())
+        })
     }
     fn dispatch(&mut self, op: &str, r: &Value) -> Result<Value> {
         let db = db_name(r)?;
@@ -1304,4 +1277,53 @@ pub fn validate_request(op: &str, r: &Value) -> Result<()> {
         }
     }
     keys(r, &allowed, "request")
+}
+
+pub(crate) fn import_batches(
+    mut reader: impl std::io::BufRead,
+    batch_size: usize,
+    mut commit: impl FnMut(Vec<Value>) -> Result<()>,
+) -> Result<usize> {
+    use std::io::{BufRead, Read};
+    if batch_size == 0 || batch_size > 10000 {
+        return Err(invalid("batch_size must be 1..10000"));
+    }
+
+    let mut batch = Vec::new();
+    let mut count = 0;
+    let mut line_number = 0;
+    loop {
+        let mut line = String::new();
+        let bytes = Read::take(&mut reader, 16 * 1024 * 1024 + 1).read_line(&mut line)?;
+        if bytes == 0 {
+            break;
+        }
+        line_number += 1;
+        if bytes > 16 * 1024 * 1024 {
+            return Err(invalid(format!(
+                "line {line_number} exceeds 16 MiB; {count} rows already committed"
+            )));
+        }
+        if line.trim().is_empty() {
+            continue;
+        }
+        let value: Value = serde_json::from_str(&line).map_err(|e| {
+            invalid(format!(
+                "JSONL line {line_number}: {e}; {count} rows already committed"
+            ))
+        })?;
+        batch.push(value);
+        if batch.len() == batch_size {
+            let n = batch.len();
+            commit(batch)?;
+            count += n;
+            batch = Vec::new();
+        }
+    }
+    if !batch.is_empty() {
+        let n = batch.len();
+        commit(batch)?;
+        count += n;
+    }
+    Ok(count)
 }

@@ -12,4 +12,4 @@ USER 10001:10001
 VOLUME ["/data"]
 EXPOSE 19530
 ENTRYPOINT ["vectordb"]
-CMD ["serve", "--bind", "0.0.0.0:19530", "--data", "/data/vectordb.sqlite"]
+CMD ["serve", "--bind", "0.0.0.0:19530"]

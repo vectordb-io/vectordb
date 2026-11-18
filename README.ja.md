@@ -15,7 +15,7 @@ cargo build --release --locked
 ./target/release/vectordb serve
 ```
 
-デフォルトでは `127.0.0.1:19530` で待ち受け、データを `data/vectordb.sqlite` に保存します。別のターミナルで次を実行します。
+デフォルトでは `127.0.0.1:19530` で待ち受け、データを `data/vectordb.vdb/` に保存します。別のターミナルで次を実行します。
 
 ```sh
 curl http://127.0.0.1:19530/healthz

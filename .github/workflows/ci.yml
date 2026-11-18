@@ -25,6 +25,9 @@ jobs:
           if ! command -v cmake >/dev/null; then
             if [ "$RUNNER_OS" = macOS ]; then brew install cmake; else sudo apt-get update && sudo apt-get install -y cmake; fi
           fi
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
       - name: Format
         run: cargo fmt --all --check
       - name: Test
@@ -44,6 +47,8 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake libcurl4-openssl-dev
       - name: Test minimum supported Rust version
         run: |
           rustup toolchain install 1.89 --profile minimal
@@ -102,7 +107,7 @@ jobs:
         with:
           python-version: '3.13'
       - name: Install build dependencies
-        run: sudo apt-get update && sudo apt-get install -y cmake build-essential pkg-config zlib1g-dev
+        run: sudo apt-get update && sudo apt-get install -y cmake build-essential pkg-config zlib1g-dev libcurl4-openssl-dev
       - name: Install Rust
         run: rustup toolchain install stable --profile minimal && rustup default stable
       - name: Build experimental cluster runtime
@@ -119,6 +124,14 @@ jobs:
         run: python3 -u scripts/cluster_m4_smoke.py
       - name: Coordinator, mTLS, automatic recovery and migration
         run: python3 -u scripts/cluster_m5_smoke.py
+      - name: Independent restore, migration, admission and bounded storage
+        run: |
+          cargo build -p vectordb-server --locked
+          python3 -u scripts/cluster_m6_smoke.py
+          python3 -u scripts/cluster_m6_soak.py --local --binary target/debug/vectordb-cluster --seconds 30 --interval 1 --maintenance-every 2 --backup-every 4
+      - uses: azure/setup-helm@v4
+      - name: Helm deployment manifests
+        run: helm lint deployments/helm/vectordb && helm template ci deployments/helm/vectordb > /dev/null
       - name: Catalog, pin/GC, S3 and Kafka fencing contracts
         run: cargo test -p vectordb-cluster --test backends --locked -- --ignored
       - name: Dependency logs on failure

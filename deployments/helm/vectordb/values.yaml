@@ -1,0 +1,25 @@
+# Build deployments/cluster/Dockerfile and set the image to your registry reference.
+image: vectordb-cluster:m6
+imagePullPolicy: IfNotPresent
+cluster: vectordb
+etcd: http://etcd:2379
+kafka: kafka:9092
+s3Endpoint: https://s3.amazonaws.com
+s3Region: us-east-1
+s3Bucket: vectordb
+walReplicas: 3
+queryReplicas: 2
+namespaceCollections: 16
+requestsPerSecond: 1000
+credentialsSecret: vectordb-credentials
+resources:
+  requests: {cpu: "1", memory: 1Gi}
+  limits: {cpu: "4", memory: 4Gi}
+# zone must match topology.kubernetes.io/zone. tlsSecret contains ca.crt, tls.crt, tls.key.
+members:
+  - {id: coord-a, role: coordinator, zone: zone-a, tlsSecret: vectordb-coord-a}
+  - {id: coord-b, role: coordinator, zone: zone-b, tlsSecret: vectordb-coord-b}
+  - {id: writer-a, role: node, zone: zone-a, tlsSecret: vectordb-writer-a}
+  - {id: writer-c, role: node, zone: zone-c, tlsSecret: vectordb-writer-c}
+  - {id: query-b, role: query-node, zone: zone-b, tlsSecret: vectordb-query-b}
+  - {id: query-c, role: query-node, zone: zone-c, tlsSecret: vectordb-query-c}

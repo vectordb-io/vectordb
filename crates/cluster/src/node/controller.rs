@@ -518,7 +518,7 @@ impl transport::Handler for Node {
                     let indexes = runtime.replica.build_indexes();
                     // Raw state is checkpointed even if an index exceeds its budget;
                     // the durable task remains pending and retries index construction.
-                    let result = runtime.flush_state()?;
+                    let result = runtime.compact()?;
                     indexes?;
                     Ok(json!({"code":0,"data":result}))
                 }
@@ -550,7 +550,10 @@ impl transport::Handler for Node {
             };
             if peer.role == NodeRole::Query
                 && (is_write(&op)
-                    || matches!(op.as_str(), "collections/flush" | "internal/reconcile"))
+                    || matches!(
+                        op.as_str(),
+                        "collections/flush" | "collections/compact" | "internal/reconcile"
+                    ))
             {
                 return Err(Error::Unsupported(
                     "Query identity cannot mutate writer state".into(),

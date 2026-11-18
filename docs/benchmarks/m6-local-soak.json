@@ -1,0 +1,32 @@
+{
+  "topology": "single-host coordinated",
+  "durationSeconds": 601.594,
+  "cycles": 177,
+  "verifiedBackups": 12,
+  "rowsPerUpsert": 64,
+  "verifiedRowsPerRead": 63,
+  "queryP50Ms": 278.035,
+  "queryP95Ms": 1181.469,
+  "queryP99Ms": 2590.337,
+  "storageSamples": 45,
+  "maxCheckpointObjects": 86,
+  "minObjectBytes": 29911,
+  "maxObjectBytes": 358279,
+  "maxRetainedWalOffsets": 69,
+  "firstStorage": {
+    "checkpointOffset": 20,
+    "objectBytes": 29911,
+    "objectCount": 43,
+    "stateBytes": 11313,
+    "walHigh": 22,
+    "walLow": 0
+  },
+  "lastStorage": {
+    "checkpointOffset": 4080,
+    "objectBytes": 358279,
+    "objectCount": 86,
+    "stateBytes": 11436,
+    "walHigh": 4086,
+    "walLow": 4017
+  }
+}

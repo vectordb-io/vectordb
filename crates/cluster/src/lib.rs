@@ -1,14 +1,18 @@
 //! Experimental multi-collection catalog, ordered logs and shared checkpoints.
 //! M0-M5 recovery, sharding and coordinated compute; production qualification remains open.
 pub mod catalog;
+pub mod client;
 pub mod kafka;
 pub mod object;
+mod retention;
 pub mod state;
 
 use thiserror::Error;
 pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Error)]
 pub enum Error {
+    #[error("gateway HTTP {0}: {1}")]
+    Remote(u16, String),
     #[error("WAL prefix reclaimed; reload checkpoint")]
     CheckpointRequired,
     #[error("invalid request: {0}")]

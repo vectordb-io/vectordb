@@ -87,7 +87,82 @@ impl SegmentEngine {
     pub fn row_count(&self) -> usize {
         self.rows.values().filter(|r| r.body.is_some()).count()
     }
+    /// Logical backup rows retain the business partition and canonical primary key.
+    pub fn live_rows(&self) -> impl Iterator<Item = &VersionedRow> {
+        self.rows
+            .values()
+            .map(AsRef::as_ref)
+            .filter(|r| r.body.is_some())
+    }
+    /// Materialize a verified logical snapshot at the new log's bootstrap offset.
+    pub fn from_backup(
+        spec: Option<CollectionSpec>,
+        rows: Vec<VersionedRow>,
+        revision: i64,
+    ) -> Result<Self> {
+        let mut engine = Self {
+            revision,
+            spec,
+            ..Default::default()
+        };
+        if revision <= 0 {
+            return Err(invalid("bootstrap revision must be positive"));
+        }
+        if let Some(spec) = engine.spec.as_ref() {
+            Schema::from_request(&json!({"schema":spec.schema}))?;
+            crate::shard::validate_count(spec.shard_count)?;
+            if spec.format != STATE_FORMAT
+                || spec.next_id < 1
+                || !spec.partitions.contains("_default")
+            {
+                return Err(invalid("invalid backup collection metadata"));
+            }
+            for index in &spec.indexes {
+                index
+                    .clone()
+                    .validate(spec.schema.field(&index.field_name)?)?;
+            }
+        }
+        for mut row in rows {
+            let spec = engine
+                .spec
+                .as_ref()
+                .ok_or_else(|| invalid("backup rows without collection"))?;
+            let body = row
+                .body
+                .as_mut()
+                .ok_or_else(|| invalid("tombstone in logical backup"))?;
+            spec.schema.validate_row(body)?;
+            normalize_vectors(spec, body)?;
+            let pk = &body[&spec.schema.primary().field_name];
+            let canonical = pk.to_string();
+            if canonical != row.key
+                || !spec.partitions.contains(&row.partition)
+                || (spec.schema.auto_id && pk.as_i64().is_some_and(|n| n >= spec.next_id))
+            {
+                return Err(invalid(
+                    "invalid backup primary key, partition or ID watermark",
+                ));
+            }
+            row.version = revision;
+            engine.bytes += row.bytes();
+            if engine.bytes > MAX_STATE_BYTES
+                || engine.rows.insert(row.key.clone(), Arc::new(row)).is_some()
+            {
+                return Err(invalid("duplicate backup key or state quota exceeded"));
+            }
+        }
+        Ok(engine)
+    }
     pub fn prepare(&self, operation: &str, request: Value) -> Result<MutationBatch> {
+        self.prepare_with_limit(operation, request, MAX_STATE_BYTES)
+    }
+    pub fn prepare_with_limit(
+        &self,
+        operation: &str,
+        request: Value,
+        limit: usize,
+    ) -> Result<MutationBatch> {
         let mut r = request;
         let shard_count = if operation == "collections/create" {
             let value = r
@@ -313,6 +388,15 @@ impl SegmentEngine {
             return Err(Error::Conflict(
                 "collection metadata exceeds 1 MiB quota".into(),
             ));
+        }
+        if limit < MAX_STATE_BYTES
+            && bytes + metadata_bytes > limit
+            && matches!(
+                operation,
+                "collections/create" | "entities/insert" | "entities/upsert"
+            )
+        {
+            return Err(Error::Conflict("collection storage quota reached".into()));
         }
         if bytes + metadata_bytes > MAX_STATE_BYTES {
             return Err(Error::Conflict(
@@ -799,23 +883,27 @@ fn keys(v: &Value, allowed: &[&str], context: &str) -> Result<()> {
 }
 
 pub(crate) fn normalize_vectors(c: &CollectionSpec, row: &mut Value) -> Result<()> {
-    if c.dtype == VectorDtype::Float32 {
-        for f in &c.schema.fields {
-            if f.data_type == "FloatVector" {
-                for v in row[&f.field_name]
-                    .as_array_mut()
-                    .ok_or_else(|| invalid("invalid dense vector"))?
-                {
-                    let x = v
-                        .as_f64()
-                        .ok_or_else(|| invalid("invalid vector element"))?
-                        as f32;
-                    if !x.is_finite() {
-                        return Err(invalid("Float32 overflow"));
-                    }
-                    *v = json!(f64::from(x));
-                }
+    for field in c
+        .schema
+        .fields
+        .iter()
+        .filter(|f| f.data_type == "FloatVector")
+    {
+        for element in row[&field.field_name]
+            .as_array_mut()
+            .ok_or_else(|| invalid("invalid dense vector"))?
+        {
+            let x = element
+                .as_f64()
+                .ok_or_else(|| invalid("invalid vector element"))?;
+            let value = match c.dtype {
+                VectorDtype::Float64 => x,
+                VectorDtype::Float32 => f64::from(x as f32),
+            };
+            if !value.is_finite() {
+                return Err(invalid("dense vector element overflow"));
             }
+            *element = json!(value);
         }
     }
     Ok(())

@@ -111,6 +111,10 @@ class VectorDB:
         """Delete matching entities; an empty filter is rejected."""
         return self.execute("entities/delete", {"collectionName": collection, "filter": filter})
 
+    def delete_ids(self, collection: str, ids: list[int | str]) -> dict[str, Any]:
+        """Delete explicit primary keys in a native segment database."""
+        return self.execute("entities/delete", {"collectionName": collection, "ids": ids})
+
     def search(
         self, collection: str, vectors: list[list[float]], *, limit: int = 10,
         filter: str = "", output_fields: list[str] | None = None,

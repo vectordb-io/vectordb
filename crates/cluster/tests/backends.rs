@@ -68,6 +68,14 @@ fn real_catalog_ownership_cas_and_immutable_objects() {
         catalog.collect_retired(|key| objects.delete(key)).unwrap(),
         0
     );
+    let orphan = format!(
+        "{}/checkpoints/9-abandoned/partial.bin",
+        manifest.scope.prefix()
+    );
+    objects.put(&orphan, vec![42]).unwrap();
+    assert_eq!(catalog.collect_orphans(&objects, 0).unwrap(), 0);
+    assert_eq!(catalog.collect_orphans(&objects, i64::MAX).unwrap(), 1);
+    assert!(objects.get(&orphan).is_err());
     assert!(objects.get(&pinned.key).is_ok());
     catalog.revoke(&pin_lease).unwrap();
     assert!(catalog.verify_pin(&pin).is_err());
@@ -456,4 +464,83 @@ fn real_control_fences_stale_leaders_incarnations_and_atomic_route_publication()
     control.revoke(&ql).unwrap();
     control.revoke(&next.id).unwrap();
     control.revoke(&c2lease).unwrap();
+}
+
+#[test]
+#[ignore = "requires isolated etcd, S3 and Kafka"]
+fn retired_generation_keeps_pins_then_releases_storage_and_topic() {
+    use serde_json::json;
+    use vectordb_cluster::{
+        directory::{Directory, Lifecycle},
+        kafka::Log,
+        state::{IDEMPOTENCY_WINDOW_MS, idempotency_key, now_ms},
+    };
+    let cluster = format!("retention-{}", uuid::Uuid::new_v4().simple());
+    let directory = Directory::new("http://127.0.0.1:12379".into(), &cluster).unwrap();
+    let now = now_ms();
+    let request = json!({"collectionName":"items","dimension":2});
+    let scope = directory
+        .begin(
+            "collections/create",
+            &request,
+            &idempotency_key(now, "create"),
+        )
+        .unwrap()
+        .target
+        .unwrap();
+    directory
+        .finish(&scope, Lifecycle::Active, None, 1)
+        .unwrap();
+    let catalog = Catalog::new("http://127.0.0.1:12379".into(), &scope).unwrap();
+    let log = Log::reader("127.0.0.1:19092".into(), &scope);
+    log.ensure_topic(1).unwrap();
+    let objects = Objects::new(
+        "http://127.0.0.1:19000".into(),
+        "vectordb".into(),
+        "us-east-1".into(),
+        "development".into(),
+        "development-only-password".into(),
+    )
+    .unwrap();
+    let key = format!("{}/checkpoints/2-live/state.json", scope.prefix());
+    objects.put(&key, vec![1]).unwrap();
+    let manifest = Manifest {
+        scope: scope.clone(),
+        offset: 2,
+        key: key.clone(),
+        sha256: digest(&[1]),
+        bytes: 1,
+        objects: vec![],
+    };
+    assert!(catalog.publish(&manifest).unwrap());
+    let (_, _, pin) = catalog.pin_latest().unwrap().unwrap();
+    directory
+        .begin(
+            "collections/drop",
+            &json!({"collectionName":"items"}),
+            &idempotency_key(now, "drop"),
+        )
+        .unwrap();
+    directory
+        .finish(&scope, Lifecycle::Dropped, None, 3)
+        .unwrap();
+    directory
+        .retire_dropped(now + IDEMPOTENCY_WINDOW_MS)
+        .unwrap();
+    assert!(directory.snapshot().unwrap().by_scope(&scope).is_ok());
+    let later = now + IDEMPOTENCY_WINDOW_MS + 130_000;
+    directory.retire_dropped(later).unwrap();
+    assert!(directory.snapshot().unwrap().by_scope(&scope).is_err());
+    assert!(catalog.acquire("retired".into()).is_err());
+    directory
+        .purge_retired(&objects, "127.0.0.1:19092", later + 301_000)
+        .unwrap();
+    assert!(objects.get(&key).is_ok());
+    catalog.revoke(&pin).unwrap();
+    directory
+        .purge_retired(&objects, "127.0.0.1:19092", later + 301_000)
+        .unwrap();
+    assert!(objects.get(&key).is_err());
+    assert!(catalog.manifest().unwrap().is_none());
+    assert!(!catalog.publish(&manifest).unwrap());
 }

@@ -154,27 +154,36 @@ def acceptance():
         stop(p)
 
 
-def benchmark():
+def benchmark(release_gates=False, output=None):
     cluster = "m4-bench-" + uuid.uuid4().hex
     writer, gateway = start(cluster, "node")
     qa, a = start(cluster)
     qb, b = start(cluster)
     rng = random.Random(24301)
     count, dimension, nq, samples = 10000, 32, 16, 20
+    if release_gates:
+        count,dimension,nq = 100_000,128,1
     call(gateway, "collections/create", {"collectionName": "bench", "dimension": dimension, "metricType": "L2", "shardCount": 16}, "create")
-    rows = [{"id": n, "vector": [rng.random() for _ in range(dimension)]} for n in range(count)]
-    for offset in range(0, count, 200):
-        call(gateway, "entities/insert", {"collectionName": "bench", "data": rows[offset:offset+200]}, f"batch{offset}")
+    batch_size=100 if release_gates else 200
+    started=time.monotonic()
+    for offset in range(0,count,batch_size):
+        rows=[{"id":n,"vector":[rng.randrange(256)/256 if release_gates else rng.random() for _ in range(dimension)]} for n in range(offset,min(count,offset+batch_size))]
+        call(gateway,"entities/insert",{"collectionName":"bench","data":rows},f"batch{offset}")
+    write_rate=count/(time.monotonic()-started)
     query = {"collectionName": "bench", "data": [[rng.random() for _ in range(dimension)] for _ in range(nq)], "limit": 10}
     truth = call(gateway, "entities/search", query)["data"]
     call(gateway, "collections/flush", {"collectionName": "bench"})
     epoch = 0
     results = []
-    for nodes in [1, 2]:
+    workers=[(qa,a),(qb,b)]
+    if release_gates:
+        workers.extend(start(cluster) for _ in range(2))
+    for nodes in ([1,2,4] if release_gates else [1,2]):
         if nodes == 2:
             stop(qa)
             qa, a = start(cluster, address=a)
-        epoch = route(gateway, "bench", [[a] if nodes == 1 or i < 8 else [b] for i in range(16)], epoch)
+            workers[0]=(qa,a)
+        epoch = route(gateway, "bench", [[workers[i*nodes//16][1]] for i in range(16)], epoch)
         warm = time.monotonic()
         assert call(gateway, "entities/search", query)["data"] == truth
         warm_ms = (time.monotonic()-warm)*1000
@@ -185,8 +194,8 @@ def benchmark():
             assert call(gateway, "entities/search", query)["data"] == truth
             latencies.append((time.monotonic()-t)*1000)
         elapsed = time.monotonic()-started
-        stats = [call(p, "collections/shard_status", {"collectionName": "bench"})["data"] for p in ([a] if nodes == 1 else [a, b])]
-        rss = [int(subprocess.check_output(["ps", "-o", "rss=", "-p", str(p.pid)], text=True).strip())*1024 for p in ([qa] if nodes == 1 else [qa, qb])]
+        stats = [call(p, "collections/shard_status", {"collectionName": "bench"})["data"] for _,p in workers[:nodes]]
+        rss = [int(subprocess.check_output(["ps", "-o", "rss=", "-p", str(p.pid)], text=True).strip())*1024 for p,_ in workers[:nodes]]
         assert sum(s["rows"] for s in stats) == count
         assert all(s["fullCollectionSessions"] == 0 for s in stats)
         results.append({"query_nodes": nodes, "requests_per_second": samples/elapsed, "vectors_per_second": samples*nq/elapsed, "p50_ms": sorted(latencies)[samples//2], "p99_ms": max(latencies), "cold_query_ms": warm_ms, "query_process_rss_bytes": rss, "assigned_state": stats, "exact_match": True})
@@ -196,9 +205,12 @@ def benchmark():
     if platform.system() == "Darwin":
         report["hardware"] = subprocess.check_output(["sysctl", "-n", "machdep.cpu.brand_string"], text=True).strip()
         report["host_memory_bytes"] = int(subprocess.check_output(["sysctl", "-n", "hw.memsize"], text=True).strip())
-    (ROOT/"docs/benchmarks/m4-baseline.json").write_text(json.dumps(report, indent=2)+"\n")
+    report["insert_batch_size"]=batch_size
+    report["insert_rows_per_second"]=write_rate
+    report["input_distribution"]="uniform grid [0,1) step 1/256" if release_gates else "uniform [0,1)"
+    (output or ROOT/"docs/benchmarks/m4-baseline.json").write_text(json.dumps(report, indent=2)+"\n")
     print(json.dumps(report, indent=2), flush=True)
-    for p in [writer, qa, qb]:
+    for p in [writer, *(p for p,_ in workers)]:
         stop(p)
 
 
@@ -206,12 +218,15 @@ def main():
     global TMP
     parser = argparse.ArgumentParser()
     parser.add_argument("--benchmark", action="store_true")
+    parser.add_argument("--release-gates",action="store_true",help="100k x 128, 100-row writes, 1/2/4 Query nodes")
+    parser.add_argument("--output",type=Path)
     args = parser.parse_args()
+    if args.release_gates and not args.output:parser.error("--release-gates requires a distinct --output report")
     command("exec", "-T", "minio", "mcli", "alias", "set", "test", "http://localhost:9000", "development", "development-only-password")
     command("exec", "-T", "minio", "mcli", "mb", "--ignore-existing", "test/vectordb")
     with tempfile.TemporaryDirectory(prefix="vectordb-m4-") as TMP:
         try:
-            benchmark() if args.benchmark else acceptance()
+            benchmark(args.release_gates,args.output) if args.benchmark or args.release_gates else acceptance()
         except Exception:
             for path in LOGS:
                 print(f"--- {path.name} ---\n{path.read_text()[-8000:]}", flush=True)

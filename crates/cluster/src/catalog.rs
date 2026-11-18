@@ -89,6 +89,9 @@ impl Catalog {
             bytes,
         )))
     }
+    fn open_compare(&self) -> Value {
+        json!({"key":self.key("closed"),"target":"VERSION","version":"0"})
+    }
     pub fn acquire(&self, address: String) -> Result<Lease> {
         let grant = self.post("/v3/lease/grant", json!({"TTL":30}))?;
         let id = grant["ID"]
@@ -101,7 +104,7 @@ impl Catalog {
             phase: OwnerPhase::Assigning,
         };
         let result = self.post("/v3/kv/txn", json!({
-            "compare":[{"key":self.key("owner"),"target":"VERSION","version":"0","result":"EQUAL"}],
+            "compare":[self.open_compare(),{"key":self.key("owner"),"target":"VERSION","version":"0","result":"EQUAL"}],
             "success":[{"request_put":{"key":self.key("owner"),"value":STANDARD.encode(serde_json::to_vec(&owner)?),"lease":id}}],"failure":[]
         }))?;
         if result["succeeded"] != true {
@@ -249,7 +252,7 @@ impl Catalog {
         }
         let result = self.post(
             "/v3/kv/txn",
-            json!({"compare":[compare],"success":success,"failure":[]}),
+            json!({"compare":[self.open_compare(),compare],"success":success,"failure":[]}),
         )?;
         Ok(result["succeeded"] == true)
     }
@@ -294,7 +297,7 @@ impl Catalog {
                 crate::digest(manifest.key.as_bytes()),
                 uuid::Uuid::new_v4()
             );
-            let result=self.post("/v3/kv/txn",json!({"compare":[{"key":self.key("manifest"),"target":"MOD","mod_revision":revision,"result":"EQUAL"}],"success":[{"request_put":{"key":self.key(&key),"value":STANDARD.encode(&manifest.key),"lease":lease}}],"failure":[]}))?;
+            let result=self.post("/v3/kv/txn",json!({"compare":[self.open_compare(),{"key":self.key("manifest"),"target":"MOD","mod_revision":revision,"result":"EQUAL"}],"success":[{"request_put":{"key":self.key(&key),"value":STANDARD.encode(&manifest.key),"lease":lease}}],"failure":[]}))?;
             if result["succeeded"] == true {
                 return Ok(Some((manifest, key, lease)));
             }
@@ -312,6 +315,51 @@ impl Catalog {
         } else {
             Ok(())
         }
+    }
+    pub fn collect_orphans(
+        &self,
+        objects: &crate::object::Objects,
+        before_ms: i64,
+    ) -> Result<usize> {
+        let Some(current) = self.manifest()? else {
+            return Ok(0);
+        };
+        let prefix = format!("{}/checkpoints/", current.scope.prefix());
+        let mut protected = std::collections::BTreeSet::new();
+        for (_, bytes) in self.range("retired/")? {
+            let retired: Manifest = serde_json::from_slice(&bytes)?;
+            if let Some((parent, _)) = retired.key.rsplit_once('/') {
+                protected.insert(parent.to_string());
+            }
+        }
+        let mut removed = 0;
+        objects.visit_checkpoint_objects(&prefix, |key, modified, _bytes| {
+            if modified > before_ms {
+                return Ok(());
+            }
+            let Some((namespace, file)) = key.strip_prefix(&prefix).and_then(|p| p.split_once('/'))
+            else {
+                return Ok(());
+            };
+            let Some((offset, nonce)) = namespace.split_once('-') else {
+                return Ok(());
+            };
+            // A strictly older offset can never be published again, even by a paused uploader.
+            if file.contains('/')
+                || crate::identifier(nonce).is_err()
+                || !offset
+                    .parse::<i64>()
+                    .is_ok_and(|n| n >= 0 && n < current.offset)
+            {
+                return Ok(());
+            }
+            if !protected.contains(&format!("{prefix}{namespace}")) {
+                objects.delete(key)?;
+                removed += 1;
+            }
+            Ok(())
+        })?;
+        Ok(removed)
     }
     pub fn collect_retired(&self, mut delete: impl FnMut(&str) -> Result<()>) -> Result<usize> {
         let mut count = 0;

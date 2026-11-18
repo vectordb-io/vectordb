@@ -4,7 +4,7 @@
 
 A standalone vector database reimplemented in Rust, with an embeddable engine, an HTTP service, transactional persistence, and a separate static website.
 
-**Status: 0.1.0 Alpha.** Inspired by the Milvus data model and REST v2 request style, VectorDB implements a usable set of standalone features. An experimental [distributed M5 runtime](docs/distributed-p1.md) is available separately. The distributed runtime has local fault-test coverage; multi-host high availability and production-scale qualification remain incomplete. VectorDB is not a drop-in replacement for Milvus / PyMilvus. See the [feature comparison](docs/compatibility.md) for the exact scope. The previous C++ implementation, documentation, and website have been removed.
+**Status: 0.1.0 Alpha.** Inspired by the Milvus data model and REST v2 request style, VectorDB implements a usable set of standalone features. An experimental [distributed M6 runtime](docs/distributed-p1.md) is available separately. The [M6 operations guide](docs/m6-operations.md) covers native standalone storage, backups, migration and Helm. The distributed runtime has local fault-test coverage; multi-host high availability and production-scale qualification remain incomplete. VectorDB is not a drop-in replacement for Milvus / PyMilvus. See the [feature comparison](docs/compatibility.md) for the exact scope. The previous C++ implementation, documentation, and website have been removed.
 
 ## Quick start
 
@@ -15,7 +15,7 @@ cargo build --release --locked
 ./target/release/vectordb serve
 ```
 
-The server listens on `127.0.0.1:19530` by default and stores data in `data/vectordb.sqlite`. In another terminal:
+The server listens on `127.0.0.1:19530` by default and stores data in `data/vectordb.vdb/`. In another terminal:
 
 ```sh
 curl http://127.0.0.1:19530/healthz

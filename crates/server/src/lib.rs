@@ -11,19 +11,19 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
 };
 use tokio::sync::Semaphore;
-use vectordb_engine::{Engine, Error};
+use vectordb_engine::{Database, Error};
 #[derive(Clone)]
 pub struct AppState {
-    engine: Arc<Mutex<Engine>>,
+    engine: Arc<Mutex<Database>>,
     token: Option<Arc<str>>,
     slots: Arc<Semaphore>,
     requests: Arc<AtomicU64>,
     errors: Arc<AtomicU64>,
 }
 impl AppState {
-    pub fn new(engine: Engine, token: Option<String>) -> Self {
+    pub fn new(engine: impl Into<Database>, token: Option<String>) -> Self {
         Self {
-            engine: Arc::new(Mutex::new(engine)),
+            engine: Arc::new(Mutex::new(engine.into())),
             token: token.map(Arc::from),
             slots: Arc::new(Semaphore::new(32)),
             requests: Arc::new(AtomicU64::new(0)),

@@ -106,6 +106,15 @@ pub struct Checkpoint {
     pub state: StateManifest,
     pub results: BTreeMap<String, (String, WriteResult)>,
 }
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LogicalBackup {
+    pub scope: Scope,
+    pub spec: Option<vectordb_engine::segment::CollectionSpec>,
+    pub rows: Vec<vectordb_engine::segment::VersionedRow>,
+    pub results: BTreeMap<String, (String, WriteResult)>,
+    pub clock_ms: i64,
+}
 pub struct Snapshot {
     pub checkpoint: Checkpoint,
     pub sealed: SealedState,
@@ -125,6 +134,7 @@ pub struct Replica {
     pub offset: i64,
     pub epoch: i64,
     engine: SegmentEngine,
+    admission_bytes: usize,
     clock_ms: i64,
     results: BTreeMap<String, (String, WriteResult)>,
     dedup_bytes: usize,
@@ -138,6 +148,7 @@ impl Replica {
             offset: -1,
             epoch: 0,
             engine: SegmentEngine::new(),
+            admission_bytes: vectordb_engine::segment::MAX_STATE_BYTES,
             clock_ms: 0,
             results: BTreeMap::new(),
             dedup_bytes: 0,
@@ -189,6 +200,62 @@ impl Replica {
         }
         Ok(replica)
     }
+    pub fn content_digest(&self) -> Result<String> {
+        use sha2::{Digest, Sha256};
+        let mut hash = Sha256::new();
+        for item in std::iter::once(serde_json::to_vec(&self.spec())).chain(
+            self.engine
+                .live_rows()
+                .map(|row| serde_json::to_vec(&(&row.key, &row.partition, &row.body))),
+        ) {
+            let bytes = item?;
+            hash.update((bytes.len() as u64).to_be_bytes());
+            hash.update(bytes);
+        }
+        Ok(format!("{:x}", hash.finalize()))
+    }
+    pub fn logical_backup(&self) -> LogicalBackup {
+        LogicalBackup {
+            scope: self.scope.clone(),
+            spec: self.spec().cloned(),
+            rows: self.engine.live_rows().cloned().collect(),
+            results: self.results.clone(),
+            clock_ms: self.clock_ms,
+        }
+    }
+    pub fn bootstrap(
+        mut backup: LogicalBackup,
+        scope: Scope,
+        offset: i64,
+        epoch: i64,
+    ) -> Result<(Snapshot, String)> {
+        if backup.scope.collection != scope.collection
+            || backup
+                .spec
+                .as_ref()
+                .is_some_and(|s| s.name != scope.collection)
+        {
+            return Err(Error::Integrity("logical backup identity mismatch".into()));
+        }
+        let engine = SegmentEngine::from_backup(backup.spec, backup.rows, offset)?;
+        let mut replica = Self::empty(scope.clone())?;
+        replica.offset = offset;
+        replica.epoch = epoch;
+        replica.clock_ms = backup.clock_ms.max(now_ms());
+        for (_, value) in backup.results.values_mut() {
+            if value.token.scope != backup.scope {
+                return Err(Error::Integrity("foreign backup result".into()));
+            }
+            value.token = Token {
+                scope: scope.clone(),
+                offset,
+            };
+        }
+        replica.engine = engine;
+        replica.results = backup.results;
+        replica.build_indexes()?;
+        Ok((replica.checkpoint()?, replica.content_digest()?))
+    }
     pub fn checkpoint(&self) -> Result<Snapshot> {
         let sealed = self.engine.seal()?;
         let clock = self.clock_ms;
@@ -217,6 +284,9 @@ impl Replica {
     }
     pub fn result(&self, id: &str) -> Option<WriteResult> {
         self.results.get(id).map(|(_, result)| result.clone())
+    }
+    pub fn limit_writes(&mut self, bytes: usize) {
+        self.admission_bytes = bytes;
     }
     pub fn prepare(
         &self,
@@ -251,7 +321,10 @@ impl Replica {
             }
             return Ok(Err(result.clone()));
         }
-        let result = self.engine.prepare(operation, request.clone())?.result;
+        let result = self
+            .engine
+            .prepare_with_limit(operation, request.clone(), self.admission_bytes)?
+            .result;
         let retained = self.retained_bytes(now);
         if retained + id.len() + serde_json::to_vec(&result)?.len() + 1024 > MAX_DEDUP_BYTES {
             return Err(Error::Unavailable(

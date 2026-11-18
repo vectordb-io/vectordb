@@ -31,6 +31,8 @@ pub struct Collection {
     pub create_request: Value,
     pub create_id: String,
     pub drop_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dropped_at_ms: Option<i64>,
     pub spec: Option<CollectionSpec>,
     pub spec_offset: i64,
     #[serde(default = "vectordb_engine::shard::one")]
@@ -70,7 +72,7 @@ pub struct Receipt {
 }
 #[derive(Clone)]
 pub struct Directory {
-    store: Catalog,
+    pub(crate) store: Catalog,
     cluster: String,
 }
 fn missing(message: &str) -> Error {
@@ -300,6 +302,7 @@ impl DirectoryState {
                         create_request: create,
                         create_id: id.into(),
                         drop_id: None,
+                        dropped_at_ms: None,
                         spec: engine.spec().cloned(),
                         spec_offset: -1,
                         shard_count: engine.spec().unwrap().shard_count,
@@ -438,10 +441,108 @@ impl Directory {
             json!({"request_put":{"key":self.store.key("directory"),"value":STANDARD.encode(bytes)}}),
         )
     }
+    pub fn backup_receipts(&self) -> Result<BTreeMap<String, Receipt>> {
+        let prefix = format!("/vectordb/{}/_catalog/v1/", self.cluster);
+        self.store
+            .range("requests/")?
+            .into_iter()
+            .map(|(key, bytes)| {
+                Ok((
+                    key.strip_prefix(&prefix)
+                        .ok_or_else(|| Error::Integrity("foreign receipt".into()))?
+                        .to_string(),
+                    serde_json::from_slice(&bytes)?,
+                ))
+            })
+            .collect()
+    }
+    /// The durable reservation keeps partially restored receipt batches invisible after a crash.
+    pub fn restore_step(
+        &self,
+        lease: &crate::catalog::Lease,
+        archive: &str,
+        receipts: &[(String, Receipt)],
+        directory: Option<&DirectoryState>,
+    ) -> Result<()> {
+        let mut compare = vec![
+            self.compare("0"),
+            json!({"key":self.store.key("owner"),"target":"VALUE","value":STANDARD.encode(serde_json::to_vec(&lease.owner)?)}),
+        ];
+        let key = self.store.key("restore");
+        match self.store.get("restore")? {
+            Some((_, id)) if id == archive.as_bytes() => {
+                compare.push(json!({"key":key,"target":"VALUE","value":STANDARD.encode(archive)}))
+            }
+            None => compare.push(json!({"key":key,"target":"VERSION","version":"0"})),
+            _ => return Err(Error::Conflict("target reserved by another archive".into())),
+        }
+        let mut success = vec![];
+        for (key, receipt) in receipts {
+            let parts: Vec<_> = key.split('/').collect();
+            if parts.len() != 3
+                || parts[0] != "requests"
+                || parts[1].len() != 20
+                || !parts[1].bytes().all(|b| b.is_ascii_digit())
+                || parts[2].len() != 64
+                || !parts[2].bytes().all(|b| b.is_ascii_hexdigit())
+            {
+                return Err(Error::Integrity("invalid receipt key".into()));
+            }
+            success.push(json!({"request_put":{"key":self.store.key(key),"value":STANDARD.encode(serde_json::to_vec(receipt)?)}}));
+        }
+        if let Some(state) = directory {
+            success.push(self.put(state)?);
+            success.push(json!({"request_delete_range":{"key":key}}));
+        } else {
+            success.push(json!({"request_put":{"key":key,"value":STANDARD.encode(archive)}}));
+        }
+        let r = self
+            .store
+            .post("/v3/kv/txn", json!({"compare":compare,"success":success}))?;
+        if r["succeeded"] != true {
+            return Err(Error::Conflict(
+                "restore requires an empty target and valid reservation".into(),
+            ));
+        }
+        Ok(())
+    }
+    pub fn maintenance_store(&self) -> Catalog {
+        self.store.clone()
+    }
+    pub fn allow_mutations(&self) -> Result<()> {
+        if self.store.get("owner")?.is_some() || self.store.get("restore")?.is_some() {
+            return Err(Error::Unavailable(
+                "cluster write freeze in progress".into(),
+            ));
+        }
+        Ok(())
+    }
+    pub fn configure_quota(&self, limit: usize) -> Result<()> {
+        if !(1..=MAX_COLLECTIONS).contains(&limit) {
+            return Err(Error::Invalid(
+                "namespace collection limit outside supported range".into(),
+            ));
+        }
+        let key = self.store.key("namespace-limit");
+        self.store.post("/v3/kv/txn", json!({"compare":[{"key":key,"target":"VERSION","version":"0"}],"success":[{"request_put":{"key":key,"value":STANDARD.encode(limit.to_string())}}]}))?;
+        if self.namespace_limit()? != limit {
+            return Err(Error::Conflict(
+                "namespace limit differs from cluster policy".into(),
+            ));
+        }
+        Ok(())
+    }
+    fn namespace_limit(&self) -> Result<usize> {
+        match self.store.get("namespace-limit")? {
+            Some((_, bytes)) => Ok(serde_json::from_slice(&bytes)?),
+            None => Ok(MAX_COLLECTIONS),
+        }
+    }
     pub fn begin(&self, op: &str, r: &Value, id: &str) -> Result<Receipt> {
         self.begin_at(op, r, id, now_ms())
     }
     pub fn begin_at(&self, op: &str, r: &Value, id: &str, at_ms: i64) -> Result<Receipt> {
+        let db = database(r)?;
         let key = receipt_name(r, id)?;
         let hash = request_digest(op, r)?;
         for _ in 0..32 {
@@ -449,13 +550,29 @@ impl Directory {
             let now = at_ms.max(state.clock_ms);
             let expires = expiry(id, now)?;
             if let Some((_, bytes)) = self.store.get(&key)? {
+                self.allow_mutations()?;
                 let receipt: Receipt = serde_json::from_slice(&bytes)?;
+                if receipt.digest == "retired-p1-key" {
+                    return Err(Error::Conflict(
+                        "P1 request key retired during offline migration".into(),
+                    ));
+                }
                 if receipt.digest != hash {
                     return Err(Error::Conflict(
                         "idempotency key reused with different request".into(),
                     ));
                 }
                 return Ok(receipt);
+            }
+            if op == "collections/create"
+                && state
+                    .collections
+                    .values()
+                    .filter(|c| c.database == db && c.state != Lifecycle::Dropped)
+                    .count()
+                    >= self.namespace_limit()?
+            {
+                return Err(Error::Conflict("namespace collection quota reached".into()));
             }
             state.admit_receipt(expires, now)?;
             let receipt = state.plan(&self.cluster, op, r, id)?;
@@ -472,10 +589,11 @@ impl Directory {
             }
             let put = self.put(&state)?;
             let end = format!("requests/{:020}/", now.div_euclid(60_000) * 60_000 + 1);
-            let result=self.store.post("/v3/kv/txn",json!({"compare":[self.compare(&revision),{"key":self.store.key(&key),"target":"VERSION","version":"0","result":"EQUAL"}],"success":[put,{"request_delete_range":{"key":self.store.key("requests/"),"range_end":self.store.key(&end)}},{"request_put":{"key":self.store.key(&key),"value":STANDARD.encode(serde_json::to_vec(&receipt)?)}}],"failure":[]}))?;
+            let result=self.store.post("/v3/kv/txn",json!({"compare":[self.compare(&revision),{"key":self.store.key("owner"),"target":"VERSION","version":"0"},{"key":self.store.key("restore"),"target":"VERSION","version":"0"},{"key":self.store.key(&key),"target":"VERSION","version":"0","result":"EQUAL"}],"success":[put,{"request_delete_range":{"key":self.store.key("requests/"),"range_end":self.store.key(&end)}},{"request_put":{"key":self.store.key(&key),"value":STANDARD.encode(serde_json::to_vec(&receipt)?)}}],"failure":[]}))?;
             if result["succeeded"] == true {
                 return Ok(receipt);
             }
+            self.allow_mutations()?;
         }
         Err(Error::Unavailable(
             "catalog contention; retry same request".into(),
@@ -510,6 +628,7 @@ impl Directory {
                 c.spec_offset = offset;
             }
             if state == Lifecycle::Dropped {
+                c.dropped_at_ms = Some(now_ms().max(directory.clock_ms));
                 c.create_request = json!({});
                 c.spec = None;
             }

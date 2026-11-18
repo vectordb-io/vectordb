@@ -4,7 +4,7 @@
 
 使用 Rust 重新实现的单机向量数据库。提供可嵌入引擎、HTTP 服务、事务持久化和独立静态官网。
 
-**状态：0.1.0 Alpha。** 参考 Milvus 的数据模型与 REST v2 请求风格，已实现一组可用的单机功能；另有实验性的分布式 M5 运行时，已通过本机故障测试，尚未完成真实多主机高可用与生产规模验收，也不是 Milvus / PyMilvus 的直接替代品。具体边界见 [功能对照](docs/compatibility.md)。旧 C++ 实现、旧文档与旧官网已移除。
+**状态：0.1.0 Alpha。** 参考 Milvus 的数据模型与 REST v2 请求风格，已实现一组可用的单机功能；另有实验性的分布式 M6 运行时，已通过本机故障测试，尚未完成真实多主机高可用与生产规模验收，也不是 Milvus / PyMilvus 的直接替代品。具体边界见 [功能对照](docs/compatibility.md)。旧 C++ 实现、旧文档与旧官网已移除。
 
 ## 快速启动
 
@@ -15,7 +15,7 @@ cargo build --release --locked
 ./target/release/vectordb serve
 ```
 
-默认监听 `127.0.0.1:19530`，数据保存在 `data/vectordb.sqlite`。另开终端：
+默认监听 `127.0.0.1:19530`，新数据库保存在 `data/vectordb.vdb/`，已有默认 SQLite 文件会继续打开。另开终端：
 
 ```sh
 curl http://127.0.0.1:19530/healthz
@@ -125,7 +125,8 @@ python3 scripts/check_website.py
 - [API 与请求契约](docs/api.md)
 - [架构、数据可靠性和性能边界](docs/architecture.md)
 - [Rust 核心架构与实施计划](docs/implementation-plan.md)
-- [分布式 M5 运行时运行与验证](docs/distributed-p1.md)
+- [M6 维护、备份、迁移与 Helm](docs/m6-operations.md)
+- [分布式 M6 运行时运行与验证](docs/distributed-p1.md)
 - [Milvus 功能对照](docs/compatibility.md)
 - [部署、鉴权、备份恢复](docs/operations.md)
 - [验证记录](docs/validation.md)

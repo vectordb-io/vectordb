@@ -12,6 +12,7 @@ pub struct Log {
     brokers: String,
     topic: String,
     producer: Option<FutureProducer>,
+    cursor: std::sync::Mutex<Option<(BaseConsumer, Option<i64>)>>,
 }
 impl Log {
     pub fn reader(brokers: String, scope: &Scope) -> Self {
@@ -19,7 +20,33 @@ impl Log {
             brokers,
             topic: scope.topic(),
             producer: None,
+            cursor: std::sync::Mutex::new(None),
         }
+    }
+    pub fn remove_closed_topic(&self) -> Result<()> {
+        use rdkafka::admin::{AdminClient, AdminOptions};
+        let admin: AdminClient<_> = ClientConfig::new()
+            .set("bootstrap.servers", &self.brokers)
+            .create::<AdminClient<rdkafka::client::DefaultClientContext>>()?;
+        for res in futures::executor::block_on(admin.delete_topics(
+            &[&self.topic],
+            &AdminOptions::new().operation_timeout(Some(TIMEOUT)),
+        ))? {
+            if let Err((_, e)) = res
+                && e != rdkafka::error::RDKafkaErrorCode::UnknownTopicOrPartition
+            {
+                return Err(Error::Unavailable(format!("remove retired WAL: {e}")));
+            }
+        }
+        Ok(())
+    }
+    pub fn watermarks(&self) -> Result<(i64, i64)> {
+        let consumer: BaseConsumer = ClientConfig::new()
+            .set("bootstrap.servers", &self.brokers)
+            .set("group.id", "vdb-storage-stats")
+            .set("enable.auto.commit", "false")
+            .create()?;
+        Ok(consumer.fetch_watermarks(&self.topic, 0, TIMEOUT)?)
     }
     pub fn ensure_topic(&self, replicas: i32) -> Result<()> {
         use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication};
@@ -51,6 +78,7 @@ impl Log {
             .set("transactional.id", &self.topic)
             .set("enable.idempotence", "true")
             .set("acks", "all")
+            .set("linger.ms", "0")
             .set("message.timeout.ms", "10000")
             .set("transaction.timeout.ms", "15000")
             .set("message.max.bytes", "2097152")
@@ -106,20 +134,47 @@ impl Log {
         through: i64,
         mut apply: impl FnMut(i64, Record) -> Result<()>,
     ) -> Result<()> {
-        if through < after {
+        self.replay_range(after, Some(through), &mut apply)
+    }
+    /// Used for a terminal (dropped) generation whose mutations have stopped.
+    pub fn replay_tail(
+        &self,
+        after: i64,
+        apply: impl FnMut(i64, Record) -> Result<()>,
+    ) -> Result<()> {
+        self.replay_range(after, None, apply)
+    }
+    fn replay_range(
+        &self,
+        after: i64,
+        through: Option<i64>,
+        mut apply: impl FnMut(i64, Record) -> Result<()>,
+    ) -> Result<()> {
+        if through.is_some_and(|n| n < after) {
             return Err(Error::Conflict("snapshot is older than replica".into()));
         }
-        if through == after {
+        if through == Some(after) {
             return Ok(());
         }
-        let consumer: BaseConsumer = ClientConfig::new()
-            .set("bootstrap.servers", &self.brokers)
-            .set("group.id", format!("vdb-reader-{}", uuid::Uuid::new_v4()))
-            .set("enable.auto.commit", "false")
-            .set("enable.auto.offset.store", "false")
-            .set("isolation.level", "read_committed")
-            .set("auto.offset.reset", "error")
-            .create()?;
+        let mut cursor = self.cursor.lock().unwrap();
+        if cursor.is_none() {
+            let consumer: BaseConsumer = ClientConfig::new()
+                .set("bootstrap.servers", &self.brokers)
+                .set("group.id", format!("vdb-reader-{}", uuid::Uuid::new_v4()))
+                .set("enable.auto.commit", "false")
+                .set("enable.auto.offset.store", "false")
+                .set("enable.partition.eof", "true")
+                .set("isolation.level", "read_committed")
+                .set("fetch.wait.max.ms", "10")
+                .set("fetch.queue.backoff.ms", "5")
+                .set("queued.max.messages.kbytes", "2048")
+                .set("auto.offset.reset", "error")
+                .create()?;
+            *cursor = Some((consumer, None));
+        }
+        let (consumer, last) = cursor.as_mut().unwrap();
+        // On a failed callback or a rewind, reassign from the caller's durable position.
+        let consecutive = last.take() == Some(after);
         let metadata = consumer.fetch_metadata(Some(&self.topic), TIMEOUT)?;
         let topic = metadata
             .topics()
@@ -131,20 +186,37 @@ impl Log {
                 "collection WAL must have exactly one partition".into(),
             ));
         }
-        let (low, _) = consumer.fetch_watermarks(&self.topic, 0, TIMEOUT)?;
+        let (low, high) = consumer.fetch_watermarks(&self.topic, 0, TIMEOUT)?;
         if after + 1 < low {
             return Err(Error::CheckpointRequired);
         }
-        let mut assignment = TopicPartitionList::new();
-        assignment.add_partition_offset(&self.topic, 0, Offset::Offset(after + 1))?;
-        consumer.assign(&assignment)?;
+        if through.is_none() && after + 1 >= high {
+            return Ok(());
+        }
+        if !consecutive {
+            let mut assignment = TopicPartitionList::new();
+            assignment.add_partition_offset(&self.topic, 0, Offset::Offset(after + 1))?;
+            consumer.assign(&assignment)?;
+        }
         let deadline = Instant::now() + TIMEOUT;
 
         while Instant::now() < deadline {
             if let Some(message) = consumer.poll(Duration::from_millis(100)) {
+                if matches!(message, Err(rdkafka::error::KafkaError::PartitionEOF(_))) {
+                    if through.is_none() {
+                        let position = consumer.position()?;
+                        if position
+                            .find_partition(&self.topic, 0)
+                            .is_some_and(|p| matches!(p.offset(),Offset::Offset(o) if o>=high))
+                        {
+                            return Ok(());
+                        }
+                    }
+                    continue;
+                }
                 let message = message?;
                 let offset = message.offset();
-                if offset > through {
+                if through.is_some_and(|n| offset > n) {
                     return Err(Error::Integrity("read barrier record is absent".into()));
                 }
                 let bytes = message
@@ -154,7 +226,8 @@ impl Log {
                     return Err(Error::Integrity("oversized WAL entry".into()));
                 }
                 apply(offset, serde_json::from_slice(bytes)?)?;
-                if offset == through {
+                if Some(offset) == through {
+                    *last = Some(offset);
                     return Ok(());
                 }
             }

@@ -67,7 +67,7 @@ def basic():
     first, a = start(cluster)
     second, b = start(cluster)
     capabilities = api(a, "/capabilities")[1]
-    assert capabilities["mode"] == "cluster-m5"
+    assert capabilities["mode"] == "cluster-m6"
     assert "entities/count" in capabilities["operations"]
     assert "collections/rename" not in capabilities["operations"]
     assert len(capabilities["operations"]) == len(set(capabilities["operations"]))

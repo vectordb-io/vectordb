@@ -1,3 +1,4 @@
+mod admin;
 mod node;
 use axum::{
     Json, Router,
@@ -33,9 +34,11 @@ enum Role {
     Writer,
     Query,
     Checkpoint,
+    Backup,
+    Restore,
 }
 #[derive(Parser, Clone)]
-#[command(about = "Experimental M5 distributed VectorDB")]
+#[command(about = "Distributed VectorDB")]
 struct Config {
     #[arg(long, value_enum)]
     role: Role,
@@ -93,6 +96,22 @@ struct Config {
     maintenance_ms: i64,
     #[arg(long, env = "VECTORDB_MAX_SHARDS", default_value_t = 128)]
     max_shards: usize,
+    #[arg(long, env = "VECTORDB_READ_TOKEN", hide_env_values = true)]
+    read_token: Option<String>,
+    #[arg(long, env = "VECTORDB_WRITE_TOKEN", hide_env_values = true)]
+    write_token: Option<String>,
+    #[arg(long, env = "VECTORDB_REQUESTS_PER_SECOND", default_value_t = 1000)]
+    requests_per_second: u32,
+    #[arg(long, env = "VECTORDB_NAMESPACE_COLLECTIONS", default_value_t = 16)]
+    namespace_collections: usize,
+    #[arg(long,env="VECTORDB_COLLECTION_BYTES",default_value_t=vectordb_engine::segment::MAX_STATE_BYTES)]
+    collection_bytes: usize,
+    #[arg(long, env = "VECTORDB_WAL_GRACE_OFFSETS")]
+    wal_grace_offsets: Option<u32>,
+    #[arg(long)]
+    archive: Option<std::path::PathBuf>,
+    #[arg(long)]
+    gateway: Option<String>,
     #[arg(skip)]
     incarnation: String,
     #[arg(skip)]
@@ -135,6 +154,7 @@ struct Runtime {
     failed: Arc<AtomicBool>,
     client: reqwest::blocking::Client,
     uncheckpointed_records: usize,
+    directory: Option<vectordb_cluster::directory::Directory>,
 }
 impl Runtime {
     fn open(config: Config) -> Result<Self> {
@@ -157,11 +177,21 @@ impl Runtime {
             config.access_key.clone(),
             config.secret_key.clone(),
         )?;
-        let replica = Self::load_checkpoint(&catalog, &objects, &scope)?
+        let mut replica = Self::load_checkpoint(&catalog, &objects, &scope)?
             .unwrap_or(Replica::empty(scope.clone())?);
+        replica.limit_writes(config.collection_bytes);
+        let directory = if config.managed {
+            Some(vectordb_cluster::directory::Directory::new(
+                config.etcd.clone(),
+                &config.cluster,
+            )?)
+        } else {
+            None
+        };
         let mut runtime = Self {
             config,
             uncheckpointed_records: 0,
+            directory,
             catalog,
             objects,
             log: Log::reader(String::new(), &scope),
@@ -217,7 +247,15 @@ impl Runtime {
             };
             runtime.replica.check_capacity(&record)?;
             let offset = runtime.log.append(&record)?;
+            let prior = runtime.replica.offset;
             runtime.catch_up(offset)?;
+            // Count the recovered tail too. Restarting a writer cannot reset WAL backpressure.
+            runtime.uncheckpointed_records = usize::try_from(offset.saturating_sub(prior))
+                .unwrap_or(usize::MAX)
+                .min(128);
+            if runtime.uncheckpointed_records >= 128 {
+                runtime.flush_state()?;
+            }
             node::failpoint("owner_activated");
             runtime.guard()?;
             runtime
@@ -303,6 +341,7 @@ impl Runtime {
             self.replica =
                 Self::load_checkpoint(&self.catalog, &self.objects, &self.replica.scope)?
                     .ok_or(Error::CheckpointRequired)?;
+            self.replica.limit_writes(self.config.collection_bytes);
             return self
                 .log
                 .replay(self.replica.offset, offset, |position, record| {
@@ -313,6 +352,11 @@ impl Runtime {
     }
     fn commit(&mut self, record: Record) -> Result<i64> {
         self.guard()?;
+        if matches!(record.entry, Entry::Mutation { .. })
+            && let Some(directory) = &self.directory
+        {
+            directory.allow_mutations()?;
+        }
         self.replica.check_capacity(&record)?;
         let result = (|| {
             let offset = self.log.append(&record)?;
@@ -388,7 +432,23 @@ impl Runtime {
                 "collection lifecycle requires --role node".into(),
             ));
         }
-        if operation == "collections/flush" {
+        if operation == "collections/storage_stats" {
+            let mut count = 0_u64;
+            let mut bytes = 0_u64;
+            self.objects.visit_checkpoint_objects(
+                &format!("{}/checkpoints/", self.replica.scope.prefix()),
+                |_, _, size| {
+                    count += 1;
+                    bytes += size;
+                    Ok(())
+                },
+            )?;
+            let (low, high) = self.log.watermarks()?;
+            return Ok(Work::Ready(
+                json!({"code":0,"data":{"objectBytes":bytes,"objectCount":count,"walLow":low,"walHigh":high,"checkpointOffset":self.catalog.manifest()?.map(|m|m.offset),"stateBytes":self.replica.state_bytes()}}),
+            ));
+        }
+        if matches!(operation, "collections/flush" | "collections/compact") {
             self.barrier()?;
             self.replica.read_view("collections/describe", &request)?;
             return Ok(Work::Ready(json!({"code":0,"data":self.checkpoint()?})));
@@ -461,47 +521,30 @@ impl Runtime {
         if let Err(error) = self.replica.build_indexes() {
             eprintln!("checkpoint retains FLAT fallback: {error}");
         }
-        self.flush_state()
+        self.compact()
+    }
+    fn compact(&mut self) -> Result<Value> {
+        let result = self.flush_state()?;
+        self.catalog
+            .collect_orphans(&self.objects, vectordb_cluster::state::now_ms() - 300_000)?;
+        Ok(result)
     }
     fn flush_state(&mut self) -> Result<Value> {
         let snapshot = self.replica.checkpoint()?;
-        let prefix = format!(
-            "{}/checkpoints/{}-{}",
-            self.replica.scope.prefix(),
-            self.replica.offset,
-            uuid::Uuid::new_v4()
-        );
-        let mut keys = vec![];
-        for (key, bytes) in snapshot.sealed.objects {
-            let key = format!("{prefix}/{key}");
-            let hash = digest(&bytes);
-            self.objects.put(&key, bytes)?;
-            if digest(&self.objects.get(&key)?) != hash {
-                return Err(Error::Integrity(
-                    "uploaded segment verification failed".into(),
-                ));
-            }
-            keys.push(key);
-        }
-        let bytes = serde_json::to_vec(&snapshot.checkpoint)?;
-        let manifest = Manifest {
-            scope: self.replica.scope.clone(),
-            offset: self.replica.offset,
-            key: format!("{prefix}/state.json"),
-            sha256: digest(&bytes),
-            bytes: bytes.len(),
-            objects: keys,
-        };
-        self.objects.put(&manifest.key, bytes)?;
-        if digest(&self.objects.get(&manifest.key)?) != manifest.sha256 {
-            return Err(Error::Integrity(
-                "uploaded checkpoint verification failed".into(),
-            ));
-        }
+        let manifest = upload_snapshot(&self.objects, snapshot)?;
         let published = self.catalog.publish(&manifest)?;
         if published {
+            node::failpoint("checkpoint_published");
             self.replica.reclaim();
-            self.log.trim(manifest.offset)?;
+            let grace = self
+                .config
+                .wal_grace_offsets
+                .unwrap_or(if self.config.coordinated { 64 } else { 0 });
+            let through = manifest.offset - i64::from(grace);
+            if through >= 0 {
+                self.log.trim(through)?;
+                node::failpoint("wal_trimmed");
+            }
             self.catalog
                 .collect_retired(|key| self.objects.delete(key))?;
         } else {
@@ -513,6 +556,46 @@ impl Runtime {
         self.uncheckpointed_records = 0;
         Ok(json!({"published":published,"manifest":manifest}))
     }
+}
+fn upload_snapshot(
+    objects: &Objects,
+    snapshot: vectordb_cluster::state::Snapshot,
+) -> Result<Manifest> {
+    let prefix = format!(
+        "{}/checkpoints/{}-{}",
+        snapshot.checkpoint.scope.prefix(),
+        snapshot.checkpoint.offset,
+        uuid::Uuid::new_v4()
+    );
+    let mut keys = vec![];
+    for (key, bytes) in snapshot.sealed.objects {
+        let key = format!("{prefix}/{key}");
+        let hash = digest(&bytes);
+        objects.put(&key, bytes)?;
+        if digest(&objects.get(&key)?) != hash {
+            return Err(Error::Integrity(
+                "uploaded segment verification failed".into(),
+            ));
+        }
+        keys.push(key);
+    }
+    let bytes = serde_json::to_vec(&snapshot.checkpoint)?;
+    let manifest = Manifest {
+        scope: snapshot.checkpoint.scope.clone(),
+        offset: snapshot.checkpoint.offset,
+        key: format!("{prefix}/state.json"),
+        sha256: digest(&bytes),
+        bytes: bytes.len(),
+        objects: keys,
+    };
+    objects.put(&manifest.key, bytes)?;
+    node::failpoint("checkpoint_uploaded");
+    if digest(&objects.get(&manifest.key)?) != manifest.sha256 {
+        return Err(Error::Integrity(
+            "uploaded checkpoint verification failed".into(),
+        ));
+    }
+    Ok(manifest)
 }
 impl Drop for Runtime {
     fn drop(&mut self) {
@@ -652,6 +735,10 @@ async fn ready(State(app): State<App>, headers: HeaderMap) -> Response {
 #[tokio::main]
 async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let mut config = Config::parse();
+    if matches!(config.role, Role::Backup | Role::Restore) {
+        tokio::task::spawn_blocking(move || admin::run(config)).await??;
+        return Ok(());
+    }
     if config.role == Role::Coordinator {
         config.coordinated = true;
     }

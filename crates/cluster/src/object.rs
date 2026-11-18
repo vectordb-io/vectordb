@@ -56,18 +56,32 @@ impl Objects {
         key: &str,
         body: Vec<u8>,
     ) -> Result<reqwest::blocking::Response> {
-        if key.split('/').any(|p| {
-            p.is_empty()
-                || p == "."
-                || p == ".."
-                || !p
-                    .bytes()
-                    .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))
-        }) {
+        self.signed(method, key, "", body)
+    }
+    fn signed(
+        &self,
+        method: Method,
+        key: &str,
+        query: &str,
+        body: Vec<u8>,
+    ) -> Result<reqwest::blocking::Response> {
+        if !(key.is_empty() && method == Method::GET && !query.is_empty())
+            && key.split('/').any(|p| {
+                p.is_empty()
+                    || p == "."
+                    || p == ".."
+                    || !p
+                        .bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))
+            })
+        {
             return Err(Error::Invalid("invalid object key".into()));
         }
-        let url = reqwest::Url::parse(&format!("{}/{}/{}", self.endpoint, self.bucket, key))
+        let mut url = reqwest::Url::parse(&format!("{}/{}/{}", self.endpoint, self.bucket, key))
             .map_err(|_| Error::Invalid("invalid object URL".into()))?;
+        if !query.is_empty() {
+            url.set_query(Some(query));
+        }
         let host = match url.port() {
             Some(port) => format!("{}:{port}", url.host_str().unwrap_or_default()),
             None => url.host_str().unwrap_or_default().into(),
@@ -79,7 +93,7 @@ impl Objects {
         let headers = format!("host:{host}\nx-amz-content-sha256:{hash}\nx-amz-date:{timestamp}\n");
         let signed = "host;x-amz-content-sha256;x-amz-date";
         let canonical = format!(
-            "{}\n{}\n\n{headers}\n{signed}\n{hash}",
+            "{}\n{}\n{query}\n{headers}\n{signed}\n{hash}",
             method.as_str(),
             url.path()
         );
@@ -113,6 +127,68 @@ impl Objects {
             request = request.header("If-None-Match", "*");
         }
         Ok(request.body(body).send()?.error_for_status()?)
+    }
+    /// Enumerate candidate garbage only. Visibility and retirement come from etcd.
+    pub fn visit_checkpoint_objects(
+        &self,
+        prefix: &str,
+        mut visit: impl FnMut(&str, i64, u64) -> Result<()>,
+    ) -> Result<()> {
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "PascalCase")]
+        struct Page {
+            #[serde(default)]
+            contents: Vec<Item>,
+            is_truncated: bool,
+            next_continuation_token: Option<String>,
+        }
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "PascalCase")]
+        struct Item {
+            key: String,
+            last_modified: String,
+            size: u64,
+        }
+        fn encode(s: &str) -> String {
+            let mut out = String::new();
+            for b in s.bytes() {
+                if b.is_ascii_alphanumeric() || b"-_.~".contains(&b) {
+                    out.push(char::from(b));
+                } else {
+                    use std::fmt::Write;
+                    write!(out, "%{b:02X}").unwrap();
+                }
+            }
+            out
+        }
+        let mut continuation: Option<String> = None;
+        loop {
+            let mut query = format!("list-type=2&max-keys=256&prefix={}", encode(prefix));
+            if let Some(token) = &continuation {
+                query = format!("continuation-token={}&{query}", encode(token));
+            }
+            let response = self.signed(Method::GET, "", &query, vec![])?;
+            let mut xml = String::new();
+            response.take(1024 * 1024).read_to_string(&mut xml)?;
+            let page: Page =
+                quick_xml::de::from_str(&xml).map_err(|e| Error::Integrity(e.to_string()))?;
+            for item in page.contents {
+                let time = chrono::DateTime::parse_from_rfc3339(&item.last_modified)
+                    .map_err(|e| Error::Integrity(e.to_string()))?;
+                if !item.key.starts_with(prefix) {
+                    return Err(Error::Integrity("foreign listing entry".into()));
+                }
+                visit(&item.key, time.timestamp_millis(), item.size)?;
+            }
+            if !page.is_truncated {
+                return Ok(());
+            }
+            let next = page
+                .next_continuation_token
+                .filter(|t| !t.is_empty() && Some(t) != continuation.as_ref())
+                .ok_or_else(|| Error::Integrity("invalid S3 continuation token".into()))?;
+            continuation = Some(next);
+        }
     }
     pub fn put(&self, key: &str, bytes: Vec<u8>) -> Result<()> {
         if bytes.len() > MAX_CHECKPOINT_BYTES {

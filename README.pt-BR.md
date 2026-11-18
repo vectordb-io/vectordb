@@ -15,7 +15,7 @@ cargo build --release --locked
 ./target/release/vectordb serve
 ```
 
-O servidor escuta em `127.0.0.1:19530` por padrão e armazena os dados em `data/vectordb.sqlite`. Em outro terminal:
+O servidor escuta em `127.0.0.1:19530` por padrão e armazena os dados em `data/vectordb.vdb/`. Em outro terminal:
 
 ```sh
 curl http://127.0.0.1:19530/healthz

@@ -11,8 +11,9 @@ from ._native import (
     __version__,
 )
 from .client import VectorDB
+from .cluster import ClusterClient, ClusterError
 
 __all__ = [
-    "VectorDB", "VectorDBError", "InvalidArgumentError", "NotFoundError",
+    "ClusterClient", "ClusterError", "VectorDB", "VectorDBError", "InvalidArgumentError", "NotFoundError",
     "ConflictError", "UnsupportedError", "StorageError", "ClosedError", "__version__",
 ]

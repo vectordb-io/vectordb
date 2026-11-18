@@ -1,0 +1,222 @@
+{
+  "format": 1,
+  "created_at": "2026-11-18T06:57:55.174644+00:00",
+  "seed": 24301,
+  "rows": 100000,
+  "dimension": 128,
+  "dtype": "Float32",
+  "index": "FLAT",
+  "shards": 16,
+  "vectors_per_request": 1,
+  "samples": 20,
+  "concurrency": 1,
+  "top_k": 10,
+  "profile": "release",
+  "platform": "macOS-26.5-arm64-arm-64bit",
+  "base_commit": "abe7d01b5dbedccb3d3cd7dab7edd382803c0d70",
+  "binary_sha256": "4f7460b4e1476cff9b0f3a5e83754c82d889561cb38a67a8e3ed240018139f9e",
+  "source_sha256": "bc0ded0b4a2d0375dab91b563e58bba463c3db316ec63531cdd9c408a217b981",
+  "results": [
+    {
+      "query_nodes": 1,
+      "requests_per_second": 16.314102489015852,
+      "vectors_per_second": 16.314102489015852,
+      "p50_ms": 59.6504999999965,
+      "p99_ms": 74.02441699999684,
+      "cold_query_ms": 1764.6099170000014,
+      "query_process_rss_bytes": [
+        575799296
+      ],
+      "assigned_state": [
+        {
+          "fullCollectionSessions": 0,
+          "offsets": [
+            {
+              "cache": "m4-bench-1e4e3f4509bd4214b0de03d23c4bd5bd/c61bf7a7e36ef4f4c8f72a1f36e0160e9/48d2e9fd74334bc2993d16a17878ab26/1",
+              "offset": 2050
+            }
+          ],
+          "rows": 100000,
+          "shards": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "stateBytes": 144479286,
+          "walRecordsApplied": 21
+        }
+      ],
+      "exact_match": true
+    },
+    {
+      "query_nodes": 2,
+      "requests_per_second": 19.663137673207434,
+      "vectors_per_second": 19.663137673207434,
+      "p50_ms": 50.66000000000059,
+      "p99_ms": 58.738374999997234,
+      "cold_query_ms": 901.9849999999963,
+      "query_process_rss_bytes": [
+        303136768,
+        301449216
+      ],
+      "assigned_state": [
+        {
+          "fullCollectionSessions": 0,
+          "offsets": [
+            {
+              "cache": "m4-bench-1e4e3f4509bd4214b0de03d23c4bd5bd/c61bf7a7e36ef4f4c8f72a1f36e0160e9/48d2e9fd74334bc2993d16a17878ab26/2",
+              "offset": 2092
+            }
+          ],
+          "rows": 50072,
+          "shards": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "stateBytes": 72346090,
+          "walRecordsApplied": 42
+        },
+        {
+          "fullCollectionSessions": 0,
+          "offsets": [
+            {
+              "cache": "m4-bench-1e4e3f4509bd4214b0de03d23c4bd5bd/c61bf7a7e36ef4f4c8f72a1f36e0160e9/48d2e9fd74334bc2993d16a17878ab26/2",
+              "offset": 2092
+            }
+          ],
+          "rows": 49928,
+          "shards": [
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "stateBytes": 72133196,
+          "walRecordsApplied": 42
+        }
+      ],
+      "exact_match": true
+    },
+    {
+      "query_nodes": 4,
+      "requests_per_second": 21.256227078148314,
+      "vectors_per_second": 21.256227078148314,
+      "p50_ms": 47.16979099999463,
+      "p99_ms": 48.950666999999726,
+      "cold_query_ms": 709.7739169999998,
+      "query_process_rss_bytes": [
+        306741248,
+        306675712,
+        164184064,
+        164888576
+      ],
+      "assigned_state": [
+        {
+          "fullCollectionSessions": 0,
+          "offsets": [
+            {
+              "cache": "m4-bench-1e4e3f4509bd4214b0de03d23c4bd5bd/c61bf7a7e36ef4f4c8f72a1f36e0160e9/48d2e9fd74334bc2993d16a17878ab26/3",
+              "offset": 2134
+            }
+          ],
+          "rows": 25073,
+          "shards": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "stateBytes": 36225063,
+          "walRecordsApplied": 63
+        },
+        {
+          "fullCollectionSessions": 0,
+          "offsets": [
+            {
+              "cache": "m4-bench-1e4e3f4509bd4214b0de03d23c4bd5bd/c61bf7a7e36ef4f4c8f72a1f36e0160e9/48d2e9fd74334bc2993d16a17878ab26/3",
+              "offset": 2134
+            }
+          ],
+          "rows": 24999,
+          "shards": [
+            4,
+            5,
+            6,
+            7
+          ],
+          "stateBytes": 36121027,
+          "walRecordsApplied": 63
+        },
+        {
+          "fullCollectionSessions": 0,
+          "offsets": [
+            {
+              "cache": "m4-bench-1e4e3f4509bd4214b0de03d23c4bd5bd/c61bf7a7e36ef4f4c8f72a1f36e0160e9/48d2e9fd74334bc2993d16a17878ab26/3",
+              "offset": 2134
+            }
+          ],
+          "rows": 24920,
+          "shards": [
+            8,
+            9,
+            10,
+            11
+          ],
+          "stateBytes": 36003001,
+          "walRecordsApplied": 63
+        },
+        {
+          "fullCollectionSessions": 0,
+          "offsets": [
+            {
+              "cache": "m4-bench-1e4e3f4509bd4214b0de03d23c4bd5bd/c61bf7a7e36ef4f4c8f72a1f36e0160e9/48d2e9fd74334bc2993d16a17878ab26/3",
+              "offset": 2134
+            }
+          ],
+          "rows": 25008,
+          "shards": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "stateBytes": 36130195,
+          "walRecordsApplied": 63
+        }
+      ],
+      "exact_match": true
+    }
+  ],
+  "throughput_ratio_2_vs_1": 1.205284672353043,
+  "scope": "Single-host Query scaling only; writer still retains full collection state. RSS is a post-run sample, not peak RSS; no production throughput claim.",
+  "logical_cpus": 10,
+  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "hardware": "Apple M5",
+  "host_memory_bytes": 25769803776,
+  "insert_batch_size": 100,
+  "insert_rows_per_second": 3417.702723746528,
+  "input_distribution": "uniform grid [0,1) step 1/256"
+}

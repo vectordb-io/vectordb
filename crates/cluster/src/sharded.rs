@@ -115,6 +115,7 @@ pub struct ShardReplica {
     pub count: usize,
     pub engines: BTreeMap<usize, SegmentEngine>,
     pub records: u64,
+    reader: Option<crate::kafka::Log>,
 }
 impl ShardReplica {
     pub fn empty(scope: Scope, count: usize, assigned: &BTreeSet<usize>) -> Result<Self> {
@@ -133,6 +134,7 @@ impl ShardReplica {
             count,
             engines,
             records: 0,
+            reader: None,
         })
     }
     pub fn restore(
@@ -165,7 +167,25 @@ impl ShardReplica {
             count,
             engines: engine.split_shards(assigned)?.into_iter().collect(),
             records: 0,
+            reader: None,
         })
+    }
+    pub fn catch_up(
+        &mut self,
+        brokers: &str,
+        offset: i64,
+        mut check_deadline: impl FnMut() -> Result<()>,
+    ) -> Result<()> {
+        let reader = self
+            .reader
+            .take()
+            .unwrap_or_else(|| crate::kafka::Log::reader(brokers.into(), &self.scope));
+        let result = reader.replay(self.offset, offset, |n, r| {
+            check_deadline()?;
+            self.apply(n, r)
+        });
+        self.reader = Some(reader);
+        result
     }
     pub fn apply(&mut self, offset: i64, record: Record) -> Result<()> {
         if record.format != FORMAT || record.scope != self.scope || offset <= self.offset {

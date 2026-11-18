@@ -1,7 +1,7 @@
 //! Thin Python boundary; all database semantics remain in vectordb-engine.
 use pyo3::{create_exception, exceptions::PyException, prelude::*};
 use std::sync::{Mutex, MutexGuard};
-use vectordb_engine::{Engine, Error};
+use vectordb_engine::{Database, Engine, Error};
 
 create_exception!(vectordb_io, VectorDBError, PyException);
 create_exception!(vectordb_io, InvalidArgumentError, VectorDBError);
@@ -26,12 +26,12 @@ fn python_error(error: Error) -> PyErr {
 
 #[pyclass(frozen, module = "vectordb_io._native")]
 struct NativeEngine {
-    engine: Mutex<Option<Engine>>,
+    engine: Mutex<Option<Database>>,
     pid: u32,
 }
 
 impl NativeEngine {
-    fn lock(&self) -> PyResult<MutexGuard<'_, Option<Engine>>> {
+    fn lock(&self) -> PyResult<MutexGuard<'_, Option<Database>>> {
         // Check before touching a mutex possibly inherited locked across fork().
         if self.pid != std::process::id() {
             return Err(ConflictError::new_err(
@@ -45,7 +45,7 @@ impl NativeEngine {
 
     fn with_engine<T>(
         &self,
-        action: impl FnOnce(&mut Engine) -> vectordb_engine::Result<T>,
+        action: impl FnOnce(&mut Database) -> vectordb_engine::Result<T>,
     ) -> PyResult<T> {
         let mut guard = self.lock()?;
         let engine = guard
@@ -61,8 +61,8 @@ impl NativeEngine {
     #[pyo3(signature = (path=None))]
     fn new(py: Python<'_>, path: Option<String>) -> PyResult<Self> {
         let engine = py.detach(|| match path {
-            Some(path) => Engine::open(path),
-            None => Engine::memory(),
+            Some(path) => Database::open(path),
+            None => Engine::memory().map(Database::from),
         });
         Ok(Self {
             engine: Mutex::new(Some(engine.map_err(python_error)?)),

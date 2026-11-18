@@ -84,6 +84,21 @@ class EmbeddedTests(unittest.TestCase):
         with VectorDB(self.path) as reopened:
             self.assertEqual(reopened.list_collections(), [])
 
+    def test_native_segments_persist_wal_and_backup(self):
+        path = Path(self.temp.name) / "native.vdb"
+        snapshot = Path(self.temp.name) / "snapshot.vdb"
+        with VectorDB(path) as db:
+            db.create_collection("items", 2)
+            db.insert("items", [{"id": 1, "vector": [1, 0]}, {"id": 2, "vector": [0, 1]}])
+            db.delete_ids("items", [2])
+            db.backup(snapshot)
+        for store in (path, snapshot):
+            with VectorDB(store) as db:
+                self.assertEqual(db.search("items", [[1, 0]], limit=1)[0]["id"], 1)
+                self.assertEqual(db.get("items", 2), [])
+                db.flush()
+                self.assertTrue((store / "HEAD").is_file())
+
     def test_memory_databases_are_isolated(self):
         with VectorDB() as first, VectorDB(":memory:") as second:
             first.create_collection("demo", 2)
