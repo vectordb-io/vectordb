@@ -168,13 +168,24 @@ def acceptance():
         return not t["maintenance_pending"] and t["maintenance_completed_ms"]>0
     wait_for(maintained)
     print("M5: real S3 outage leaves maintenance pending, then retries safely",flush=True)
-    before=max(t["maintenance_completed_ms"] for t in status(observer)["state"]["assignments"].values())
-    command("pause","minio")
+    # Refuse new S3 connections during this outage. A paused process can leave
+    # existing TCP connections open until platform-specific transport timeouts.
+    command("stop", "-t", "0", "minio")
     try:
-        wait_for(lambda:any(t["maintenance_pending"] and t["attempts"]>0 for t in status(observer)["state"]["assignments"].values()),seconds=60)
+        def failed_maintenance():
+            tasks = status(observer)["state"]["assignments"]
+            return next(((key, task) for key, task in tasks.items()
+                         if task["maintenance_pending"] and task["attempts"] > 0 and task["error"]), None)
+        key, failed = wait_for(failed_maintenance)
     finally:
-        command("unpause","minio")
-    wait_for(lambda:active(observer) and max(t["maintenance_completed_ms"] for t in status(observer)["state"]["assignments"].values())>before)
+        command("start", "minio")
+
+    def retried():
+        task = status(observer)["state"]["assignments"][key]
+        return (task["maintenance_sequence"] >= failed["maintenance_sequence"]
+                and task["maintenance_completed_ms"] > failed["maintenance_completed_ms"]
+                and not task["maintenance_pending"] and not task["error"])
+    wait_for(retried)
     assert request(q3,"entities/count",{"collectionName":"items"})["data"]["count"]==101
     req=urllib.request.Request(f"http://127.0.0.1:{observer}/metrics",headers={"Authorization":"Bearer "+ENV["VECTORDB_CLUSTER_TOKEN"]})
     with urllib.request.urlopen(req,timeout=10) as response:
